@@ -42,6 +42,7 @@ export async function onRequestGet({ request, env, params }) {
 
     return json({
       ...game,
+      is_admin: game.created_by === user.user_id,
       players: playersWithScores,
       state: stateView,
     })

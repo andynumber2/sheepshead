@@ -27,6 +27,8 @@ export const api = {
     create: (name, noPickVariant) => request('POST', '/games', { name, no_pick_variant: noPickVariant }),
     get: (id) => request('GET', `/games/${id}`),
     join: (id) => request('POST', `/games/${id}/join`),
+    leave: (id) => request('POST', `/games/${id}/leave`),
     action: (id, type, payload) => request('POST', `/games/${id}/action`, { type, payload }),
+    updateSettings: (id, settings) => request('PATCH', `/games/${id}/settings`, settings),
   },
 }

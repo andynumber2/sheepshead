@@ -79,9 +79,10 @@ body {
     "left . center . right"
     ". . bottom . ."
     ". . action . ."
-    "log log log scores scores";
+    "log log log scores scores"
+    "admin admin admin admin admin";
   grid-template-columns: 1fr 1fr 2fr 1fr 1fr;
-  grid-template-rows: auto auto auto auto auto;
+  grid-template-rows: auto auto auto auto auto auto;
   gap: 8px;
   padding: 16px;
   min-height: 100vh;
@@ -98,6 +99,7 @@ body {
 .action-panel { grid-area: action; }
 .game-log    { grid-area: log; }
 .score-board { grid-area: scores; }
+.admin-panel-area { grid-area: admin; }
 
 /* ── Player seat ─────────────────────────────────────────── */
 .player-seat {
