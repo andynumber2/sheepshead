@@ -9,8 +9,8 @@
     "dev:wrangler": "wrangler pages dev --port 8788",
     "build": "npm run build -w frontend",
     "deploy": "npm run build && wrangler pages deploy frontend/dist",
-    "db:migrate:local": "wrangler d1 migrations apply sheepshead-db --migrations-dir migrations",
-    "db:migrate": "wrangler d1 migrations apply sheepshead-db --migrations-dir migrations --remote"
+    "db:migrate:local": "wrangler d1 migrations apply sheepshead-db --local",
+    "db:migrate": "wrangler d1 migrations apply sheepshead-db --remote"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
