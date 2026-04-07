@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(wsl -e bash -c \"cd /mnt/c/Users/abarcinski/OneDrive/Documents/repos/sheepshead && git push --no-verify -u origin main 2>&1\")",
-      "Bash(wsl -e bash -c \"gh api repos/andynumber2/sheepshead -X PATCH -f delete_branch_on_merge=true 2>&1 | grep -E ''delete_branch_on_merge|error'' || echo ''done''\")"
+      "Bash(wsl -e bash -c \"gh api repos/andynumber2/sheepshead -X PATCH -f delete_branch_on_merge=true 2>&1 | grep -E ''delete_branch_on_merge|error'' || echo ''done''\")",
+      "Bash(wsl -e bash -c \"cd /mnt/c/Users/abarcinski/OneDrive/Documents/repos/sheepshead && npm run db:migrate:local 2>&1\")",
+      "Bash(wsl -e bash -c \"cd /mnt/c/Users/abarcinski/OneDrive/Documents/repos/sheepshead && npm run build 2>&1\")",
+      "Bash(wsl -e bash -c \"cd /mnt/c/Users/abarcinski/OneDrive/Documents/repos/sheepshead && git add . && git status\")"
     ]
   }
 }

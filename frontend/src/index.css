@@ -1,0 +1,242 @@
+:root {
+  --card-width: 60px;
+  --card-height: 90px;
+  --card-radius: 6px;
+}
+
+body {
+  min-height: 100vh;
+  background: #1a5c2a;
+}
+
+/* ── Cards ───────────────────────────────────────────────── */
+.card {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: var(--card-width);
+  height: var(--card-height);
+  border-radius: var(--card-radius);
+  border: 1px solid #ccc;
+  background: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: default;
+  user-select: none;
+  transition: transform 0.1s, box-shadow 0.1s;
+  box-shadow: 1px 2px 4px rgba(0,0,0,0.3);
+  position: relative;
+}
+
+.card.playable {
+  cursor: pointer;
+}
+
+.card.playable:hover {
+  transform: translateY(-8px);
+  box-shadow: 2px 6px 10px rgba(0,0,0,0.4);
+}
+
+.card.selected {
+  transform: translateY(-12px);
+  outline: 2px solid var(--pico-primary);
+}
+
+.card.hidden {
+  background: repeating-linear-gradient(
+    135deg,
+    #1a5c9e,
+    #1a5c9e 5px,
+    #1e6db5 5px,
+    #1e6db5 10px
+  );
+  border-color: #0d3a6e;
+}
+
+.card.trump { color: #c00; }
+.card.hearts, .card.diamonds { color: #c00; }
+.card.spades, .card.clubs { color: #111; }
+.card.trump.hearts, .card.trump.diamonds { color: #900; }
+
+.card-rank { font-size: 1rem; line-height: 1; }
+.card-suit { font-size: 0.75rem; line-height: 1; }
+
+/* ── Hand ────────────────────────────────────────────────── */
+.hand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  padding: 8px;
+}
+
+/* ── Table layout ────────────────────────────────────────── */
+.game-table {
+  display: grid;
+  grid-template-areas:
+    ". top-left top top-right ."
+    "left . center . right"
+    ". . bottom . ."
+    ". . action . ."
+    "log log log scores scores";
+  grid-template-columns: 1fr 1fr 2fr 1fr 1fr;
+  grid-template-rows: auto auto auto auto auto;
+  gap: 8px;
+  padding: 16px;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.seat-top    { grid-area: top; }
+.seat-top-left  { grid-area: top-left; }
+.seat-top-right { grid-area: top-right; }
+.seat-left   { grid-area: left; }
+.seat-right  { grid-area: right; }
+.seat-bottom { grid-area: bottom; }
+.trick-area  { grid-area: center; }
+.action-panel { grid-area: action; }
+.game-log    { grid-area: log; }
+.score-board { grid-area: scores; }
+
+/* ── Player seat ─────────────────────────────────────────── */
+.player-seat {
+  background: rgba(0,0,0,0.35);
+  border-radius: 8px;
+  padding: 8px;
+  text-align: center;
+  color: #fff;
+  min-width: 80px;
+}
+
+.player-seat.active-turn {
+  outline: 2px solid gold;
+}
+
+.player-seat .badge {
+  font-size: 0.65rem;
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-left: 4px;
+}
+
+.badge-dealer { background: #f59e0b; color: #000; }
+.badge-picker { background: #3b82f6; color: #fff; }
+.badge-partner { background: #10b981; color: #fff; }
+.badge-you { background: #8b5cf6; color: #fff; }
+
+/* ── Trick area ──────────────────────────────────────────── */
+.trick-area {
+  background: rgba(0,0,0,0.2);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+  min-height: 120px;
+}
+
+/* ── Action panel ────────────────────────────────────────── */
+.action-panel {
+  background: rgba(0,0,0,0.35);
+  border-radius: 8px;
+  padding: 12px;
+  color: #fff;
+  text-align: center;
+}
+
+.action-panel h4 { margin: 0 0 8px; }
+
+/* ── Game log ────────────────────────────────────────────── */
+.game-log {
+  background: rgba(0,0,0,0.4);
+  border-radius: 8px;
+  padding: 10px;
+  color: #ccc;
+  font-size: 0.78rem;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.game-log p { margin: 2px 0; }
+
+/* ── Score board ─────────────────────────────────────────── */
+.score-board {
+  background: rgba(0,0,0,0.4);
+  border-radius: 8px;
+  padding: 10px;
+  color: #fff;
+  font-size: 0.85rem;
+}
+
+.score-board table { width: 100%; margin: 0; }
+
+/* ── Scoring overlay ─────────────────────────────────────── */
+.scoring-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.scoring-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 32px 40px;
+  max-width: 480px;
+  width: 90%;
+  text-align: center;
+}
+
+.scoring-card h2 { margin-bottom: 16px; }
+
+.delta-positive { color: #16a34a; font-weight: 700; }
+.delta-negative { color: #dc2626; font-weight: 700; }
+
+/* ── Lobby ───────────────────────────────────────────────── */
+.lobby-container {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+/* ── Auth pages ──────────────────────────────────────────── */
+.auth-container {
+  max-width: 360px;
+  margin: 80px auto;
+  padding: 0 16px;
+}
+
+/* ── Suit picker ─────────────────────────────────────────── */
+.suit-picker {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin: 8px 0;
+}
+
+.suit-btn {
+  font-size: 2rem;
+  background: none;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: border-color 0.1s;
+}
+
+.suit-btn:hover { border-color: var(--pico-primary); }
+.suit-btn.red { color: #c00; }
+.suit-btn.black { color: #111; }
+
+/* Discard selection hint */
+.discard-hint {
+  color: #aaa;
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
