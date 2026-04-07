@@ -13,6 +13,9 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState(null)
 
+  // Game the user is currently a member of (waiting or active)
+  const myGame = games.find(g => g.is_member)
+
   async function loadGames() {
     try {
       const list = await api.games.list()
@@ -32,6 +35,7 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
 
   async function handleCreate(e) {
     e.preventDefault()
+    if (myGame) return setError('Leave your current game before creating a new one.')
     setCreating(true)
     setError(null)
     try {
@@ -62,16 +66,37 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
           <p style={{ margin: 0, fontSize: '0.85rem' }}>Welcome, {user.username}</p>
         </hgroup>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setShowCreate(s => !s)} className="secondary">
+          <button
+            onClick={() => setShowCreate(s => !s)}
+            className="secondary"
+            disabled={!!myGame}
+            title={myGame ? 'Leave your current game first' : undefined}
+          >
             {showCreate ? 'Cancel' : 'New game'}
           </button>
           <button className="outline" onClick={onLogout}>Sign out</button>
         </div>
       </div>
 
+      {/* Banner if user is already in a game */}
+      {myGame && (
+        <article style={{ background: 'rgba(245,158,11,0.15)', borderLeft: '3px solid #f59e0b', marginBottom: 16 }}>
+          <p style={{ margin: 0 }}>
+            You are in <strong>{myGame.name}</strong> ({STATUS_LABELS[myGame.status]}).{' '}
+            <a
+              href={`#/game/${myGame.id}`}
+              style={{ fontWeight: 600 }}
+              onClick={e => { e.preventDefault(); onNavigate(`/game/${myGame.id}`) }}
+            >
+              Rejoin →
+            </a>
+          </p>
+        </article>
+      )}
+
       {error && <p style={{ color: 'var(--pico-del-color)' }}>{error}</p>}
 
-      {showCreate && (
+      {showCreate && !myGame && (
         <article style={{ marginBottom: 24 }}>
           <h4>Create a game</h4>
           <form onSubmit={handleCreate}>
@@ -119,13 +144,16 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
       )}
 
       {games.map(game => {
-        const isMine = game.player_count > 0  // heuristic — full join info not loaded here
+        const canJoin = game.status === 'waiting' && game.player_count < 5 && !game.is_member && !myGame
         return (
           <article key={game.id} style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <strong>{game.name}</strong>
-                <span style={{ marginLeft: 8, fontSize: '0.75rem', color: '#888' }}>
+                {game.is_admin && (
+                  <span className="badge badge-dealer" style={{ marginLeft: 6 }}>your game</span>
+                )}
+                <span style={{ marginLeft: 6, fontSize: '0.75rem', color: '#888' }}>
                   by {game.created_by_username}
                 </span>
                 <br />
@@ -138,16 +166,25 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
                 </small>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                {game.status === 'active' && (
-                  <button className="secondary" onClick={() => onNavigate(`/game/${game.id}`)}>
-                    Spectate / Rejoin
-                  </button>
-                )}
-                {game.status === 'waiting' && game.player_count < 5 && (
-                  <button onClick={() => handleJoin(game.id)}>Join</button>
-                )}
-                {game.status === 'waiting' && game.player_count >= 5 && (
-                  <button disabled>Full</button>
+                {game.is_member ? (
+                  <button onClick={() => onNavigate(`/game/${game.id}`)}>Rejoin</button>
+                ) : (
+                  <>
+                    {game.status === 'active' && (
+                      <button className="secondary" onClick={() => onNavigate(`/game/${game.id}`)}>
+                        Spectate
+                      </button>
+                    )}
+                    {game.status === 'waiting' && (
+                      <button
+                        onClick={() => handleJoin(game.id)}
+                        disabled={!canJoin}
+                        title={myGame && !game.is_member ? 'Leave your current game first' : undefined}
+                      >
+                        {game.player_count >= 5 ? 'Full' : 'Join'}
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
