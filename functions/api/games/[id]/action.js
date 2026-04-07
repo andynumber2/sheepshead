@@ -2,18 +2,17 @@ import { json, err, requireUser, AuthError } from '../../_helpers.js'
 import {
   pick, pass, discard, callAce, playCard,
   setupLeaster, awardLeasterBlind, resolveLeaster,
-  currentPicker, currentPlayer,
+  dealHand,
 } from '../../../../shared/gameEngine.js'
 
 export async function onRequestPost({ request, env, params }) {
   try {
     const user = await requireUser(request, env.DB)
     const gameId = params.id
-    const userId = String(user.user_id)
 
     let body
     try { body = await request.json() } catch { return err('Invalid JSON.') }
-    const { type, payload } = body ?? {}
+    const { type, payload, act_as: actAsRaw } = body ?? {}
 
     const game = await env.DB.prepare('SELECT * FROM games WHERE id = ?').bind(gameId).first()
     if (!game) return err('Game not found.', 404)
@@ -26,11 +25,26 @@ export async function onRequestPost({ request, env, params }) {
 
     let state = JSON.parse(stateRow.state_json)
 
-    // Verify player is in this game
-    const player = await env.DB.prepare(
+    // Verify requesting user is in this game
+    const playerRow = await env.DB.prepare(
       'SELECT seat FROM game_players WHERE game_id = ? AND user_id = ?'
     ).bind(gameId, user.user_id).first()
-    if (!player) return err('You are not in this game.', 403)
+    if (!playerRow) return err('You are not in this game.', 403)
+
+    // Resolve the effective userId for this action
+    // In test mode, an admin can pass act_as to play on behalf of another player
+    let userId = String(user.user_id)
+    if (actAsRaw) {
+      if (!game.is_test_mode)  return err('act_as is only allowed in test mode games.', 403)
+      if (!user.is_admin)       return err('Only admins can use act_as.', 403)
+
+      const targetPlayer = await env.DB.prepare(
+        'SELECT gp.user_id, u.is_bot FROM game_players gp JOIN users u ON u.id = gp.user_id WHERE gp.game_id = ? AND gp.user_id = ?'
+      ).bind(gameId, Number(actAsRaw)).first()
+      if (!targetPlayer) return err('act_as player is not in this game.', 400)
+
+      userId = String(actAsRaw)
+    }
 
     // Apply action
     switch (type) {
@@ -40,12 +54,12 @@ export async function onRequestPost({ request, env, params }) {
 
       case 'pass':
         state = pass(state, userId)
-        // Check for no-pick situation
         if (state.phase === 'no_pick') {
-          if (game.no_pick_variant === 'leasters') {
+          // Re-read no_pick_variant from DB in case admin changed it mid-session
+          const freshGame = await env.DB.prepare('SELECT no_pick_variant FROM games WHERE id = ?').bind(gameId).first()
+          if (freshGame.no_pick_variant === 'leasters') {
             state = setupLeaster(state)
           } else {
-            // Doublers: redeal with doubled multiplier
             const newMultiplier = state.doublerMultiplier * 2
             const { results: players } = await env.DB.prepare(
               'SELECT user_id FROM game_players WHERE game_id = ? ORDER BY seat'
@@ -57,7 +71,7 @@ export async function onRequestPost({ request, env, params }) {
             state.log.push(`Doubler! Stakes are now ×${newMultiplier}.`)
 
             await env.DB.prepare(
-              'UPDATE games SET doubler_multiplier = ?, updated_at = datetime(\'now\') WHERE id = ?'
+              "UPDATE games SET doubler_multiplier = ?, updated_at = datetime('now') WHERE id = ?"
             ).bind(newMultiplier, gameId).run()
           }
         }
@@ -72,38 +86,32 @@ export async function onRequestPost({ request, env, params }) {
         break
 
       case 'play_card': {
-        const wasLeaster = state.isLeaster
         state = playCard(state, userId, payload?.cardId)
 
-        // In leasters, award blind to trick 1 winner
         if (state.isLeaster && state.leasterBlind?.length > 0 && state.tricks.length === 1) {
           state = awardLeasterBlind(state)
         }
 
         if (state.phase === 'scoring') {
-          await finishHand(env.DB, gameId, game, state)
+          state = await finishHand(env.DB, gameId, state)
         }
         break
       }
 
       case 'next_hand':
-        // Transition from scoring phase to the next hand
-        if (state.phase !== 'scoring') return err('Not in scoring phase.')
-        if (!state.nextHandState) return err('No next hand state available.')
-        state = state.nextHandState
+        // No-op — hands now auto-advance; kept for backward compatibility
         break
 
       default:
         return err(`Unknown action type: ${type}`)
     }
 
-    // Persist updated state
     await env.DB.prepare(
-      'UPDATE game_state SET state_json = ?, updated_at = datetime(\'now\') WHERE game_id = ?'
+      "UPDATE game_state SET state_json = ?, updated_at = datetime('now') WHERE game_id = ?"
     ).bind(JSON.stringify(state), gameId).run()
 
     await env.DB.prepare(
-      'UPDATE games SET updated_at = datetime(\'now\') WHERE id = ?'
+      "UPDATE games SET updated_at = datetime('now') WHERE id = ?"
     ).bind(gameId).run()
 
     return json({ ok: true })
@@ -114,17 +122,15 @@ export async function onRequestPost({ request, env, params }) {
   }
 }
 
-async function finishHand(DB, gameId, game, state) {
+async function finishHand(DB, gameId, state) {
   let scores = state.scores
 
-  // Handle leaster scoring
   if (state.isLeaster) {
     const { scores: leasterScores } = resolveLeaster(state)
     scores = leasterScores
     state.scores = scores
   }
 
-  // Write score events
   const stmts = Object.entries(scores).map(([userId, delta]) =>
     DB.prepare(
       'INSERT INTO score_events (user_id, game_id, hand_number, delta) VALUES (?, ?, ?, ?)'
@@ -132,7 +138,6 @@ async function finishHand(DB, gameId, game, state) {
   )
   await DB.batch(stmts)
 
-  // Start next hand
   const { results: players } = await DB.prepare(
     'SELECT user_id FROM game_players WHERE game_id = ? ORDER BY seat'
   ).bind(gameId).all()
@@ -140,16 +145,15 @@ async function finishHand(DB, gameId, game, state) {
   const nextDealer = (state.dealerSeat + 1) % 5
   const nextState = dealHand(playerIds, nextDealer, state.handNumber + 1, 1)
 
-  // Carry log summary
-  nextState.log.unshift(`--- Hand ${state.handNumber} complete. New hand starting. ---`)
+  // Carry log forward so history is preserved across hands
+  nextState.log = [
+    ...state.log,
+    `--- Hand ${state.handNumber} complete ---`,
+  ]
 
-  // Store the scoring state briefly so clients can see results, then the new hand
-  // We keep scoring phase visible — client transitions after seeing scores
-  state.nextHandState = nextState
-  state.phase = 'scoring'
-
-  // Reset doubler multiplier
   await DB.prepare(
-    'UPDATE games SET doubler_multiplier = 1, updated_at = datetime(\'now\') WHERE id = ?'
+    "UPDATE games SET doubler_multiplier = 1, updated_at = datetime('now') WHERE id = ?"
   ).bind(gameId).run()
+
+  return nextState
 }

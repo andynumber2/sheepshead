@@ -20,7 +20,10 @@ export async function getUser(request, DB) {
   const token = match[1]
   const now = new Date().toISOString()
   const row = await DB.prepare(
-    'SELECT s.user_id, u.username FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ? AND s.expires_at > ?'
+    `SELECT s.user_id, u.username, u.is_admin, u.is_bot
+     FROM sessions s
+     JOIN users u ON u.id = s.user_id
+     WHERE s.id = ? AND s.expires_at > ?`
   ).bind(token, now).first()
 
   return row ?? null
@@ -29,6 +32,12 @@ export async function getUser(request, DB) {
 export async function requireUser(request, DB) {
   const user = await getUser(request, DB)
   if (!user) throw new AuthError('Not authenticated.')
+  return user
+}
+
+export async function requireAdmin(request, DB) {
+  const user = await requireUser(request, DB)
+  if (!user.is_admin) throw new AuthError('Admin access required.')
   return user
 }
 

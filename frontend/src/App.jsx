@@ -4,33 +4,32 @@ import LoginPage from './pages/LoginPage.jsx'
 import RegisterPage from './pages/RegisterPage.jsx'
 import LobbyPage from './pages/LobbyPage.jsx'
 import GamePage from './pages/GamePage.jsx'
+import AccountManagementPage from './pages/AccountManagementPage.jsx'
 
 function getRoute() {
-  const hash = window.location.hash.replace('#', '') || '/'
-  return hash
+  return window.location.hash.replace('#', '') || '/'
 }
 
 function parseRoute(route) {
   const gameMatch = route.match(/^\/game\/(\d+)$/)
   if (gameMatch) return { page: 'game', gameId: gameMatch[1] }
-  if (route === '/register') return { page: 'register' }
-  if (route === '/lobby') return { page: 'lobby' }
+  if (route === '/register')           return { page: 'register' }
+  if (route === '/lobby')              return { page: 'lobby' }
+  if (route === '/account-management') return { page: 'account-management' }
   return { page: 'login' }
 }
 
 export default function App() {
-  const [user, setUser] = useState(null)
+  const [user, setUser]               = useState(null)
   const [authChecked, setAuthChecked] = useState(false)
-  const [route, setRoute] = useState(getRoute())
+  const [route, setRoute]             = useState(getRoute())
 
-  // Sync route with hash
   useEffect(() => {
     const onHashChange = () => setRoute(getRoute())
     window.addEventListener('hashchange', onHashChange)
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
 
-  // Check existing session on load
   useEffect(() => {
     api.auth.me()
       .then(u => { setUser(u); setAuthChecked(true) })
@@ -62,15 +61,18 @@ export default function App() {
 
   const { page, gameId } = parseRoute(route)
 
-  // Unauthenticated routes
   if (!user) {
     if (page === 'register') return <RegisterPage onLogin={handleLogin} />
     return <LoginPage onLogin={handleLogin} />
   }
 
-  // Authenticated routes
   if (page === 'game' && gameId) {
     return <GamePage gameId={gameId} user={user} onNavigate={navigate} />
+  }
+
+  if (page === 'account-management') {
+    if (!user.is_admin) { navigate('/lobby'); return null }
+    return <AccountManagementPage currentUser={user} onNavigate={navigate} />
   }
 
   return <LobbyPage user={user} onNavigate={navigate} onLogout={handleLogout} />
