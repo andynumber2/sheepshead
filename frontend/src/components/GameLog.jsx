@@ -9,7 +9,7 @@ export default function GameLog({ entries = [] }) {
 
   return (
     <div className="game-log" ref={ref}>
-      <strong style={{ color: '#fff', display: 'block', marginBottom: 4 }}>Game Log</strong>
+      <strong style={{ color: '#fff', display: 'block', marginBottom: 4 }}>Play History</strong>
       {entries.length === 0 && <p style={{ color: '#666' }}>No events yet.</p>}
       {entries.map((entry, i) => <p key={i}>{entry}</p>)}
     </div>

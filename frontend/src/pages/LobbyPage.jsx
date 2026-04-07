@@ -1,19 +1,19 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api.js'
 
-const STATUS_LABELS = { waiting: 'Open', active: 'In progress' }
+const STATUS_LABELS  = { waiting: 'Open', active: 'In progress' }
 const VARIANT_LABELS = { leasters: 'Leasters', doublers: 'Doublers' }
 
 export default function LobbyPage({ user, onNavigate, onLogout }) {
-  const [games, setGames] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [games, setGames]       = useState([])
+  const [loading, setLoading]   = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [gameName, setGameName] = useState(`${user.username}'s game`)
-  const [variant, setVariant] = useState('leasters')
+  const [variant, setVariant]   = useState('leasters')
+  const [testMode, setTestMode] = useState(false)
   const [creating, setCreating] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError]       = useState(null)
 
-  // Game the user is currently a member of (waiting or active)
   const myGame = games.find(g => g.is_member)
 
   async function loadGames() {
@@ -39,7 +39,11 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
     setCreating(true)
     setError(null)
     try {
-      const game = await api.games.create(gameName.trim() || `${user.username}'s game`, variant)
+      const game = await api.games.create(
+        gameName.trim() || `${user.username}'s game`,
+        variant,
+        user.is_admin ? testMode : false,
+      )
       onNavigate(`/game/${game.id}`)
     } catch (e) {
       setError(e.message)
@@ -60,12 +64,21 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
 
   return (
     <div className="lobby-container">
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <hgroup style={{ margin: 0 }}>
           <h2 style={{ margin: 0 }}>Lobby</h2>
-          <p style={{ margin: 0, fontSize: '0.85rem' }}>Welcome, {user.username}</p>
+          <p style={{ margin: 0, fontSize: '0.85rem' }}>
+            Welcome, {user.username}
+            {user.is_admin && <span className="badge badge-dealer" style={{ marginLeft: 6 }}>admin</span>}
+          </p>
         </hgroup>
         <div style={{ display: 'flex', gap: 8 }}>
+          {user.is_admin && (
+            <button className="outline" onClick={() => onNavigate('/account-management')} style={{ fontSize: '0.85rem' }}>
+              ⚙ Accounts
+            </button>
+          )}
           <button
             onClick={() => setShowCreate(s => !s)}
             className="secondary"
@@ -78,7 +91,7 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
         </div>
       </div>
 
-      {/* Banner if user is already in a game */}
+      {/* Rejoin banner */}
       {myGame && (
         <article style={{ background: 'rgba(245,158,11,0.15)', borderLeft: '3px solid #f59e0b', marginBottom: 16 }}>
           <p style={{ margin: 0 }}>
@@ -96,6 +109,7 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
 
       {error && <p style={{ color: 'var(--pico-del-color)' }}>{error}</p>}
 
+      {/* Create game form */}
       {showCreate && !myGame && (
         <article style={{ marginBottom: 24 }}>
           <h4>Create a game</h4>
@@ -112,31 +126,39 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
             <fieldset>
               <legend>No-pick variant</legend>
               <label>
-                <input
-                  type="radio"
-                  name="variant"
-                  value="leasters"
-                  checked={variant === 'leasters'}
-                  onChange={() => setVariant('leasters')}
-                />
+                <input type="radio" name="variant" value="leasters"
+                  checked={variant === 'leasters'} onChange={() => setVariant('leasters')} />
                 Leasters — fewest points wins
               </label>
               <label>
-                <input
-                  type="radio"
-                  name="variant"
-                  value="doublers"
-                  checked={variant === 'doublers'}
-                  onChange={() => setVariant('doublers')}
-                />
+                <input type="radio" name="variant" value="doublers"
+                  checked={variant === 'doublers'} onChange={() => setVariant('doublers')} />
                 Doublers — stakes double each pass
               </label>
             </fieldset>
+
+            {user.is_admin && (
+              <label className="test-mode-label">
+                <input
+                  type="checkbox"
+                  checked={testMode}
+                  onChange={e => setTestMode(e.target.checked)}
+                />
+                <span>
+                  <strong>Test mode</strong>
+                  <small style={{ display: 'block', color: '#888', marginTop: 2 }}>
+                    Bots auto-fill seats. You can see all hands and play for bots. Max 1 active at a time.
+                  </small>
+                </span>
+              </label>
+            )}
+
             <button type="submit" aria-busy={creating} disabled={creating}>Create</button>
           </form>
         </article>
       )}
 
+      {/* Game list */}
       <h4>Games</h4>
       {loading && <p aria-busy="true">Loading games…</p>}
       {!loading && games.length === 0 && (
@@ -152,6 +174,9 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
                 <strong>{game.name}</strong>
                 {game.is_admin && (
                   <span className="badge badge-dealer" style={{ marginLeft: 6 }}>your game</span>
+                )}
+                {game.is_test_mode && (
+                  <span className="badge" style={{ background: '#7c3aed', color: '#fff', marginLeft: 6 }}>test</span>
                 )}
                 <span style={{ marginLeft: 6, fontSize: '0.75rem', color: '#888' }}>
                   by {game.created_by_username}

@@ -9,10 +9,11 @@ export async function onRequestPost({ request, env }) {
   if (!username || !password) return err('Username and password are required.')
 
   const user = await DB.prepare(
-    'SELECT id, username, password_hash, salt FROM users WHERE username = ?'
+    'SELECT id, username, password_hash, salt, is_bot FROM users WHERE username = ?'
   ).bind(username).first()
 
   if (!user) return err('Invalid username or password.', 401)
+  if (user.is_bot) return err('Bot accounts cannot log in.', 403)
 
   const hash = await hashPassword(password, user.salt)
   if (hash !== user.password_hash) return err('Invalid username or password.', 401)

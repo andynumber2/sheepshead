@@ -8,13 +8,17 @@ export default function Card({ card, playable = false, selected = false, onClick
     return <div className="card hidden" aria-label="Hidden card" />
   }
 
-  const trump = isTrump(card)
+  const trump     = isTrump(card)
   const suitClass = SUIT_CLASSES[card.suit] ?? ''
+
+  // suitClass ALWAYS applied — determines color (clubs/spades=black, diamonds/hearts=red)
+  // trump class adds a background tint only — never overrides color
   const classes = [
     'card',
-    trump ? 'trump' : suitClass,
-    playable ? 'playable' : '',
-    selected ? 'selected' : '',
+    suitClass,
+    trump     ? 'trump'    : '',
+    playable  ? 'playable' : '',
+    selected  ? 'selected' : '',
   ].filter(Boolean).join(' ')
 
   return (
