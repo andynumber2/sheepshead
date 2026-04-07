@@ -5,5 +5,5 @@ pages_build_output_dir = "frontend/dist"
 [[d1_databases]]
 binding = "DB"
 database_name = "sheepshead-db"
-database_id = "PLACEHOLDER"
+database_id = "2e40777e-f2dc-4936-95f6-affd9ef0c814"
 migrations_dir = "migrations"
