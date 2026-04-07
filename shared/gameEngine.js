@@ -98,6 +98,7 @@ export function dealHand(playerIds, dealerSeat, handNumber, doublerMultiplier) {
     hands,                     // { userId: [cards] }
     tricks: [],                // completed tricks: [{ leader, plays: [{userId, card}], winner }]
     currentTrick: [],          // in-progress: [{userId, card}]
+    lastTrick: [],             // last completed trick — shown between tricks
     currentLeader: null,       // userId who leads next trick
     log: [],                   // string messages
     scores: {},                // { userId: delta } — populated at scoring
@@ -251,6 +252,7 @@ export function playCard(state, userId, cardId) {
       plays: [...newState.currentTrick],
       winner,
     })
+    newState.lastTrick = [...newState.currentTrick]
     newState.currentTrick = []
     newState.currentLeader = winner
     newState.log.push(`${winner} won the trick.`)

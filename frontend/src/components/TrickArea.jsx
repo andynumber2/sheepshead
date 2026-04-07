@@ -1,10 +1,12 @@
 import Card from './Card.jsx'
 
-export default function TrickArea({ trick = [], players = [], blind = [] }) {
+export default function TrickArea({ trick = [], lastTrick = [], players = [], blind = [] }) {
   const getUsername = (userId) => {
     const p = players.find(p => String(p.user_id) === String(userId))
     return p?.username ?? userId
   }
+
+  const showingLast = trick.length === 0 && blind.length === 0 && lastTrick.length > 0
 
   return (
     <div className="trick-area">
@@ -17,14 +19,20 @@ export default function TrickArea({ trick = [], players = [], blind = [] }) {
         </div>
       )}
 
-      {trick.length === 0 && blind.length === 0 && (
+      {trick.length === 0 && blind.length === 0 && lastTrick.length === 0 && (
         <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>
           Waiting for first play…
         </span>
       )}
 
-      {trick.map(({ userId, card }) => (
-        <div key={userId} style={{ textAlign: 'center' }}>
+      {showingLast && (
+        <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.7rem', width: '100%', textAlign: 'center', marginBottom: 4 }}>
+          Last trick
+        </div>
+      )}
+
+      {(showingLast ? lastTrick : trick).map(({ userId, card }) => (
+        <div key={userId} style={{ textAlign: 'center', opacity: showingLast ? 0.55 : 1 }}>
           <div style={{ color: '#ccc', fontSize: '0.7rem', marginBottom: 2 }}>
             {getUsername(userId)}
           </div>

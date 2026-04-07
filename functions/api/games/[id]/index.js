@@ -12,19 +12,36 @@ export async function onRequestGet({ request, env, params }) {
     if (!game) return err('Game not found.', 404)
 
     const { results: players } = await env.DB.prepare(
-      'SELECT gp.seat, gp.user_id, u.username FROM game_players gp JOIN users u ON u.id = gp.user_id WHERE gp.game_id = ? ORDER BY gp.seat'
+      `SELECT gp.seat, gp.user_id, u.username, u.is_bot
+       FROM game_players gp
+       JOIN users u ON u.id = gp.user_id
+       WHERE gp.game_id = ?
+       ORDER BY gp.seat`
     ).bind(gameId).all()
 
-    // Score per player for this game
-    const { results: gameScores } = await env.DB.prepare(
-      'SELECT user_id, SUM(delta) as score FROM score_events WHERE game_id = ? GROUP BY user_id'
-    ).bind(gameId).all()
-    const scoreMap = Object.fromEntries(gameScores.map(r => [r.user_id, r.score]))
+    // Game score + day score + lifetime score for each player in one query
+    const { results: scoreRows } = await env.DB.prepare(`
+      SELECT
+        user_id,
+        COALESCE(SUM(CASE WHEN game_id = ? THEN delta ELSE 0 END), 0)                        AS game_score,
+        COALESCE(SUM(CASE WHEN date(recorded_at) = date('now') THEN delta ELSE 0 END), 0)    AS day_score,
+        COALESCE(SUM(delta), 0)                                                               AS lifetime_score
+      FROM score_events
+      WHERE user_id IN (SELECT user_id FROM game_players WHERE game_id = ?)
+      GROUP BY user_id
+    `).bind(gameId, gameId).all()
 
-    const playersWithScores = players.map(p => ({
-      ...p,
-      score: scoreMap[p.user_id] ?? 0,
-    }))
+    const scoreMap = Object.fromEntries(scoreRows.map(r => [r.user_id, r]))
+
+    const playersWithScores = players.map(p => {
+      const s = scoreMap[p.user_id] ?? {}
+      return {
+        ...p,
+        score:           s.game_score     ?? 0,
+        day_score:       s.day_score      ?? 0,
+        lifetime_score:  s.lifetime_score ?? 0,
+      }
+    })
 
     let stateView = null
     if (game.status === 'active') {
@@ -34,17 +51,21 @@ export async function onRequestGet({ request, env, params }) {
 
       if (stateRow) {
         const state = JSON.parse(stateRow.state_json)
-        // Convert user_id keys from integer to string for lookup
         const userId = String(user.user_id)
-        stateView = getPlayerView(state, userId)
+        const isTestModeAdmin = game.is_test_mode && user.is_admin
+
+        // In test mode the admin sees all hands unredacted
+        stateView = isTestModeAdmin ? state : getPlayerView(state, userId)
       }
     }
 
     return json({
       ...game,
-      is_admin: game.created_by === user.user_id,
-      players: playersWithScores,
-      state: stateView,
+      is_test_mode:   game.is_test_mode   === 1,
+      reveal_partner: game.reveal_partner === 1,
+      is_admin:       game.created_by     === user.user_id,
+      players:        playersWithScores,
+      state:          stateView,
     })
   } catch (e) {
     if (e instanceof AuthError) return err(e.message, 401)

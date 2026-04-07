@@ -16,7 +16,9 @@ export async function onRequestGet({ request, env }) {
   return json({
     id: user.user_id,
     username: user.username,
+    is_admin: user.is_admin === 1,
+    is_bot:   user.is_bot   === 1,
     lifetimeScore: lifetime?.total ?? 0,
-    todayScore: today?.total ?? 0,
+    todayScore:    today?.total    ?? 0,
   })
 }
