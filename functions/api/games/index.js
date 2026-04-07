@@ -17,7 +17,9 @@ async function listGames({ request, env }) {
   const { results } = await env.DB.prepare(`
     SELECT g.id, g.name, g.status, g.no_pick_variant,
            u.username as created_by_username,
-           COUNT(gp.id) as player_count
+           g.created_by,
+           COUNT(gp.id) as player_count,
+           MAX(CASE WHEN gp.user_id = ? THEN 1 ELSE 0 END) as is_member
     FROM games g
     JOIN users u ON u.id = g.created_by
     LEFT JOIN game_players gp ON gp.game_id = g.id
@@ -25,9 +27,13 @@ async function listGames({ request, env }) {
     GROUP BY g.id
     ORDER BY g.created_at DESC
     LIMIT 50
-  `).all()
+  `).bind(user.user_id).all()
 
-  return json(results)
+  return json(results.map(g => ({
+    ...g,
+    is_member: g.is_member === 1,
+    is_admin: g.created_by === user.user_id,
+  })))
 }
 
 async function createGame({ request, env }) {

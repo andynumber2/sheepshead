@@ -11,11 +11,21 @@ export async function onRequestPost({ request, env, params }) {
     if (!game) return err('Game not found.', 404)
     if (game.status !== 'waiting') return err('Game is not open for joining.')
 
+    // Block joining if already in any active/waiting game
+    const existingGame = await env.DB.prepare(`
+      SELECT g.id, g.name FROM game_players gp
+      JOIN games g ON g.id = gp.game_id
+      WHERE gp.user_id = ? AND g.status IN ('waiting', 'active')
+      LIMIT 1
+    `).bind(user.user_id).first()
+    if (existingGame) {
+      return err(`You are already in a game ("${existingGame.name}"). Leave it before joining another.`, 409)
+    }
+
     const { results: players } = await env.DB.prepare(
       'SELECT seat, user_id FROM game_players WHERE game_id = ? ORDER BY seat'
     ).bind(gameId).all()
 
-    if (players.some(p => String(p.user_id) === userId)) return err('Already in this game.')
     if (players.length >= 5) return err('Game is full.')
 
     // Find next open seat
