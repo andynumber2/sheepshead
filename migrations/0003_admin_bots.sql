@@ -2,6 +2,15 @@ ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE users ADD COLUMN is_bot   INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE games ADD COLUMN is_test_mode INTEGER NOT NULL DEFAULT 0;
 
+INSERT OR IGNORE INTO users (username, password_hash, salt, is_bot, is_admin)
+VALUES
+  ('Andy',
+   '2f3e5a700d5c568561c5bb1db688c20e70b04ac2c4c30d63b61e963dcaf1d146',
+   'd4c672acd04728977b0d24e409b46321',
+   0,
+   1
+  );
+
 -- Create bot accounts (cannot log in; used only for test mode games)
 INSERT OR IGNORE INTO users (username, password_hash, salt, is_bot)
 VALUES
