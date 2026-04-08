@@ -277,6 +277,19 @@ export function callAceUnknown(state, userId, suit, underCardId) {
     throw new Error(`Cannot call A${suit} unknown — picker holds fail card(s) of that suit. Use call_ace.`)
   }
 
+  // Under card calls are only legal when the picker has no normal call available.
+  // A normal call exists for any suit whose ace the picker neither holds nor buried,
+  // and in which the picker holds at least one fail card.
+  const hasNormalCall = ['C', 'H', 'S'].some(s => {
+    const a = `A${s}`
+    if (state.hands[userId].some(c => c.id === a)) return false
+    if (state.discard.some(c => c.id === a)) return false
+    return state.hands[userId].some(c => c.suit === s && !isTrump(c))
+  })
+  if (hasNormalCall) {
+    throw new Error('Cannot call an unknown ace when a normal ace call is available.')
+  }
+
   const cardIdx = state.hands[userId].findIndex(c => c.id === underCardId)
   if (cardIdx === -1) throw new Error(`Under card ${underCardId} not in hand.`)
 
