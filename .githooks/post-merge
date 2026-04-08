@@ -2,4 +2,5 @@
 
 # Auto-delete local branches whose remote tracking branch is gone
 git fetch --prune
-git branch -vv | grep ': gone]' | awk '{print $1}' | xargs -r git branch -d
+gone=$(git branch -vv | awk '/: gone\]/ {print $1}')
+[ -n "$gone" ] && echo "$gone" | xargs git branch -d

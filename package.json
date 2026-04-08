@@ -10,7 +10,8 @@
     "build": "npm run build -w frontend",
     "deploy": "npm run build && wrangler pages deploy frontend/dist",
     "db:migrate:local": "wrangler d1 migrations apply sheepshead-db --local",
-    "db:migrate": "wrangler d1 migrations apply sheepshead-db --remote"
+    "db:migrate": "wrangler d1 migrations apply sheepshead-db --remote",
+    "postinstall": "git config core.hooksPath .githooks"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
