@@ -255,10 +255,11 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
             </button>
           ))}
         </div>
-        {unknownSuits.length > 0 && (
+        {/* Under card calls are only allowed when there is no normal call available. */}
+        {normalSuits.length === 0 && unknownSuits.length > 0 && (
           <>
             <p style={{ fontSize: '0.8rem', color: '#ccc', marginTop: 8 }}>
-              These suits require placing an under card (you hold no fail card of the suit):
+              You hold no fail card of any callable suit. Place an under card and call Unknown:
             </p>
             <div className="suit-picker">
               {unknownSuits.map(suit => (
