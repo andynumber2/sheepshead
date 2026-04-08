@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import Hand from './Hand.jsx'
-import { effectiveSuit } from '@shared/gameEngine.js'
 
 const SUIT_SYMBOLS = { C: '♣', H: '♥', S: '♠' }
 
-export default function ActionPanel({ state, myUserId, myHand, onAction, loading }) {
+export default function ActionPanel({ state, myUserId, myHand, onAction, loading, actingForName }) {
+  const botStyle = actingForName
+    ? { background: 'rgba(124,58,237,0.3)', border: '1px solid rgba(124,58,237,0.5)' }
+    : {}
+  const turnLabel = actingForName ? `Acting for ${actingForName}` : 'Your turn'
   const [selectedDiscards, setSelectedDiscards] = useState([])
   const [error, setError] = useState(null)
 
@@ -36,8 +39,8 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
       )
     }
     return (
-      <div className="action-panel">
-        <h4>Your turn — pick or pass?</h4>
+      <div className="action-panel" style={botStyle}>
+        <h4>{turnLabel} — pick or pass?</h4>
         {doublerMultiplier > 1 && <p style={{ color: '#f59e0b' }}>⚠ Stakes are ×{doublerMultiplier}</p>}
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 8 }}>
           <button onClick={() => act('pick')} disabled={loading}>Pick the blind</button>
@@ -61,7 +64,7 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
       })
     }
     return (
-      <div className="action-panel">
+      <div className="action-panel" style={botStyle}>
         <h4>Select 2 cards to discard</h4>
         <p className="discard-hint">({selectedDiscards.length}/2 selected)</p>
         <Hand
@@ -91,7 +94,7 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
     const callableSuits = ['C', 'H', 'S'].filter(s => !myAces.has(`A${s}`))
 
     return (
-      <div className="action-panel">
+      <div className="action-panel" style={botStyle}>
         <h4>Call an ace</h4>
         <p style={{ fontSize: '0.85rem', color: '#ccc' }}>The holder of the called ace is your partner.</p>
         <div className="suit-picker">
@@ -128,23 +131,18 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
       )
     }
 
-    // Determine legal cards
-    const legalIds = getLegalCardIds(state, myUserId, myHand)
+    // Acting for a bot: show the header so admin knows who they're playing for
+    if (actingForName) {
+      return (
+        <div className="action-panel" style={botStyle}>
+          <h4>{turnLabel} — play a card</h4>
+          {isLeaster && <p style={{ color: '#f59e0b', marginBottom: 4 }}>🃏 Leaster — fewest points wins!</p>}
+        </div>
+      )
+    }
 
-    return (
-      <div className="action-panel">
-        <h4>Your turn — play a card</h4>
-        {isLeaster && <p style={{ color: '#f59e0b', marginBottom: 4 }}>🃏 Leaster — fewest points wins!</p>}
-        <Hand
-          cards={myHand}
-          playableIds={legalIds}
-          onCardClick={(card) => {
-            if (legalIds.includes(card.id)) act('play_card', { cardId: card.id })
-          }}
-        />
-        {error && <p style={{ color: '#f87171', marginTop: 6 }}>{error}</p>}
-      </div>
-    )
+    // Real player's turn: cards are played directly from the hand in seat-bottom
+    return null
   }
 
   // ── Scoring phase ─────────────────────────────────────────
@@ -155,28 +153,7 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
   return null
 }
 
-// Replicate legal-play logic from engine (client-side for UI highlighting)
-function getLegalCardIds(state, userId, hand) {
-  const { currentTrick, calledAce, partner, partnerRevealed } = state
-  if (currentTrick.length === 0) return hand.map(c => c.id)
-
-  const ledSuit = effectiveSuit(currentTrick[0].card)
-  const hasSuit = hand.some(c => effectiveSuit(c) === ledSuit)
-
-  if (!hasSuit) return hand.map(c => c.id)
-
-  const mustFollowSuit = hand.filter(c => effectiveSuit(c) === ledSuit).map(c => c.id)
-
-  // Partner must play the called ace when that suit is led (if they have it)
-  if (calledAce && userId === partner && !partnerRevealed && ledSuit === calledAce.suit) {
-    const hasCalledAce = hand.some(c => c.id === calledAce.aceId)
-    if (hasCalledAce) return [calledAce.aceId]
-  }
-
-  return mustFollowSuit
-}
-
-// Re-export helper needed here
+// Helper to determine whose turn it is during playing phase
 function currentPlayer(state) {
   const played = state.currentTrick.map(p => p.userId)
   const seats = state.pickOrder
