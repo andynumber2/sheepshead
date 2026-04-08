@@ -236,6 +236,26 @@ export function callAce(state, userId, suit) {
   return newState
 }
 
+// Picker chooses to go alone instead of calling a partner. Available in any call mode.
+// No partner is selected; picker plays solo against the other four.
+export function goAlone(state, userId) {
+  assertPhase(state, 'calling')
+  if (state.picker !== userId) throw new Error('Only the picker can go alone.')
+
+  const newState = deepClone(state)
+  newState.goingAlone = true
+  newState.partner = null
+  newState.calledAce = null
+  newState.calledTen = null
+  newState.calledKing = null
+  newState.calledSuit = null
+  newState.pickerForcedPlays = []
+  newState.phase = 'playing'
+  newState.currentLeader = userId
+  newState.log.push(`${userId} is going alone.`)
+  return newState
+}
+
 // Situation B: picker calls an ace of a suit in which they hold no fail card,
 // placing one card from their hand face-down on the table as the "under card."
 export function callAceUnknown(state, userId, suit, underCardId) {

@@ -11,7 +11,43 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
   const [selectedDiscards, setSelectedDiscards] = useState([])
   const [unknownSelectedSuit, setUnknownSelectedSuit] = useState(null)
   const [selectedUnderCard, setSelectedUnderCard] = useState(null)
+  const [confirmingAlone, setConfirmingAlone] = useState(false)
   const [error, setError] = useState(null)
+
+  const goAloneSection = (
+    <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.15)' }}>
+      {confirmingAlone ? (
+        <>
+          <p style={{ fontSize: '0.85rem', color: '#fbbf24', marginBottom: 6 }}>
+            Play this hand alone against all four opponents?
+          </p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+            <button
+              onClick={() => act('go_alone').then(() => setConfirmingAlone(false))}
+              disabled={loading}
+            >
+              Confirm Go Alone
+            </button>
+            <button
+              className="secondary"
+              onClick={() => setConfirmingAlone(false)}
+              disabled={loading}
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      ) : (
+        <button
+          className="secondary"
+          onClick={() => setConfirmingAlone(true)}
+          disabled={loading}
+        >
+          Go Alone
+        </button>
+      )}
+    </div>
+  )
 
   async function act(type, payload) {
     setError(null)
@@ -123,6 +159,7 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
               </button>
             ))}
           </div>
+          {goAloneSection}
           {error && <p style={{ color: '#f87171', marginTop: 6 }}>{error}</p>}
         </div>
       )
@@ -152,6 +189,7 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
               </button>
             ))}
           </div>
+          {goAloneSection}
           {error && <p style={{ color: '#f87171', marginTop: 6 }}>{error}</p>}
         </div>
       )
@@ -240,6 +278,7 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
         {normalSuits.length === 0 && unknownSuits.length === 0 && (
           <p style={{ color: '#f87171' }}>No valid suit to call. Contact the game admin.</p>
         )}
+        {goAloneSection}
         {error && <p style={{ color: '#f87171', marginTop: 6 }}>{error}</p>}
       </div>
     )
