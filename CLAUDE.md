@@ -26,6 +26,15 @@ npm run db:migrate:local
 # Apply DB migrations to remote (production)
 npm run db:migrate
 
+# Query the local D1 database
+npx wrangler d1 execute sheepshead-db --local --command "SELECT * FROM games;"
+
+# List all tables in the local D1 database
+npx wrangler d1 execute sheepshead-db --local --command "SELECT name FROM sqlite_master WHERE type='table';"
+
+# Describe a table's schema in the local D1 database
+npx wrangler d1 execute sheepshead-db --local --command "PRAGMA table_info(games);"
+
 # Deploy to Cloudflare Pages
 npm run deploy
 ```
