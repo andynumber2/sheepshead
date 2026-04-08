@@ -1,6 +1,9 @@
+import { sortHand } from './Hand.jsx'
+
+const CARD_BACK_SRC = '/cards/blue_back.png'
+
 export default function PlayerSeat({
   player,
-  cardCount,
   isDealer,
   isPicker,
   isPartner,
@@ -8,6 +11,11 @@ export default function PlayerSeat({
   isActiveTurn,
   dayScore,
   lifetimeScore,
+  hand,
+  showFaceUp,
+  playableIds,
+  onCardClick,
+  noOverlap,
 }) {
   if (!player) {
     return (
@@ -20,7 +28,7 @@ export default function PlayerSeat({
   const formatScore = (n) => (n > 0 ? `+${n}` : String(n))
 
   return (
-    <div className={`player-seat${isActiveTurn ? ' active-turn' : ''}`}>
+    <div className={`player-seat${isActiveTurn ? ' active-turn' : ''}${noOverlap ? ' player-seat-wide' : ''}`}>
       <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
         {player.username}
         {isYou     && <span className="badge badge-you">you</span>}
@@ -31,9 +39,24 @@ export default function PlayerSeat({
       <div className="player-scores">
         D: {formatScore(dayScore ?? 0)}, L: {formatScore(lifetimeScore ?? 0)}
       </div>
-      <div style={{ fontSize: '0.75rem', color: '#888', marginTop: 1 }}>
-        {cardCount} card{cardCount !== 1 ? 's' : ''}
-      </div>
+
+      {hand && hand.length > 0 && (
+        <div className={`mini-card-stack${noOverlap ? ' no-overlap' : ''}`}>
+          {sortHand(hand.filter(c => !c.hidden)).concat(hand.filter(c => c.hidden)).map((card, i) => {
+            const faceUp = showFaceUp && !card.hidden
+            const playable = playableIds?.includes(card.id)
+            return (
+              <img
+                key={i}
+                src={faceUp ? `/cards/${card.id}.png` : CARD_BACK_SRC}
+                alt={faceUp ? card.id : 'card'}
+                className={`mini-card${playable ? ' mini-card-playable' : ''}`}
+                onClick={playable ? () => onCardClick?.(card) : undefined}
+              />
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

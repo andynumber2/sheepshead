@@ -1,24 +1,28 @@
 import { isTrump } from '@shared/gameEngine.js'
 
-const SUIT_SYMBOLS = { C: '♣', D: '♦', H: '♥', S: '♠' }
-const SUIT_CLASSES  = { C: 'clubs', D: 'diamonds', H: 'hearts', S: 'spades' }
+const CARD_BACK_SRC = '/cards/blue_back.png'
+
+function cardImageSrc(cardId) {
+  return `/cards/${cardId}.png`
+}
 
 export default function Card({ card, playable = false, selected = false, onClick }) {
   if (!card || card.hidden) {
-    return <div className="card hidden" aria-label="Hidden card" />
+    return (
+      <div className="card card-img hidden" aria-label="Hidden card">
+        <img src={CARD_BACK_SRC} alt="Card back" className="card-image" />
+      </div>
+    )
   }
 
-  const trump     = isTrump(card)
-  const suitClass = SUIT_CLASSES[card.suit] ?? ''
+  const trump = isTrump(card)
 
-  // suitClass ALWAYS applied — determines color (clubs/spades=black, diamonds/hearts=red)
-  // trump class adds a background tint only — never overrides color
   const classes = [
     'card',
-    suitClass,
-    trump     ? 'trump'    : '',
-    playable  ? 'playable' : '',
-    selected  ? 'selected' : '',
+    'card-img',
+    trump    ? 'trump'    : '',
+    playable ? 'playable' : '',
+    selected ? 'selected' : '',
   ].filter(Boolean).join(' ')
 
   return (
@@ -28,8 +32,7 @@ export default function Card({ card, playable = false, selected = false, onClick
       title={trump ? `${card.id} (trump)` : card.id}
       role={playable ? 'button' : undefined}
     >
-      <span className="card-rank">{card.rank}</span>
-      <span className="card-suit">{SUIT_SYMBOLS[card.suit]}</span>
+      <img src={cardImageSrc(card.id)} alt={card.id} className="card-image" />
     </div>
   )
 }
