@@ -90,7 +90,14 @@ export function dealHand(playerIds, dealerSeat, handNumber, doublerMultiplier) {
     pickIndex: 0,              // index into pickOrder of whose turn it is to pick/pass
     picker: null,              // userId of picker
     partner: null,             // userId of partner (set when ace is called)
-    calledAce: null,           // { suit } e.g. { suit: 'C' }
+    calledAce: null,           // { suit, aceId, unknown? } — set for ace and ace-unknown calls
+    calledTen: null,           // { suit, tenId } — set when picker holds all 3 fail aces
+    calledKing: null,          // { suit, kingId } — set when picker holds all 3 fail aces and tens
+    calledSuit: null,          // 'C'|'H'|'S' — unifying field across all call types
+    callMode: null,            // null | 'ace' | 'ten' | 'king'
+    underCard: null,           // { id, suit, rank, ownerId, played } — server-side full info
+    pickerMustHold: [],        // card ids the picker may not bury during discard
+    pickerForcedPlays: [],     // card ids the picker must play when called suit is led
     partnerRevealed: false,
     goingAlone: false,
     blind,
@@ -150,6 +157,29 @@ export function discard(state, userId, cardIds) {
   const newState = deepClone(state)
   const hand = newState.hands[userId]
 
+  // Determine calling mode based on the picker's 8-card hand BEFORE discard
+  const failAces = ['AC', 'AH', 'AS']
+  const failTens = ['10C', '10H', '10S']
+  const holdsAllAces = failAces.every(id => hand.some(c => c.id === id))
+  const holdsAllTens = failTens.every(id => hand.some(c => c.id === id))
+
+  let mustHold = []
+  let callMode = 'ace'
+  if (holdsAllAces && holdsAllTens) {
+    mustHold = [...failAces, ...failTens]
+    callMode = 'king'
+  } else if (holdsAllAces) {
+    mustHold = [...failAces]
+    callMode = 'ten'
+  }
+
+  // Reject discards that bury cards the picker must keep for the partner call
+  for (const cid of cardIds) {
+    if (mustHold.includes(cid)) {
+      throw new Error(`Cannot bury ${cid} — must keep for partner call.`)
+    }
+  }
+
   const discarded = []
   for (const cid of cardIds) {
     const idx = hand.findIndex(c => c.id === cid)
@@ -158,101 +188,208 @@ export function discard(state, userId, cardIds) {
   }
 
   newState.discard = discarded
+  newState.pickerMustHold = mustHold
+  newState.callMode = callMode
+  newState.phase = 'calling'
   newState.log.push(`${userId} discarded 2 cards.`)
-
-  // Check if picker holds all non-trump aces → goes alone
-  const nonTrumpAces = ['AC', 'AH', 'AS']
-  const pickerHasAll = nonTrumpAces.every(aid =>
-    newState.hands[userId].some(c => c.id === aid)
-  )
-
-  if (pickerHasAll) {
-    newState.goingAlone = true
-    newState.partner = null
-    newState.partnerRevealed = true
-    newState.phase = 'playing'
-    // Picker leads first trick
-    newState.currentLeader = userId
-    newState.log.push(`${userId} is going alone (holds all non-trump aces).`)
-  } else {
-    newState.phase = 'calling'
-  }
 
   return newState
 }
 
 // ─── Calling phase ───────────────────────────────────────────────────────────
+function findHolder(hands, cardId, exclude) {
+  for (const [pid, hand] of Object.entries(hands)) {
+    if (pid === exclude) continue
+    if (hand.some(c => c.id === cardId)) return pid
+  }
+  return null
+}
+
 export function callAce(state, userId, suit) {
   assertPhase(state, 'calling')
   if (state.picker !== userId) throw new Error('Only the picker calls the ace.')
+  if (state.callMode !== 'ace') throw new Error(`Picker must call a ${state.callMode}, not an ace.`)
   if (!['C', 'H', 'S'].includes(suit)) throw new Error('Must call a non-trump suit ace.')
 
   const aceId = `A${suit}`
-  // Picker cannot call an ace they hold
   if (state.hands[userId].some(c => c.id === aceId)) {
     throw new Error(`Picker holds the ${aceId} — cannot call it.`)
   }
+  if (state.discard.some(c => c.id === aceId)) {
+    throw new Error(`Picker buried the ${aceId} — cannot call it.`)
+  }
 
-  // Under card rule: picker must have at least one non-trump card of the called suit
-  const underCards = state.hands[userId].filter(c => c.suit === suit && !isTrump(c))
-  if (underCards.length === 0) {
-    throw new Error(`Under card rule: must hold at least one ${suit} card to call A${suit}.`)
+  // Picker must hold at least one fail card of the called suit (called-suit holding rule).
+  // If they don't, they must use call_ace_unknown with an under card instead.
+  const failOfSuit = state.hands[userId].filter(c => c.suit === suit && !isTrump(c))
+  if (failOfSuit.length === 0) {
+    throw new Error(`Cannot call A${suit} normally — picker holds no fail card of that suit. Use call_ace_unknown.`)
   }
 
   const newState = deepClone(state)
   newState.calledAce = { suit, aceId }
-
-  // Identify partner (may be in discard — picker buried it — handled at scoring)
-  let partner = null
-  for (const [pid, hand] of Object.entries(newState.hands)) {
-    if (pid === userId) continue
-    if (hand.some(c => c.id === aceId)) {
-      partner = pid
-      break
-    }
-  }
-
-  // Partner could be null if ace is buried in picker's discard (picker going with buried ace)
-  newState.partner = partner
+  newState.calledSuit = suit
+  newState.partner = findHolder(newState.hands, aceId, userId)
   newState.phase = 'playing'
-  newState.currentLeader = userId  // picker leads first trick
+  newState.currentLeader = userId
   newState.log.push(`${userId} called the A${suit}.`)
   return newState
 }
 
+// Situation B: picker calls an ace of a suit in which they hold no fail card,
+// placing one card from their hand face-down on the table as the "under card."
+export function callAceUnknown(state, userId, suit, underCardId) {
+  assertPhase(state, 'calling')
+  if (state.picker !== userId) throw new Error('Only the picker calls the ace.')
+  if (state.callMode !== 'ace') throw new Error(`Picker must call a ${state.callMode}, not an unknown ace.`)
+  if (!['C', 'H', 'S'].includes(suit)) throw new Error('Must call a non-trump suit ace.')
+
+  const aceId = `A${suit}`
+  if (state.hands[userId].some(c => c.id === aceId)) {
+    throw new Error(`Picker holds the ${aceId} — cannot call it.`)
+  }
+  if (state.discard.some(c => c.id === aceId)) {
+    throw new Error(`Picker buried the ${aceId} — cannot call it.`)
+  }
+
+  const failOfSuit = state.hands[userId].filter(c => c.suit === suit && !isTrump(c))
+  if (failOfSuit.length > 0) {
+    throw new Error(`Cannot call A${suit} unknown — picker holds fail card(s) of that suit. Use call_ace.`)
+  }
+
+  const cardIdx = state.hands[userId].findIndex(c => c.id === underCardId)
+  if (cardIdx === -1) throw new Error(`Under card ${underCardId} not in hand.`)
+
+  const newState = deepClone(state)
+  const card = newState.hands[userId].splice(cardIdx, 1)[0]
+  newState.underCard = { id: card.id, suit: card.suit, rank: card.rank, ownerId: userId, played: false }
+  newState.calledAce = { suit, aceId, unknown: true }
+  newState.calledSuit = suit
+  newState.partner = findHolder(newState.hands, aceId, userId)
+  newState.phase = 'playing'
+  newState.currentLeader = userId
+  newState.log.push(`${userId} called A${suit} Unknown and placed an under card.`)
+  return newState
+}
+
+// Situation A: picker holds all 3 fail aces and calls the 10 of a fail suit
+// whose 10 they do not hold. Picker is forced to play that suit's Ace when the
+// called suit is led; partner plays the called 10.
+export function callTen(state, userId, suit) {
+  assertPhase(state, 'calling')
+  if (state.picker !== userId) throw new Error('Only the picker calls the ten.')
+  if (state.callMode !== 'ten') throw new Error(`Picker must call a ${state.callMode}, not a ten.`)
+  if (!['C', 'H', 'S'].includes(suit)) throw new Error('Must call a non-trump suit ten.')
+
+  const tenId = `10${suit}`
+  if (state.hands[userId].some(c => c.id === tenId)) {
+    throw new Error(`Picker holds the ${tenId} — cannot call it.`)
+  }
+  if (state.discard.some(c => c.id === tenId)) {
+    throw new Error(`Picker buried the ${tenId} — cannot call it.`)
+  }
+
+  const newState = deepClone(state)
+  newState.calledTen = { suit, tenId }
+  newState.calledSuit = suit
+  newState.pickerForcedPlays = [`A${suit}`]
+  newState.partner = findHolder(newState.hands, tenId, userId)
+  newState.phase = 'playing'
+  newState.currentLeader = userId
+  newState.log.push(`${userId} called the ${tenId}.`)
+  return newState
+}
+
+// King escalation of Situation A: picker holds all 3 fail aces and all 3 fail tens
+// and calls the King of any fail suit. Picker plays the Ace and 10 of the called
+// suit when that suit is led (in either order).
+export function callKing(state, userId, suit) {
+  assertPhase(state, 'calling')
+  if (state.picker !== userId) throw new Error('Only the picker calls the king.')
+  if (state.callMode !== 'king') throw new Error(`Picker must call a ${state.callMode}, not a king.`)
+  if (!['C', 'H', 'S'].includes(suit)) throw new Error('Must call a non-trump suit king.')
+
+  const kingId = `K${suit}`
+  if (state.hands[userId].some(c => c.id === kingId)) {
+    throw new Error(`Picker holds the ${kingId} — cannot call it.`)
+  }
+  if (state.discard.some(c => c.id === kingId)) {
+    throw new Error(`Picker buried the ${kingId} — cannot call it.`)
+  }
+
+  const newState = deepClone(state)
+  newState.calledKing = { suit, kingId }
+  newState.calledSuit = suit
+  newState.pickerForcedPlays = [`A${suit}`, `10${suit}`]
+  newState.partner = findHolder(newState.hands, kingId, userId)
+  newState.phase = 'playing'
+  newState.currentLeader = userId
+  newState.log.push(`${userId} called the ${kingId}.`)
+  return newState
+}
+
 // ─── Play card ───────────────────────────────────────────────────────────────
+// Sentinel id used by clients to play the under card (its real id is hidden from them)
+export const UNDER_CARD_ID = 'UNDER_CARD'
+
 export function playCard(state, userId, cardId) {
   assertPhase(state, 'playing')
   assertTurn(state, userId, currentPlayer(state))
 
   const newState = deepClone(state)
-  const hand = newState.hands[userId]
-  const cardIdx = hand.findIndex(c => c.id === cardId)
-  if (cardIdx === -1) throw new Error(`Card ${cardId} not in hand.`)
 
-  const card = hand[cardIdx]
+  const isUnderCardPlay =
+    newState.underCard &&
+    !newState.underCard.played &&
+    userId === newState.picker &&
+    (cardId === UNDER_CARD_ID || cardId === newState.underCard.id)
 
-  // Validate legal play
-  validatePlay(newState, userId, card)
+  let card
+  if (isUnderCardPlay) {
+    validateUnderCardPlay(newState, userId)
+    const uc = newState.underCard
+    card = { id: uc.id, suit: uc.suit, rank: uc.rank, faceDown: true, hidden: true }
+    newState.underCard.played = true
 
-  hand.splice(cardIdx, 1)
-  newState.currentTrick.push({ userId, card })
+    const isLead = newState.currentTrick.length === 0
+    const entry = { userId, card, faceDown: true }
+    if (isLead) entry.declaredSuit = newState.calledSuit
+    newState.currentTrick.push(entry)
+    newState.log.push(`${userId} played the under card.`)
+  } else {
+    const hand = newState.hands[userId]
+    const cardIdx = hand.findIndex(c => c.id === cardId)
+    if (cardIdx === -1) throw new Error(`Card ${cardId} not in hand.`)
+    card = hand[cardIdx]
 
-  // Reveal partner if they just played the called ace
-  if (
-    !newState.partnerRevealed &&
-    newState.calledAce &&
-    card.id === newState.calledAce.aceId
-  ) {
-    newState.partnerRevealed = true
-    newState.log.push(`${userId} revealed as partner by playing the ${card.id}.`)
+    validatePlay(newState, userId, card)
+
+    hand.splice(cardIdx, 1)
+    newState.currentTrick.push({ userId, card })
+
+    // Track picker's forced plays (Situation A / King case)
+    if (userId === newState.picker && newState.pickerForcedPlays.includes(card.id)) {
+      newState.pickerForcedPlays = newState.pickerForcedPlays.filter(id => id !== card.id)
+    }
+
+    newState.log.push(`${userId} played ${card.id}.`)
   }
 
-  newState.log.push(`${userId} played ${card.id}.`)
+  // Reveal partner if they just played the called ace/ten/king
+  if (!newState.partnerRevealed) {
+    const calledCardId =
+      newState.calledAce?.aceId ||
+      newState.calledTen?.tenId ||
+      newState.calledKing?.kingId
+    if (calledCardId && card.id === calledCardId && userId === newState.partner) {
+      newState.partnerRevealed = true
+      newState.log.push(`${userId} revealed as partner by playing the ${card.id}.`)
+    }
+  }
 
   if (newState.currentTrick.length === 5) {
-    // Resolve trick
-    const winner = resolveTrick(newState.currentTrick)
+    const ledSuit = getLedSuit(newState.currentTrick, newState)
+    const winner = resolveTrick(newState.currentTrick, ledSuit)
     newState.tricks.push({
       leader: newState.currentLeader,
       plays: [...newState.currentTrick],
@@ -264,7 +401,6 @@ export function playCard(state, userId, cardId) {
     newState.log.push(`${winner} won the trick.`)
 
     if (newState.tricks.length === 6) {
-      // Hand over
       newState.phase = 'scoring'
       newState.scores = computeScores(newState)
     }
@@ -286,12 +422,32 @@ export function currentPlayer(state) {
   return null
 }
 
+// Determine the led suit for the current trick. When the under card is the lead,
+// the picker has declared the called suit, so we use that instead of the (hidden) card's suit.
+function getLedSuit(trick, state) {
+  if (!trick || trick.length === 0) return null
+  const first = trick[0]
+  if (first.declaredSuit) return first.declaredSuit
+  return effectiveSuit(first.card)
+}
+
 function validatePlay(state, userId, card) {
   const trick = state.currentTrick
   if (trick.length === 0) return  // Leader can play anything
 
-  const ledSuit = effectiveSuit(trick[0].card)
+  const ledSuit = getLedSuit(trick, state)
   const hand = state.hands[userId]
+
+  // If the picker still has an under card and the called suit is led, they MUST play the under card
+  if (
+    userId === state.picker &&
+    state.underCard &&
+    !state.underCard.played &&
+    ledSuit === state.calledSuit
+  ) {
+    throw new Error('Picker must play the under card when the called suit is led.')
+  }
+
   const hasSuit = hand.some(c => effectiveSuit(c) === ledSuit)
 
   // Must follow suit if possible
@@ -299,33 +455,71 @@ function validatePlay(state, userId, card) {
     throw new Error(`Must follow suit (${ledSuit}).`)
   }
 
-  // Special rule: if led suit is called suit, partner must play the called ace if they have it
+  // Partner must play the called card (ace/ten/king) when called suit is led
+  const calledCardId =
+    state.calledAce?.aceId || state.calledTen?.tenId || state.calledKing?.kingId
   if (
-    state.calledAce &&
+    calledCardId &&
     userId === state.partner &&
     !state.partnerRevealed &&
-    ledSuit === state.calledAce.suit
+    ledSuit === state.calledSuit
   ) {
-    const hasCalledAce = hand.some(c => c.id === state.calledAce.aceId)
-    if (hasCalledAce && card.id !== state.calledAce.aceId) {
-      throw new Error(`Partner must play the called ace (${state.calledAce.aceId}) when that suit is led.`)
+    const hasCalled = hand.some(c => c.id === calledCardId)
+    if (hasCalled && card.id !== calledCardId) {
+      throw new Error(`Partner must play ${calledCardId} when the called suit is led.`)
+    }
+  }
+
+  // Picker forced plays (Situation A / King case): when called suit led, picker must
+  // play one of the still-held forced cards (Ace, or Ace/Ten in either order).
+  if (
+    userId === state.picker &&
+    state.pickerForcedPlays?.length > 0 &&
+    ledSuit === state.calledSuit
+  ) {
+    const heldForced = state.pickerForcedPlays.filter(cid => hand.some(c => c.id === cid))
+    if (heldForced.length > 0 && !heldForced.includes(card.id)) {
+      throw new Error(
+        `Picker must play ${heldForced.join(' or ')} when the called suit is led.`
+      )
     }
   }
 }
 
-function resolveTrick(plays) {
-  const [first, ...rest] = plays
-  let winner = first
-
-  for (const play of rest) {
-    if (beats(play.card, winner.card)) {
-      winner = play
-    }
+// Validate that the picker is allowed to play the under card right now.
+function validateUnderCardPlay(state, userId) {
+  if (userId !== state.picker) throw new Error('Only the picker may play the under card.')
+  if (!state.underCard || state.underCard.played) {
+    throw new Error('No under card to play.')
   }
+
+  const trick = state.currentTrick
+  if (trick.length === 0) {
+    // Leading: legal — declares the called suit as the led suit
+    return
+  }
+
+  // Following: only legal if the called suit was led, OR the picker has no other cards
+  // (last-trick fallback when called suit was never led).
+  const ledSuit = getLedSuit(trick, state)
+  if (ledSuit === state.calledSuit) return
+  if (state.hands[userId].length === 0) return
+
+  throw new Error('Under card can only be played when the called suit is led.')
+}
+
+function resolveTrick(plays, ledSuit) {
+  let winner = null
+  for (const play of plays) {
+    if (play.card?.faceDown) continue  // face-down under card has no power
+    if (winner === null) { winner = play; continue }
+    if (beats(play.card, winner.card, ledSuit)) winner = play
+  }
+  if (winner === null) winner = plays[0]  // all face-down (shouldn't happen)
   return winner.userId
 }
 
-function beats(challenger, current) {
+function beats(challenger, current, ledSuit) {
   const cTrump = isTrump(challenger)
   const wTrump = isTrump(current)
 
@@ -333,7 +527,12 @@ function beats(challenger, current) {
   if (!cTrump && wTrump) return false
   if (cTrump && wTrump) return trumpRank(challenger) < trumpRank(current)
 
-  // Both non-trump: only beats if same suit and higher rank
+  // Both non-trump: a card of the led suit beats a card not of the led suit.
+  const cIsLed = challenger.suit === ledSuit
+  const wIsLed = current.suit === ledSuit
+  if (cIsLed && !wIsLed) return true
+  if (!cIsLed && wIsLed) return false
+
   if (challenger.suit !== current.suit) return false
   return suitRank(challenger) < suitRank(current)
 }
@@ -475,8 +674,53 @@ export function getPlayerView(state, userId) {
   }
 
   // Picker can see blind during picking (they just picked it up — this is after picking)
-  // Discard is always hidden
-  view.discard = view.discard.map(() => ({ id: 'HIDDEN', hidden: true }))
+  // Discard is visible to the picker (they buried it); hidden to everyone else.
+  if (userId !== view.picker) {
+    view.discard = view.discard.map(() => ({ id: 'HIDDEN', hidden: true }))
+  }
+
+  // Under card: picker (who placed it) can see its identity; other players cannot.
+  // Use a sentinel id ('UNDER_CARD') for the redacted form so the client can submit
+  // play_card with that id and the server resolves it.
+  if (view.underCard) {
+    if (userId === view.picker) {
+      view.underCard = { ...view.underCard, isUnderCard: true }
+    } else {
+      view.underCard = {
+        id: UNDER_CARD_ID,
+        hidden: true,
+        isUnderCard: true,
+        played: view.underCard.played,
+      }
+    }
+  }
+
+  // Redact face-down plays in currentTrick: the player who played it sees the real card,
+  // everyone else sees a hidden card. (Trick winner is unknown until resolution.)
+  view.currentTrick = view.currentTrick.map(p => {
+    if (!p.faceDown) return p
+    if (p.userId === userId) return p
+    return { ...p, card: { id: UNDER_CARD_ID, hidden: true, faceDown: true } }
+  })
+
+  // Redact face-down plays in completed tricks: the player who played it AND the trick winner
+  // can see the real card. Everyone else sees a hidden card.
+  view.tricks = view.tricks.map(t => ({
+    ...t,
+    plays: t.plays.map(p => {
+      if (!p.faceDown) return p
+      if (p.userId === userId || t.winner === userId) return p
+      return { ...p, card: { id: UNDER_CARD_ID, hidden: true, faceDown: true } }
+    }),
+  }))
+
+  // Redact lastTrick face-down plays the same way (using the most recent completed trick's winner).
+  const mostRecent = view.tricks[view.tricks.length - 1]
+  view.lastTrick = view.lastTrick.map(p => {
+    if (!p.faceDown) return p
+    if (p.userId === userId || mostRecent?.winner === userId) return p
+    return { ...p, card: { id: UNDER_CARD_ID, hidden: true, faceDown: true } }
+  })
 
   return view
 }

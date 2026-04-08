@@ -8,8 +8,19 @@ function cardImageSrc(cardId) {
 
 export default function Card({ card, playable = false, selected = false, onClick }) {
   if (!card || card.hidden) {
+    const hiddenClasses = [
+      'card', 'card-img', 'hidden',
+      playable ? 'playable' : '',
+      selected ? 'selected' : '',
+    ].filter(Boolean).join(' ')
     return (
-      <div className="card card-img hidden" aria-label="Hidden card">
+      <div
+        className={hiddenClasses}
+        aria-label={card?.isUnderCard ? 'Under card' : 'Hidden card'}
+        title={card?.isUnderCard ? 'Under card' : undefined}
+        onClick={playable ? onClick : undefined}
+        role={playable ? 'button' : undefined}
+      >
         <img src={CARD_BACK_SRC} alt="Card back" className="card-image" />
       </div>
     )

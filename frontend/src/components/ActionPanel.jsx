@@ -9,6 +9,8 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
     : {}
   const turnLabel = actingForName ? `Acting for ${actingForName}` : 'Your turn'
   const [selectedDiscards, setSelectedDiscards] = useState([])
+  const [unknownSelectedSuit, setUnknownSelectedSuit] = useState(null)
+  const [selectedUnderCard, setSelectedUnderCard] = useState(null)
   const [error, setError] = useState(null)
 
   async function act(type, payload) {
@@ -88,24 +90,125 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
   // ── Calling phase ─────────────────────────────────────────
   if (phase === 'calling') {
     if (picker !== myUserId) {
-      return <div className="action-panel"><p>Waiting for picker to call an ace…</p></div>
+      return <div className="action-panel"><p>Waiting for picker to call a partner card…</p></div>
     }
-    const myAces = new Set(myHand.map(c => c.id))
-    // Under card rule: can only call a suit if picker holds ≥1 non-trump card of that suit
-    const callableSuits = ['C', 'H', 'S'].filter(s =>
-      !myAces.has(`A${s}`) &&
-      myHand.some(c => c.suit === s && c.rank !== 'Q' && c.rank !== 'J')
-    )
+
+    const callMode = state.callMode ?? 'ace'
+    const heldIds = new Set(myHand.map(c => c.id))
+    // Cards the picker buried — cannot call any of these since the "partner" would be
+    // nobody (the card is in the blind, never played).
+    const buriedIds = new Set((state.discard ?? []).filter(c => !c.hidden).map(c => c.id))
+
+    // ── King mode: picker holds all 3 fail aces and all 3 fail tens.
+    //    Calls the King of any fail suit they don't hold (mathematically all 3).
+    if (callMode === 'king') {
+      const callableSuits = ['C', 'H', 'S'].filter(s => !heldIds.has(`K${s}`) && !buriedIds.has(`K${s}`))
+      return (
+        <div className="action-panel" style={botStyle}>
+          <h4>Call a king</h4>
+          <p style={{ fontSize: '0.85rem', color: '#ccc' }}>
+            You hold all fail aces and tens. Call a king as your partner.
+            You'll be forced to play your A and 10 of the called suit when it's led.
+          </p>
+          <div className="suit-picker">
+            {callableSuits.map(suit => (
+              <button
+                key={suit}
+                className={`suit-btn ${suit === 'H' ? 'red' : 'black'}`}
+                onClick={() => act('call_king', { suit })}
+                disabled={loading}
+                title={`Call K${suit}`}
+              >
+                K{SUIT_SYMBOLS[suit]}
+              </button>
+            ))}
+          </div>
+          {error && <p style={{ color: '#f87171', marginTop: 6 }}>{error}</p>}
+        </div>
+      )
+    }
+
+    // ── Ten mode: picker holds all 3 fail aces but not all 3 fail tens.
+    //    Calls the 10 of a fail suit whose 10 they do not hold.
+    if (callMode === 'ten') {
+      const callableSuits = ['C', 'H', 'S'].filter(s => !heldIds.has(`10${s}`) && !buriedIds.has(`10${s}`))
+      return (
+        <div className="action-panel" style={botStyle}>
+          <h4>Call a ten</h4>
+          <p style={{ fontSize: '0.85rem', color: '#ccc' }}>
+            You hold all three fail aces. Call a 10 as your partner.
+            You'll be forced to play the Ace of the called suit when that suit is led.
+          </p>
+          <div className="suit-picker">
+            {callableSuits.map(suit => (
+              <button
+                key={suit}
+                className={`suit-btn ${suit === 'H' ? 'red' : 'black'}`}
+                onClick={() => act('call_ten', { suit })}
+                disabled={loading}
+                title={`Call 10${suit}`}
+              >
+                10{SUIT_SYMBOLS[suit]}
+              </button>
+            ))}
+          </div>
+          {error && <p style={{ color: '#f87171', marginTop: 6 }}>{error}</p>}
+        </div>
+      )
+    }
+
+    // ── Ace mode (default). Each suit is either a normal call or requires placing
+    //    an under card (Situation B) if the picker holds no fail card of that suit.
+    const isFailCard = (c, s) => c.suit === s && c.rank !== 'Q' && c.rank !== 'J'
+    const candidateSuits = ['C', 'H', 'S'].filter(s => !heldIds.has(`A${s}`) && !buriedIds.has(`A${s}`))
+    const normalSuits = candidateSuits.filter(s => myHand.some(c => isFailCard(c, s)))
+    const unknownSuits = candidateSuits.filter(s => !myHand.some(c => isFailCard(c, s)))
+
+    if (unknownSelectedSuit) {
+      // Situation B: pick the under card from hand
+      return (
+        <div className="action-panel" style={botStyle}>
+          <h4>Place an under card for A{SUIT_SYMBOLS[unknownSelectedSuit]} Unknown</h4>
+          <p style={{ fontSize: '0.85rem', color: '#ccc' }}>
+            Choose any card to place face-down as the under card. It has no power; it must be played
+            when the called suit is led.
+          </p>
+          <Hand
+            cards={myHand}
+            playableIds={myHand.map(c => c.id)}
+            selectedIds={selectedUnderCard ? [selectedUnderCard] : []}
+            onCardClick={(card) => setSelectedUnderCard(card.id)}
+          />
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 8 }}>
+            <button
+              disabled={!selectedUnderCard || loading}
+              onClick={() => act('call_ace_unknown', { suit: unknownSelectedSuit, underCardId: selectedUnderCard })
+                .then(() => { setUnknownSelectedSuit(null); setSelectedUnderCard(null) })}
+            >
+              Confirm
+            </button>
+            <button
+              className="secondary"
+              onClick={() => { setUnknownSelectedSuit(null); setSelectedUnderCard(null) }}
+              disabled={loading}
+            >
+              Back
+            </button>
+          </div>
+          {error && <p style={{ color: '#f87171', marginTop: 6 }}>{error}</p>}
+        </div>
+      )
+    }
 
     return (
       <div className="action-panel" style={botStyle}>
         <h4>Call an ace</h4>
         <p style={{ fontSize: '0.85rem', color: '#ccc' }}>The holder of the called ace is your partner.</p>
         <div className="suit-picker">
-          {callableSuits.map(suit => (
+          {normalSuits.map(suit => (
             <button
               key={suit}
-              className={`suit-btn ${suit === 'H' || suit === 'D' ? 'red' : 'black'}`}
+              className={`suit-btn ${suit === 'H' ? 'red' : 'black'}`}
               onClick={() => act('call_ace', { suit })}
               disabled={loading}
               title={`Call A${suit}`}
@@ -114,8 +217,28 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
             </button>
           ))}
         </div>
-        {callableSuits.length === 0 && (
-          <p style={{ color: '#f87171' }}>No valid suit to call — you have no under cards. Contact the game admin.</p>
+        {unknownSuits.length > 0 && (
+          <>
+            <p style={{ fontSize: '0.8rem', color: '#ccc', marginTop: 8 }}>
+              These suits require placing an under card (you hold no fail card of the suit):
+            </p>
+            <div className="suit-picker">
+              {unknownSuits.map(suit => (
+                <button
+                  key={suit}
+                  className={`suit-btn ${suit === 'H' ? 'red' : 'black'}`}
+                  onClick={() => setUnknownSelectedSuit(suit)}
+                  disabled={loading}
+                  title={`Call A${suit} Unknown`}
+                >
+                  A{SUIT_SYMBOLS[suit]}?
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        {normalSuits.length === 0 && unknownSuits.length === 0 && (
+          <p style={{ color: '#f87171' }}>No valid suit to call. Contact the game admin.</p>
         )}
         {error && <p style={{ color: '#f87171', marginTop: 6 }}>{error}</p>}
       </div>
