@@ -91,7 +91,11 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
       return <div className="action-panel"><p>Waiting for picker to call an ace…</p></div>
     }
     const myAces = new Set(myHand.map(c => c.id))
-    const callableSuits = ['C', 'H', 'S'].filter(s => !myAces.has(`A${s}`))
+    // Under card rule: can only call a suit if picker holds ≥1 non-trump card of that suit
+    const callableSuits = ['C', 'H', 'S'].filter(s =>
+      !myAces.has(`A${s}`) &&
+      myHand.some(c => c.suit === s && c.rank !== 'Q' && c.rank !== 'J')
+    )
 
     return (
       <div className="action-panel" style={botStyle}>
@@ -111,7 +115,7 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
           ))}
         </div>
         {callableSuits.length === 0 && (
-          <p style={{ color: '#f87171' }}>You hold all non-trump aces — you go alone!</p>
+          <p style={{ color: '#f87171' }}>No valid suit to call — you have no under cards. Contact the game admin.</p>
         )}
         {error && <p style={{ color: '#f87171', marginTop: 6 }}>{error}</p>}
       </div>

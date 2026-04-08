@@ -193,6 +193,12 @@ export function callAce(state, userId, suit) {
     throw new Error(`Picker holds the ${aceId} — cannot call it.`)
   }
 
+  // Under card rule: picker must have at least one non-trump card of the called suit
+  const underCards = state.hands[userId].filter(c => c.suit === suit && !isTrump(c))
+  if (underCards.length === 0) {
+    throw new Error(`Under card rule: must hold at least one ${suit} card to call A${suit}.`)
+  }
+
   const newState = deepClone(state)
   newState.calledAce = { suit, aceId }
 
