@@ -1,6 +1,6 @@
 import { json, err, requireUser, AuthError } from '../../_helpers.js'
 import {
-  pick, pass, discard, callAce, playCard,
+  pick, pass, discard, callAce, callAceUnknown, callTen, callKing, playCard,
   setupLeaster, awardLeasterBlind, resolveLeaster,
   dealHand,
 } from '../../../../shared/gameEngine.js'
@@ -83,6 +83,18 @@ export async function onRequestPost({ request, env, params }) {
 
       case 'call_ace':
         state = callAce(state, userId, payload?.suit)
+        break
+
+      case 'call_ace_unknown':
+        state = callAceUnknown(state, userId, payload?.suit, payload?.underCardId)
+        break
+
+      case 'call_ten':
+        state = callTen(state, userId, payload?.suit)
+        break
+
+      case 'call_king':
+        state = callKing(state, userId, payload?.suit)
         break
 
       case 'play_card': {

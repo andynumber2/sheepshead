@@ -142,7 +142,15 @@ function TestModePanel({ state, players, currentTurnUserId, myUserId, onAction, 
           const hand         = state.hands?.[uid] ?? []
           const isTurn       = uid === currentTurnUserId
           const isMe         = uid === myUserId
-          const visibleCards = hand.filter(c => !c.hidden)
+          let visibleCards = hand.filter(c => !c.hidden)
+          // Append the under card as a clickable face-down tile if this player is the
+          // picker and there's an unplayed under card.
+          if (uid === state.picker && state.underCard && !state.underCard.played) {
+            visibleCards = [
+              ...visibleCards,
+              { id: 'UNDER_CARD', hidden: true, isUnderCard: true, faceDown: true },
+            ]
+          }
 
           if (isMe || visibleCards.length === 0) return null
 
@@ -187,17 +195,48 @@ function currentTurnPlayer(state) {
 }
 
 // ── Legal card computation (mirrors ActionPanel / engine logic) ───────────────
+// `hand` here may include the under card pseudo-entry (id 'UNDER_CARD', isUnderCard: true)
+// when the viewer is the picker.
 function getLegalCardIds(state, userId, hand) {
-  const { currentTrick, calledAce, partner, partnerRevealed } = state
-  if (!currentTrick || currentTrick.length === 0) return hand.map(c => c.id)
-  const ledSuit = effectiveSuit(currentTrick[0].card)
-  const hasSuit = hand.some(c => effectiveSuit(c) === ledSuit)
-  if (!hasSuit) return hand.map(c => c.id)
-  const mustFollow = hand.filter(c => effectiveSuit(c) === ledSuit).map(c => c.id)
-  if (calledAce && userId === partner && !partnerRevealed && ledSuit === calledAce.suit) {
-    const hasCalledAce = hand.some(c => c.id === calledAce.aceId)
-    if (hasCalledAce) return [calledAce.aceId]
+  const { currentTrick, calledAce, calledTen, calledKing, calledSuit, partner, partnerRevealed,
+          underCard, picker, pickerForcedPlays = [] } = state
+  const handCards = hand.filter(c => !c.isUnderCard)
+  const hasUnderCard = hand.some(c => c.isUnderCard) && underCard && !underCard.played
+
+  // Leading: any hand card, plus the under card if held (declares called suit as led)
+  if (!currentTrick || currentTrick.length === 0) {
+    const ids = handCards.map(c => c.id)
+    if (userId === picker && hasUnderCard) ids.push('UNDER_CARD')
+    return ids
   }
+
+  // Determine led suit (face-down lead means called suit is led)
+  const first = currentTrick[0]
+  const ledSuit = first.declaredSuit ?? effectiveSuit(first.card)
+
+  // Picker with under card: when called suit led, MUST play under card
+  if (userId === picker && hasUnderCard && ledSuit === calledSuit) {
+    return ['UNDER_CARD']
+  }
+
+  const hasSuit = handCards.some(c => effectiveSuit(c) === ledSuit)
+  const mustFollow = hasSuit
+    ? handCards.filter(c => effectiveSuit(c) === ledSuit).map(c => c.id)
+    : handCards.map(c => c.id)
+
+  // Partner must play the called card when called suit is led
+  const calledCardId = calledAce?.aceId || calledTen?.tenId || calledKing?.kingId
+  if (calledCardId && userId === partner && !partnerRevealed && ledSuit === calledSuit) {
+    if (handCards.some(c => c.id === calledCardId)) return [calledCardId]
+  }
+
+  // Picker forced plays (Situation A / King case): when called suit led, must play
+  // one of the still-held forced cards (Ace, or Ace/Ten in either order).
+  if (userId === picker && pickerForcedPlays.length > 0 && ledSuit === calledSuit) {
+    const heldForced = pickerForcedPlays.filter(cid => handCards.some(c => c.id === cid))
+    if (heldForced.length > 0) return heldForced
+  }
+
   return mustFollow
 }
 
@@ -343,9 +382,18 @@ export default function GamePage({ gameId, user, onNavigate }) {
   const isActingForBot = isTestMode && user.is_admin && turnUserId !== myUserId && turnUserId !== null
   const actingForPlayer = isActingForBot ? players.find(p => String(p.user_id) === turnUserId) : null
   const effectiveUserId = isActingForBot ? turnUserId : myUserId
-  const activeHand      = isActingForBot
+  let activeHand        = isActingForBot
     ? (state.hands?.[turnUserId] ?? []).filter(c => !c.hidden)
     : myHand
+
+  // If the effective viewer is the picker and there is an unplayed under card,
+  // append it to the hand so it renders as a clickable face-down tile.
+  if (effectiveUserId === state.picker && state.underCard && !state.underCard.played) {
+    activeHand = [
+      ...activeHand,
+      { id: 'UNDER_CARD', hidden: true, isUnderCard: true, faceDown: true },
+    ]
+  }
 
   const dealerUserId  = state.pickOrder ? state.pickOrder[state.dealerSeat] : null
   const pickerUserId  = state.picker
@@ -361,7 +409,15 @@ export default function GamePage({ gameId, user, onNavigate }) {
   function seatProps(player) {
     if (!player) return {}
     const uid  = String(player.user_id)
-    const hand = state.hands?.[uid] ?? []
+    let hand = state.hands?.[uid] ?? []
+    // Append the under card pseudo entry for the picker so it renders as a
+    // face-down, clickable tile alongside the rest of their hand.
+    if (uid === state.picker && state.underCard && !state.underCard.played) {
+      hand = [
+        ...hand,
+        { id: 'UNDER_CARD', hidden: true, isUnderCard: true, faceDown: true },
+      ]
+    }
     return {
       isDealer:      uid === dealerUserId,
       isPicker:      uid === pickerUserId,
