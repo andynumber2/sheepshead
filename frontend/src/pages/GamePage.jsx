@@ -473,6 +473,11 @@ export default function GamePage({ gameId, user, onNavigate }) {
             {partnerPlayer ? ` (${partnerPlayer.username})` : ''}
           </span>
         )}
+        {state.goingAlone && (
+          <span className="called-ace-badge" style={{ background: 'rgba(168,85,247,0.35)' }}>
+            Picker is going alone
+          </span>
+        )}
         {state.isLeaster && (
           <span className="called-ace-badge" style={{ background: 'rgba(245,158,11,0.3)' }}>
             🃏 Leaster
