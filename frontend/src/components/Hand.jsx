@@ -2,7 +2,7 @@ import Card from './Card.jsx'
 import { effectiveSuit, isTrump } from '@shared/gameEngine.js'
 
 // Sort hand: trump first (by trump order), then by suit then rank
-function sortHand(cards) {
+export function sortHand(cards) {
   const TRUMP_ORDER = ['QC','QS','QH','QD','JC','JS','JH','JD','AD','10D','KD','9D','8D','7D']
   const SUIT_RANK = ['A','10','K','9','8','7']
   const SUIT_ORDER = { T: 0, S: 1, H: 2, C: 3 }

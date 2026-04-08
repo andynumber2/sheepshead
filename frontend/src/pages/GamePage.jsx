@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { effectiveSuit } from '@shared/gameEngine.js'
 import { api } from '../lib/api.js'
 import PlayerSeat from '../components/PlayerSeat.jsx'
 import TrickArea from '../components/TrickArea.jsx'
@@ -19,21 +20,22 @@ function getRelativeSeats(players, myUserId) {
   const get = (offset) => sorted[(myIdx + offset) % sorted.length] ?? null
   return {
     bottom:   get(0),   // you
-    right:    get(1),   // 1 seat clockwise
-    topRight: get(2),   // 2 seats clockwise
-    topLeft:  get(3),   // 3 seats clockwise
-    left:     get(4),   // 4 seats clockwise (= 1 counter-clockwise)
+    left:     get(1),   // next player (clockwise from your perspective at the table)
+    topLeft:  get(2),
+    topRight: get(3),
+    right:    get(4),
   }
 }
 
 // ── Replace user IDs in log entries with player usernames ────────────────────
+// Only replace a numeric ID when it follows start-of-line, '(', ', ', or '! '
+// to avoid matching hand numbers ("Hand 1 complete") or multipliers ("×1").
 function resolveLogNames(entries, players) {
   return entries.map(entry => {
     let s = entry
     for (const p of players) {
       const uid = String(p.user_id)
-      // Only replace whole-word matches so "123" doesn't match inside "1234"
-      s = s.replace(new RegExp(`\\b${uid}\\b`, 'g'), p.username)
+      s = s.replace(new RegExp(`(^|\\(|, |! )${uid}\\b`, 'gm'), `$1${p.username}`)
     }
     return s
   })
@@ -182,6 +184,21 @@ function currentTurnPlayer(state) {
     }
   }
   return null
+}
+
+// ── Legal card computation (mirrors ActionPanel / engine logic) ───────────────
+function getLegalCardIds(state, userId, hand) {
+  const { currentTrick, calledAce, partner, partnerRevealed } = state
+  if (!currentTrick || currentTrick.length === 0) return hand.map(c => c.id)
+  const ledSuit = effectiveSuit(currentTrick[0].card)
+  const hasSuit = hand.some(c => effectiveSuit(c) === ledSuit)
+  if (!hasSuit) return hand.map(c => c.id)
+  const mustFollow = hand.filter(c => effectiveSuit(c) === ledSuit).map(c => c.id)
+  if (calledAce && userId === partner && !partnerRevealed && ledSuit === calledAce.suit) {
+    const hasCalledAce = hand.some(c => c.id === calledAce.aceId)
+    if (hasCalledAce) return [calledAce.aceId]
+  }
+  return mustFollow
 }
 
 // ── Main GamePage ─────────────────────────────────────────────────────────────
@@ -343,22 +360,29 @@ export default function GamePage({ gameId, user, onNavigate }) {
 
   function seatProps(player) {
     if (!player) return {}
-    const uid = String(player.user_id)
+    const uid  = String(player.user_id)
+    const hand = state.hands?.[uid] ?? []
     return {
       isDealer:      uid === dealerUserId,
       isPicker:      uid === pickerUserId,
       isPartner:     uid === partnerUserId,
       isYou:         uid === myUserId,
       isActiveTurn:  uid === turnUserId,
-      cardCount:     state.hands?.[uid]?.length ?? 0,
+      cardCount:     hand.length,
       dayScore:      player.day_score      ?? 0,
       lifetimeScore: player.lifetime_score ?? 0,
+      hand,
+      showFaceUp:    isTestMode && user.is_admin,
     }
   }
 
   const resolvedLog  = resolveLogNames(state.log ?? [], players)
+    .filter(e => !/ played /.test(e) && !e.endsWith('won the trick.'))
   const currentTrick = state.currentTrick ?? []
   const lastTrick    = state.lastTrick    ?? []
+
+  const isMyPlayingTurn = state.phase === 'playing' && turnUserId === effectiveUserId
+  const legalIds = isMyPlayingTurn ? getLegalCardIds(state, effectiveUserId, activeHand) : []
 
   return (
     <div className="game-table">
@@ -405,37 +429,33 @@ export default function GamePage({ gameId, user, onNavigate }) {
         )}
       </div>
 
-      {/* ── Your seat + hand ── */}
+      {/* ── Your seat + hand (cards inside the seat box, playable on your turn) ── */}
       <div className="seat-bottom" style={{ textAlign: 'center' }}>
-        <PlayerSeat player={seats.bottom} {...seatProps(seats.bottom)} />
-        {state.phase !== 'discarding' && state.phase !== 'playing' && (
-          <Hand cards={myHand} />
-        )}
-      </div>
-
-      {/* ── Action panel ── */}
-      <div className="action-panel">
-        {isActingForBot && (
-          <div style={{
-            background: 'rgba(124,58,237,0.3)',
-            borderRadius: 6,
-            padding: '8px 10px',
-            fontSize: '0.8rem',
-            color: '#c4b5fd',
-            marginBottom: 8,
-          }}>
-            <div style={{ marginBottom: 6 }}>🧪 Acting for {actingForPlayer?.username ?? turnUserId}</div>
-            <Hand cards={activeHand} />
-          </div>
-        )}
-        <ActionPanel
-          state={state}
-          myUserId={effectiveUserId}
-          myHand={activeHand}
-          onAction={(type, payload) => handleAction(type, payload, isActingForBot ? turnUserId : null)}
-          loading={actionLoading}
+        <PlayerSeat
+          player={seats.bottom}
+          {...seatProps(seats.bottom)}
+          showFaceUp={true}
+          noOverlap={true}
+          playableIds={isMyPlayingTurn ? legalIds : undefined}
+          onCardClick={isMyPlayingTurn
+            ? (card) => { if (legalIds.includes(card.id)) handleAction('play_card', { cardId: card.id }, isActingForBot ? turnUserId : null) }
+            : undefined}
         />
       </div>
+
+      {/* ── Action panel (hidden on your real playing turn — cards in seat instead) ── */}
+      {!(isMyPlayingTurn && !isActingForBot) && (
+        <div className="action-panel">
+          <ActionPanel
+            state={state}
+            myUserId={effectiveUserId}
+            myHand={activeHand}
+            onAction={(type, payload) => handleAction(type, payload, isActingForBot ? turnUserId : null)}
+            loading={actionLoading}
+            actingForName={isActingForBot ? (actingForPlayer?.username ?? turnUserId) : null}
+          />
+        </div>
+      )}
 
       {/* ── Game log ── */}
       <GameLog entries={resolvedLog} />
