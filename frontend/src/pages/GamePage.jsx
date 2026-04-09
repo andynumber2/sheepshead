@@ -289,7 +289,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
   }
 
   async function handleLeave() {
-    if (!window.confirm('Leave this game? If the game is active, it will end for everyone.')) return
+    if (!window.confirm('Leave this game?')) return
     setLeaving(true)
     try {
       await api.games.leave(gameId)
