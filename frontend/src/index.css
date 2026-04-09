@@ -2,6 +2,9 @@
   --card-width: 90px;
   --card-height: 126px;
   --card-radius: 6px;
+  /* Width of the left/right seat columns in the .game-table grid.
+     Fits a full 8-card overlapping mini-card-stack (~384px) plus padding. */
+  --side-col-width: 400px;
 }
 
 body {
@@ -102,7 +105,6 @@ body {
 .mini-card-playable {
   cursor: pointer;
   transition: transform 0.1s;
-  outline: 2px solid var(--pico-primary);
 }
 
 .mini-card-playable:hover {
@@ -124,13 +126,18 @@ body {
   grid-template-areas:
     "top-left  center    top-right"
     "left      center    right"
-    ".         info-bar  ."
-    ".         bottom    ."
+    ".         info-bar  last-trick"
+    ".         bottom    last-trick"
     ".         action    ."
-    "log       log       scores"
-    "admin     admin     admin";
-  grid-template-columns: auto calc(6 * var(--card-width) + 5px + 16px) auto;
-  grid-template-rows: auto auto auto auto auto auto auto;
+    "log       log       scores";
+  /* Side columns are a fixed width so left and right seats stay symmetric
+     regardless of hand size or whether the last-trick widget is showing.
+     Width is sized to comfortably hold a full 8-card mini-card-stack. */
+  grid-template-columns:
+    var(--side-col-width)
+    calc(6 * var(--card-width) + 5px + 16px)
+    var(--side-col-width);
+  grid-template-rows: auto auto auto auto auto auto;
   gap: 12px;
   padding: 16px;
   margin: 0 auto;
@@ -138,17 +145,17 @@ body {
   box-sizing: border-box;
 }
 
-.seat-top-left  { grid-area: top-left; }
-.seat-top-right { grid-area: top-right; }
-.seat-left      { grid-area: left; }
-.seat-right     { grid-area: right; }
+.seat-top-left  { grid-area: top-left;  justify-self: center; }
+.seat-top-right { grid-area: top-right; justify-self: center; }
+.seat-left      { grid-area: left;      justify-self: center; }
+.seat-right     { grid-area: right;     justify-self: center; }
 .seat-bottom    { grid-area: bottom; }
 .trick-area     { grid-area: center; }
 .info-bar       { grid-area: info-bar; }
 .action-panel   { grid-area: action; }
 .game-log       { grid-area: log; }
 .score-board    { grid-area: scores; }
-.admin-panel-area { grid-area: admin; }
+.last-trick-area  { grid-area: last-trick; }
 
 /* ── Player seat ─────────────────────────────────────────── */
 .player-seat {
@@ -158,6 +165,9 @@ body {
   text-align: center;
   color: #fff;
   min-width: 80px;
+  /* Reserve space for the mini-card stack so the seat doesn't collapse
+     vertically when a player runs out of cards mid-hand. */
+  min-height: calc(var(--card-height) + 48px);
 }
 
 /* Wide enough for 6 non-overlapping cards + gaps + padding */
@@ -217,6 +227,68 @@ body {
   justify-content: center;
   align-items: center;
   min-height: 160px;
+}
+
+/* 3x3 sub-grid that places each played card in front of its seat. */
+.trick-grid {
+  display: grid;
+  grid-template-columns: repeat(3, var(--card-width));
+  grid-template-rows: repeat(2, var(--card-height));
+  gap: 6px;
+  justify-items: center;
+  align-items: center;
+}
+
+.trick-grid-mini {
+  --card-width: 70px;
+  --card-height: 98px;
+  gap: 4px;
+}
+
+.trick-slot {
+  width: var(--card-width);
+  height: var(--card-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Nudge each played card toward the seat of the player who played it.
+   Y offsets line each card up vertically with the center of the corresponding
+   seat box (top seats in row 1, side seats in row 2, bottom seat below). */
+.trick-slot-topLeft  { transform: translate(-90px, -36px); }
+.trick-slot-topRight { transform: translate( 90px, -36px); }
+.trick-slot-left     { transform: translate(-90px,  36px); }
+.trick-slot-right    { transform: translate( 90px,  36px); }
+.trick-slot-bottom   { transform: translate(   0,   60px); }
+
+/* Mini last-trick keeps cards in the plain 3x2 grid (no nudging). */
+.trick-grid-mini .trick-slot-topLeft,
+.trick-grid-mini .trick-slot-topRight,
+.trick-grid-mini .trick-slot-left,
+.trick-grid-mini .trick-slot-right,
+.trick-grid-mini .trick-slot-bottom { transform: none; }
+
+/* Last trick — sits below right seat / right of bottom seat.
+   Stretches to fill the right column so it lines up with the right seats. */
+.last-trick-area {
+  background: rgba(0,0,0,0.25);
+  border-radius: 8px;
+  padding: 8px;
+  opacity: 0.7;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  justify-self: stretch;
+  box-sizing: border-box;
+}
+
+.last-trick-label {
+  color: rgba(255,255,255,0.55);
+  font-size: 0.7rem;
+  margin-bottom: 4px;
 }
 
 /* ── Action panel ────────────────────────────────────────── */

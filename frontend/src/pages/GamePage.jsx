@@ -2,11 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { effectiveSuit } from '@shared/gameEngine.js'
 import { api } from '../lib/api.js'
 import PlayerSeat from '../components/PlayerSeat.jsx'
-import TrickArea from '../components/TrickArea.jsx'
+import TrickArea, { LastTrickArea } from '../components/TrickArea.jsx'
 import ActionPanel from '../components/ActionPanel.jsx'
 import GameLog from '../components/GameLog.jsx'
 import ScoreBoard from '../components/ScoreBoard.jsx'
-import Hand from '../components/Hand.jsx'
 
 const SUIT_SYMBOLS   = { C: '♣', D: '♦', H: '♥', S: '♠' }
 const VARIANT_LABELS = { leasters: 'Leasters', doublers: 'Doublers' }
@@ -121,62 +120,6 @@ function AdminSettingsPanel({ gameId, currentVariant, revealPartner, onUpdated }
   )
 }
 
-// ── Test mode panel — shows ALL players' hands ────────────────────────────────
-function TestModePanel({ state, players, currentTurnUserId, myUserId, onAction, loading }) {
-  if (!state) return null
-
-  return (
-    <div style={{
-      background: 'rgba(124,58,237,0.15)',
-      border: '1px solid rgba(124,58,237,0.4)',
-      borderRadius: 8,
-      padding: 12,
-      color: '#fff',
-    }}>
-      <div style={{ fontWeight: 700, marginBottom: 8, fontSize: '0.85rem', color: '#c4b5fd' }}>
-        🧪 Test Mode — all hands visible
-      </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
-        {players.map(p => {
-          const uid          = String(p.user_id)
-          const hand         = state.hands?.[uid] ?? []
-          const isTurn       = uid === currentTurnUserId
-          const isMe         = uid === myUserId
-          let visibleCards = hand.filter(c => !c.hidden)
-          // Append the under card as a clickable face-down tile if this player is the
-          // picker and there's an unplayed under card.
-          if (uid === state.picker && state.underCard && !state.underCard.played) {
-            visibleCards = [
-              ...visibleCards,
-              { id: 'UNDER_CARD', hidden: true, isUnderCard: true, faceDown: true },
-            ]
-          }
-
-          if (isMe || visibleCards.length === 0) return null
-
-          return (
-            <div key={uid} style={{
-              background: isTurn ? 'rgba(124,58,237,0.3)' : 'rgba(0,0,0,0.2)',
-              borderRadius: 6,
-              padding: 8,
-              outline: isTurn ? '2px solid #a78bfa' : 'none',
-            }}>
-              <div style={{ fontSize: '0.75rem', marginBottom: 4, color: isTurn ? '#c4b5fd' : '#aaa' }}>
-                {p.username}{isTurn && ' ← turn'}{p.is_bot && <span style={{ color: '#6b7280' }}> (bot)</span>}
-              </div>
-              <Hand
-                cards={visibleCards}
-                playableIds={isTurn && state.phase === 'playing' ? visibleCards.map(c => c.id) : []}
-                onCardClick={isTurn ? (card) => onAction('play_card', { cardId: card.id }, uid) : undefined}
-              />
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
 // ── Current turn helper ───────────────────────────────────────────────────────
 function currentTurnPlayer(state) {
   if (!state) return null
@@ -249,6 +192,10 @@ export default function GamePage({ gameId, user, onNavigate }) {
   const [currentVariant, setCurrentVariant] = useState(null)
   const [revealPartner, setRevealPartner]   = useState(null)
   const pollingRef = useRef(null)
+  // Tracks the auto-play timer for the last trick. We key by
+  // `${turnUserId}:${trickLen}` so each "pending play" only schedules once,
+  // even though state polling produces a new state object every 2s.
+  const autoPlayRef = useRef({ key: null, timer: null })
 
   const myUserId = String(user.id)
 
@@ -270,6 +217,61 @@ export default function GamePage({ gameId, user, onNavigate }) {
     pollingRef.current = setInterval(fetchGame, 2000)
     return () => clearInterval(pollingRef.current)
   }, [fetchGame])
+
+  // ── Auto-play the last trick ────────────────────────────────────────────────
+  // Once we're down to the final trick (every player has exactly 1 card left),
+  // there are no more decisions to make, so the client auto-dispatches each
+  // play with a 1s pause for a smoother end-of-hand cadence. In test mode the
+  // admin acts on behalf of any player whose turn it is.
+  useEffect(() => {
+    const state    = gameData?.state
+    const isTestMode = gameData?.is_test_mode
+    if (!state || state.phase !== 'playing') return
+
+    const turnUserId = currentTurnPlayer(state)
+    if (!turnUserId) return
+
+    // The "effective" user — me, or in test mode the player whose turn it is.
+    const isActingForBot = isTestMode && user.is_admin && String(turnUserId) !== myUserId
+    const effectiveUserId = isActingForBot ? String(turnUserId) : myUserId
+    if (String(turnUserId) !== effectiveUserId) return
+
+    // Are we in the last trick? Total cards remaining (across all hands +
+    // any unplayed under card + the current trick) should equal pickOrder.length.
+    const handsSum = Object.values(state.hands ?? {}).reduce((s, h) => s + (h?.length ?? 0), 0)
+    const underCount = state.underCard && !state.underCard.played ? 1 : 0
+    const totalRemaining = handsSum + underCount + (state.currentTrick?.length ?? 0)
+    if (totalRemaining !== (state.pickOrder?.length ?? 5)) return
+
+    // Compute the legal play (there should be exactly one in the last trick).
+    let hand = state.hands?.[effectiveUserId] ?? []
+    if (effectiveUserId === state.picker && state.underCard && !state.underCard.played) {
+      hand = [...hand, { id: 'UNDER_CARD', hidden: true, isUnderCard: true, faceDown: true }]
+    }
+    const ids = getLegalCardIds(state, effectiveUserId, hand)
+    if (ids.length === 0) return
+    const cardId = ids[0]
+
+    // Schedule the play — but only once per (turn, trick-progress) pair so
+    // repeated polling of an unchanged state doesn't keep resetting the timer.
+    const key = `${turnUserId}:${state.currentTrick?.length ?? 0}`
+    if (autoPlayRef.current.key === key) return
+    if (autoPlayRef.current.timer) clearTimeout(autoPlayRef.current.timer)
+    autoPlayRef.current.key = key
+    autoPlayRef.current.timer = setTimeout(() => {
+      autoPlayRef.current.timer = null
+      handleAction('play_card', { cardId }, isActingForBot ? turnUserId : null)
+    }, 1000)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameData, myUserId, user.is_admin])
+
+  // Cancel any pending auto-play timer on unmount.
+  useEffect(() => () => {
+    if (autoPlayRef.current.timer) {
+      clearTimeout(autoPlayRef.current.timer)
+      autoPlayRef.current.timer = null
+    }
+  }, [])
 
   async function handleAction(type, payload, actAs = null) {
     setActionLoading(true)
@@ -418,6 +420,18 @@ export default function GamePage({ gameId, user, onNavigate }) {
         { id: 'UNDER_CARD', hidden: true, isUnderCard: true, faceDown: true },
       ]
     }
+    // In test mode, the global admin can play directly out of any seat's hand
+    // when it's that player's turn. (For the bottom seat — i.e. yourself —
+    // playability is wired up below in the JSX as before.)
+    const seatIsActingTarget =
+      isTestMode && user.is_admin
+      && state.phase === 'playing'
+      && uid === turnUserId
+      && uid !== myUserId
+    const seatLegalIds = seatIsActingTarget
+      ? getLegalCardIds(state, uid, hand)
+      : undefined
+
     return {
       isDealer:      uid === dealerUserId,
       isPicker:      uid === pickerUserId,
@@ -429,6 +443,14 @@ export default function GamePage({ gameId, user, onNavigate }) {
       lifetimeScore: player.lifetime_score ?? 0,
       hand,
       showFaceUp:    isTestMode && user.is_admin,
+      playableIds:   seatLegalIds,
+      onCardClick:   seatIsActingTarget
+        ? (card) => {
+            if (seatLegalIds.includes(card.id)) {
+              handleAction('play_card', { cardId: card.id }, uid)
+            }
+          }
+        : undefined,
     }
   }
 
@@ -460,10 +482,12 @@ export default function GamePage({ gameId, user, onNavigate }) {
       {/* ── Center trick ── */}
       <TrickArea
         trick={currentTrick}
-        lastTrick={lastTrick}
-        players={players}
+        seats={seats}
         blind={state.phase === 'picking' ? (state.blind ?? []) : []}
       />
+
+      {/* ── Last trick (mini, mirrors seat positions) ── */}
+      <LastTrickArea lastTrick={lastTrick} seats={seats} />
 
       {/* ── Info bar: called ace + partner reveal ── */}
       <div className="info-bar">
@@ -529,20 +553,6 @@ export default function GamePage({ gameId, user, onNavigate }) {
             currentVariant={currentVariant ?? noPickVariant}
             revealPartner={revealPartner ?? gameData.reveal_partner ?? true}
             onUpdated={handleSettingsUpdate}
-          />
-        </div>
-      )}
-
-      {/* ── Test mode panel (global admin only) ── */}
-      {isTestMode && user.is_admin && (
-        <div className="admin-panel-area">
-          <TestModePanel
-            state={state}
-            players={players}
-            currentTurnUserId={turnUserId}
-            myUserId={myUserId}
-            onAction={handleAction}
-            loading={actionLoading}
           />
         </div>
       )}

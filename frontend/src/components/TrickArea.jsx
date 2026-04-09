@@ -1,22 +1,48 @@
 import Card from './Card.jsx'
 
-export default function TrickArea({ trick = [], lastTrick = [], players = [], blind = [] }) {
-  const getUsername = (userId) => {
-    const p = players.find(p => String(p.user_id) === String(userId))
-    return p?.username ?? userId
+// Map a played-card entry to one of the 5 seat slots based on `seats`
+// (the relative-seat layout passed in from GamePage).
+function slotForUserId(seats, userId) {
+  const u = String(userId)
+  for (const slot of ['bottom', 'left', 'topLeft', 'topRight', 'right']) {
+    if (seats?.[slot] && String(seats[slot].user_id) === u) return slot
+  }
+  return null
+}
+
+// 3x3 sub-grid that places cards in front of their seat positions:
+//   [topLeft]  .       [topRight]
+//   [left]     .       [right]
+//   .          [bottom] .
+function TrickGrid({ entries = [], seats = {}, mini = false }) {
+  const slots = { topLeft: null, topRight: null, left: null, right: null, bottom: null }
+  for (const entry of entries) {
+    const slot = slotForUserId(seats, entry.userId)
+    if (slot) slots[slot] = entry
   }
 
-  const trickCards = (entries, dim = false) => (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', opacity: dim ? 0.45 : 1 }}>
-      {entries.map(({ userId, card }) => (
-        <div key={userId} style={{ textAlign: 'center' }}>
-          <div style={{ color: '#ccc', fontSize: '0.7rem', marginBottom: 2 }}>{getUsername(userId)}</div>
-          <Card card={card} />
-        </div>
-      ))}
+  const cell = (slot) => {
+    const entry = slots[slot]
+    return (
+      <div className={`trick-slot trick-slot-${slot}`}>
+        {entry && <Card card={entry.card} />}
+      </div>
+    )
+  }
+
+  return (
+    <div className={`trick-grid${mini ? ' trick-grid-mini' : ''}`}>
+      {cell('topLeft')}
+      <div className="trick-slot trick-slot-spacer" />
+      {cell('topRight')}
+      {cell('left')}
+      {cell('bottom')}
+      {cell('right')}
     </div>
   )
+}
 
+export default function TrickArea({ trick = [], seats = {}, blind = [] }) {
   return (
     <div className="trick-area">
       {blind.length > 0 && (
@@ -28,22 +54,23 @@ export default function TrickArea({ trick = [], lastTrick = [], players = [], bl
         </div>
       )}
 
-      {trick.length === 0 && lastTrick.length === 0 && blind.length === 0 && (
+      {trick.length === 0 && blind.length === 0 && (
         <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>
           Waiting for first play…
         </span>
       )}
 
-      {trick.length > 0 && trickCards(trick)}
+      {trick.length > 0 && <TrickGrid entries={trick} seats={seats} />}
+    </div>
+  )
+}
 
-      {lastTrick.length > 0 && (
-        <div style={{ width: '100%', marginTop: trick.length > 0 ? 12 : 0 }}>
-          <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', textAlign: 'center', marginBottom: 4 }}>
-            Last trick
-          </div>
-          {trickCards(lastTrick, true)}
-        </div>
-      )}
+export function LastTrickArea({ lastTrick = [], seats = {} }) {
+  if (!lastTrick || lastTrick.length === 0) return null
+  return (
+    <div className="last-trick-area">
+      <div className="last-trick-label">Last trick</div>
+      <TrickGrid entries={lastTrick} seats={seats} mini />
     </div>
   )
 }
