@@ -33,8 +33,8 @@ export async function onRequestPost({ request, env, params }) {
       return json({ left: true, ended: true })
     }
 
-    if (game.status === 'active') {
-      // Can't continue with fewer than 5 — end the game
+    if (game.status === 'active' && game.is_test_mode) {
+      // Test mode: end the game immediately when anyone leaves
       await env.DB.prepare(
         "UPDATE games SET status = 'complete', updated_at = datetime('now') WHERE id = ?"
       ).bind(gameId).run()
