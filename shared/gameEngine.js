@@ -518,6 +518,17 @@ function validatePlay(state, userId, card) {
     }
   }
 
+  // Called card cannot be played unless the called suit is led
+  // (except when it's the player's only remaining card)
+  if (
+    calledCardId &&
+    card.id === calledCardId &&
+    ledSuit !== state.calledSuit &&
+    hand.some(c => c.id !== calledCardId)
+  ) {
+    throw new Error(`Cannot play ${calledCardId} unless the called suit is led.`)
+  }
+
   // Picker forced plays (Situation A / King case): when called suit led, picker must
   // play one of the still-held forced cards (Ace, or Ace/Ten in either order).
   if (
