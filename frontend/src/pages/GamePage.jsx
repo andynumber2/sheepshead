@@ -196,6 +196,11 @@ export default function GamePage({ gameId, user, onNavigate }) {
   // `${turnUserId}:${trickLen}` so each "pending play" only schedules once,
   // even though state polling produces a new state object every 2s.
   const autoPlayRef = useRef({ key: null, timer: null })
+  // Displayed trick — trails the server state by 1 s after each trick completes
+  // so the completed trick stays visible before clearing.
+  const [displayedTrick, setDisplayedTrick] = useState([])
+  const trickClearTimerRef = useRef(null)
+  const lastProcessedTrickCountRef = useRef(null)
 
   const myUserId = String(user.id)
 
@@ -270,6 +275,50 @@ export default function GamePage({ gameId, user, onNavigate }) {
     if (autoPlayRef.current.timer) {
       clearTimeout(autoPlayRef.current.timer)
       autoPlayRef.current.timer = null
+    }
+  }, [])
+
+  // ── Trick clear delay ───────────────────────────────────────────────────────
+  // When a trick completes the server returns currentTrick: []. Keep the cards
+  // visible for 1 s before clearing, so players can see who played what.
+  useEffect(() => {
+    const trick      = gameData?.state?.currentTrick ?? []
+    const trickCount = gameData?.state?.tricks?.length ?? 0
+
+    if (trick.length > 0) {
+      // Cards are being played — update immediately and cancel any pending clear.
+      if (trickClearTimerRef.current) {
+        clearTimeout(trickClearTimerRef.current)
+        trickClearTimerRef.current = null
+      }
+      setDisplayedTrick(trick)
+    } else if (trickCount !== lastProcessedTrickCountRef.current) {
+      // A new trick just completed — guard by trickCount so repeated polls of
+      // the same state don't re-trigger.
+      lastProcessedTrickCountRef.current = trickCount
+      if (trickClearTimerRef.current) clearTimeout(trickClearTimerRef.current)
+
+      // Skip the delay on the last trick of the hand (phase has already moved on).
+      if (gameData?.state?.phase !== 'playing') {
+        setDisplayedTrick([])
+        return
+      }
+
+      // Show all 5 cards for 1 s then clear.
+      const lastTrick = gameData?.state?.lastTrick ?? []
+      if (lastTrick.length > 0) setDisplayedTrick(lastTrick)
+      trickClearTimerRef.current = setTimeout(() => {
+        trickClearTimerRef.current = null
+        setDisplayedTrick([])
+      }, 1000)
+    }
+  }, [gameData])
+
+  // Cancel pending trick clear on unmount.
+  useEffect(() => () => {
+    if (trickClearTimerRef.current) {
+      clearTimeout(trickClearTimerRef.current)
+      trickClearTimerRef.current = null
     }
   }, [])
 
@@ -481,7 +530,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
 
       {/* ── Center trick ── */}
       <TrickArea
-        trick={currentTrick}
+        trick={displayedTrick}
         seats={seats}
         blind={state.phase === 'picking' ? (state.blind ?? []) : []}
       />
