@@ -29,7 +29,7 @@ export async function onRequestPost({ request, env }) {
     'INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)'
   ).bind(token, userId, expiresAt).run()
 
-  return new Response(JSON.stringify({ id: userId, username }), {
+  return new Response(JSON.stringify({ id: userId, username, is_admin: false }), {
     status: 201,
     headers: {
       'Content-Type': 'application/json',
