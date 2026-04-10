@@ -397,7 +397,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
     ]
   }
 
-  const dealerUserId  = state.pickOrder ? state.pickOrder[state.dealerSeat] : null
+  const dealerUserId  = state.pickOrder ? state.pickOrder[4] : null
   const pickerUserId  = state.picker
   const partnerUserId = state.partnerRevealed ? state.partner : null
 

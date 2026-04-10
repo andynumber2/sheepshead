@@ -231,7 +231,7 @@ export function callAce(state, userId, suit) {
   newState.calledSuit = suit
   newState.partner = findHolder(newState.hands, aceId, userId)
   newState.phase = 'playing'
-  newState.currentLeader = userId
+  newState.currentLeader = newState.pickOrder[0]
   newState.log.push(`${userId} called the A${suit}.`)
   return newState
 }
@@ -251,7 +251,7 @@ export function goAlone(state, userId) {
   newState.calledSuit = null
   newState.pickerForcedPlays = []
   newState.phase = 'playing'
-  newState.currentLeader = userId
+  newState.currentLeader = newState.pickOrder[0]
   newState.log.push(`${userId} is going alone.`)
   return newState
 }
@@ -300,7 +300,7 @@ export function callAceUnknown(state, userId, suit, underCardId) {
   newState.calledSuit = suit
   newState.partner = findHolder(newState.hands, aceId, userId)
   newState.phase = 'playing'
-  newState.currentLeader = userId
+  newState.currentLeader = newState.pickOrder[0]
   newState.log.push(`${userId} called A${suit} Unknown and placed an under card.`)
   return newState
 }
@@ -328,7 +328,7 @@ export function callTen(state, userId, suit) {
   newState.pickerForcedPlays = [`A${suit}`]
   newState.partner = findHolder(newState.hands, tenId, userId)
   newState.phase = 'playing'
-  newState.currentLeader = userId
+  newState.currentLeader = newState.pickOrder[0]
   newState.log.push(`${userId} called the ${tenId}.`)
   return newState
 }
@@ -356,7 +356,7 @@ export function callKing(state, userId, suit) {
   newState.pickerForcedPlays = [`A${suit}`, `10${suit}`]
   newState.partner = findHolder(newState.hands, kingId, userId)
   newState.phase = 'playing'
-  newState.currentLeader = userId
+  newState.currentLeader = newState.pickOrder[0]
   newState.log.push(`${userId} called the ${kingId}.`)
   return newState
 }
