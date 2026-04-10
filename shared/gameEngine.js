@@ -640,6 +640,12 @@ function computeScores(state) {
     `${pickerWon ? 'Picker wins' : 'Opponents win'}. Multiplier: ×${multiplier}.`
   )
 
+  const fmt = (n) => (n >= 0 ? '+' : '') + n
+  let scoreLine = `${picker}: ${fmt(scores[picker])}`
+  if (partner) scoreLine += `, ${partner}: ${fmt(scores[partner])}`
+  scoreLine += `. Rest ${pickerWon ? 'lost' : 'earned'} ${Math.abs(scores[opponents[0]])}.`
+  state.log.push(scoreLine)
+
   return scores
 }
 

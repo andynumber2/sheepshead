@@ -266,7 +266,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
     autoPlayRef.current.timer = setTimeout(() => {
       autoPlayRef.current.timer = null
       handleAction('play_card', { cardId }, isActingForBot ? turnUserId : null)
-    }, 1000)
+    }, 500)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameData, myUserId, user.is_admin])
 
