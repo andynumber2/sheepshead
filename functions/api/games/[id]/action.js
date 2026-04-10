@@ -167,6 +167,9 @@ async function finishHand(DB, gameId, state) {
     `--- Hand ${state.handNumber} complete ---`,
   ]
 
+  // Carry last trick forward so players can see it at the start of the new hand
+  nextState.lastTrick = state.lastTrick
+
   await DB.prepare(
     "UPDATE games SET doubler_multiplier = 1, updated_at = datetime('now') WHERE id = ?"
   ).bind(gameId).run()

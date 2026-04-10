@@ -611,8 +611,8 @@ function computeScores(state) {
 
   if (pickerWon) {
     if (goingAlone) {
-      for (const opp of opponents) scores[opp] = -2 * multiplier
-      scores[picker] = opponents.length * 2 * multiplier
+      for (const opp of opponents) scores[opp] = -1 * multiplier
+      scores[picker] = opponents.length * multiplier
     } else {
       for (const opp of opponents) scores[opp] = -1 * multiplier
       if (partner) {
@@ -625,8 +625,8 @@ function computeScores(state) {
     }
   } else {
     if (goingAlone) {
-      scores[picker] = -opponents.length * 2 * multiplier
-      for (const opp of opponents) scores[opp] = 2 * multiplier
+      scores[picker] = -opponents.length * multiplier
+      for (const opp of opponents) scores[opp] = 1 * multiplier
     } else {
       scores[picker] = -2 * multiplier
       if (partner) scores[partner] = -1 * multiplier
@@ -639,6 +639,12 @@ function computeScores(state) {
     `Hand over. Picker team (${pickerTeam.join(', ')}) had ${pickerTeamPoints} pts. ` +
     `${pickerWon ? 'Picker wins' : 'Opponents win'}. Multiplier: ×${multiplier}.`
   )
+
+  const fmt = (n) => (n >= 0 ? '+' : '') + n
+  let scoreLine = `${picker}: ${fmt(scores[picker])}`
+  if (partner) scoreLine += `, ${partner}: ${fmt(scores[partner])}`
+  scoreLine += `. Rest ${pickerWon ? 'lost' : 'earned'} ${Math.abs(scores[opponents[0]])}.`
+  state.log.push(scoreLine)
 
   return scores
 }
