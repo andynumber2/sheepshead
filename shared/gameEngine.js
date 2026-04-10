@@ -466,7 +466,22 @@ function getLedSuit(trick, state) {
 
 function validatePlay(state, userId, card) {
   const trick = state.currentTrick
-  if (trick.length === 0) return  // Leader can play anything
+
+  // Partner cannot lead the called suit unless they lead with the called card
+  if (trick.length === 0) {
+    const calledCardId =
+      state.calledAce?.aceId || state.calledTen?.tenId || state.calledKing?.kingId
+    if (
+      calledCardId &&
+      userId === state.partner &&
+      !state.partnerRevealed &&
+      effectiveSuit(card) === state.calledSuit &&
+      card.id !== calledCardId
+    ) {
+      throw new Error(`Partner cannot lead the called suit without playing ${calledCardId}.`)
+    }
+    return
+  }
 
   const ledSuit = getLedSuit(trick, state)
   const hand = state.hands[userId]

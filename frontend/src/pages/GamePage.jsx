@@ -147,8 +147,17 @@ function getLegalCardIds(state, userId, hand) {
   const hasUnderCard = hand.some(c => c.isUnderCard) && underCard && !underCard.played
 
   // Leading: any hand card, plus the under card if held (declares called suit as led)
+  // Exception: partner cannot lead the called suit unless they lead with the called card
   if (!currentTrick || currentTrick.length === 0) {
-    const ids = handCards.map(c => c.id)
+    const calledCardId = calledAce?.aceId || calledTen?.tenId || calledKing?.kingId
+    let ids
+    if (calledCardId && userId === partner && !partnerRevealed) {
+      ids = handCards
+        .filter(c => effectiveSuit(c) !== calledSuit || c.id === calledCardId)
+        .map(c => c.id)
+    } else {
+      ids = handCards.map(c => c.id)
+    }
     if (userId === picker && hasUnderCard) ids.push('UNDER_CARD')
     return ids
   }
