@@ -9,7 +9,7 @@ export async function onRequestPost({ request, env }) {
   if (!username || !password) return err('Username and password are required.')
 
   const user = await DB.prepare(
-    'SELECT id, username, password_hash, salt, is_bot FROM users WHERE username = ?'
+    'SELECT id, username, password_hash, salt, is_bot, is_admin FROM users WHERE username = ?'
   ).bind(username).first()
 
   if (!user) return err('Invalid username or password.', 401)
@@ -25,7 +25,7 @@ export async function onRequestPost({ request, env }) {
     'INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)'
   ).bind(token, user.id, expiresAt).run()
 
-  return new Response(JSON.stringify({ id: user.id, username: user.username }), {
+  return new Response(JSON.stringify({ id: user.id, username: user.username, is_admin: user.is_admin === 1 }), {
     status: 200,
     headers: {
       'Content-Type': 'application/json',
