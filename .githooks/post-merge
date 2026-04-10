@@ -4,3 +4,9 @@
 git fetch --prune
 gone=$(git branch -vv | awk '/: gone\]/ {print $1}')
 [ -n "$gone" ] && echo "$gone" | xargs git branch -d
+
+# Pull main down to latest when we're on a different branch
+current=$(git symbolic-ref --short HEAD 2>/dev/null)
+if [ "$current" != "main" ]; then
+  git fetch origin main:main 2>/dev/null && echo "Updated local main to origin/main"
+fi
