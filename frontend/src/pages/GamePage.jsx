@@ -466,6 +466,14 @@ export default function GamePage({ gameId, user, onNavigate }) {
     ? players.find(p => String(p.user_id) === String(state.partner))
     : null
 
+  // Crack/recrack window: test mode admin can act for any seat before first card
+  const crackWindowOpen =
+    isTestMode && user.is_admin
+    && state.phase === 'playing'
+    && !state.isLeaster
+    && (state.tricks ?? []).length === 0
+    && (state.currentTrick ?? []).length === 0
+
   function seatProps(player) {
     if (!player) return {}
     const uid  = String(player.user_id)
@@ -490,6 +498,16 @@ export default function GamePage({ gameId, user, onNavigate }) {
       ? getLegalCardIds(state, uid, hand)
       : undefined
 
+    // Crack/recrack buttons: show in test mode during the cracking window
+    const isSeatOpponent = uid !== state.picker && uid !== state.partner
+    const actAs = uid !== myUserId ? uid : null
+    const onCrack   = crackWindowOpen && isSeatOpponent && state.crackState === null
+      ? () => handleAction('crack', {}, actAs)
+      : undefined
+    const onRecrack = crackWindowOpen && !isSeatOpponent && state.crackState === 'cracked'
+      ? () => handleAction('recrack', {}, actAs)
+      : undefined
+
     return {
       isDealer:      uid === dealerUserId,
       isPicker:      uid === pickerUserId,
@@ -509,6 +527,8 @@ export default function GamePage({ gameId, user, onNavigate }) {
             }
           }
         : undefined,
+      onCrack,
+      onRecrack,
     }
   }
 

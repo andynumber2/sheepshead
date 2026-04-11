@@ -16,6 +16,8 @@ export default function PlayerSeat({
   playableIds,
   onCardClick,
   noOverlap,
+  onCrack,
+  onRecrack,
 }) {
   if (!player) {
     return (
@@ -29,12 +31,22 @@ export default function PlayerSeat({
 
   return (
     <div className={`player-seat${isActiveTurn ? ' active-turn' : ''}${noOverlap ? ' player-seat-wide' : ''}`}>
-      <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+      <div style={{ fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 3 }}>
         {player.username}
         {isYou     && <span className="badge badge-you">you</span>}
         {isDealer  && <span className="badge badge-dealer">D</span>}
         {isPicker  && <span className="badge badge-picker">picker</span>}
         {isPartner && <span className="badge badge-partner">partner</span>}
+        {onCrack   && (
+          <button onClick={onCrack} style={{ fontSize: '0.6rem', padding: '1px 4px', lineHeight: 1.4, marginLeft: 2 }}>
+            crack
+          </button>
+        )}
+        {onRecrack && (
+          <button onClick={onRecrack} style={{ fontSize: '0.6rem', padding: '1px 4px', lineHeight: 1.4, marginLeft: 2 }}>
+            recrack
+          </button>
+        )}
       </div>
       <div className="player-scores">
         D: {formatScore(dayScore ?? 0)}, L: {formatScore(lifetimeScore ?? 0)}
