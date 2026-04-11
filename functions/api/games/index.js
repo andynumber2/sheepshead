@@ -55,6 +55,20 @@ async function createGame({ request, env }) {
     return err(`You are already in a game ("${existingGame.name}"). Leave it before creating a new one.`, 409)
   }
 
+  // Enforce active game limit (admins are exempt)
+  if (!user.is_admin) {
+    const limitRow = await env.DB.prepare(
+      "SELECT value FROM config WHERE key = 'max_active_games'"
+    ).first()
+    const limit = parseInt(limitRow?.value ?? '5', 10)
+    const countRow = await env.DB.prepare(
+      "SELECT COUNT(*) as count FROM games WHERE status IN ('waiting', 'active')"
+    ).first()
+    if (countRow.count >= limit) {
+      return err(`The game limit of ${limit} has been reached. Please wait for a game to finish.`, 409)
+    }
+  }
+
   const name         = body?.name?.trim() || `${user.username}'s game`
   const noPickVariant = body?.no_pick_variant === 'doublers' ? 'doublers' : 'leasters'
   const testMode     = !!(body?.test_mode && user.is_admin)
