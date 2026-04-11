@@ -35,6 +35,7 @@ export const api = {
     listUsers:    ()          => request('GET',   '/admin/users'),
     getUser:      (id)        => request('GET',   `/admin/users/${id}`),
     updateUser:   (id, patch) => request('PATCH', `/admin/users/${id}`, patch),
+    deleteUser: (id)        => request('DELETE', `/admin/users/${id}`),
     getConfig:    ()          => request('GET',   '/admin/config'),
     updateConfig: (patch)     => request('PATCH', '/admin/config', patch),
   },
