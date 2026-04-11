@@ -32,8 +32,9 @@ export const api = {
     updateSettings: (id, settings)                  => request('PATCH', `/games/${id}/settings`, settings),
   },
   admin: {
-    listUsers:  ()          => request('GET',   '/admin/users'),
-    getUser:    (id)        => request('GET',   `/admin/users/${id}`),
-    updateUser: (id, patch) => request('PATCH', `/admin/users/${id}`, patch),
+    listUsers:  ()          => request('GET',    '/admin/users'),
+    getUser:    (id)        => request('GET',    `/admin/users/${id}`),
+    updateUser: (id, patch) => request('PATCH',  `/admin/users/${id}`, patch),
+    deleteUser: (id)        => request('DELETE', `/admin/users/${id}`),
   },
 }
