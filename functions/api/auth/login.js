@@ -13,7 +13,7 @@ export async function onRequestPost({ request, env }) {
   ).bind(username).first()
 
   if (!user) return err('Invalid username or password.', 401)
-  if (user.is_bot) return err('Bot accounts cannot log in.', 403)
+  if (user.is_bot) return err('Test bot accounts cannot log in.', 403)
 
   const hash = await hashPassword(password, user.salt)
   if (hash !== user.password_hash) return err('Invalid username or password.', 401)

@@ -75,7 +75,7 @@ function UserRow({ user, currentUserId, onSaved, onDeleted }) {
         <td>
           {user.username}
           {isSelf && <span className="badge badge-you" style={{ marginLeft: 6 }}>you</span>}
-          {!!user.is_bot && <span className="badge" style={{ background: '#6b7280', color: '#fff', marginLeft: 6 }}>bot</span>}
+          {!!user.is_bot && <span className="badge" style={{ background: '#6b7280', color: '#fff', marginLeft: 6 }}>test bot</span>}
         </td>
         <td>{user.is_admin ? '✓' : '—'}</td>
         <td>{user.is_bot ? '✓' : '—'}</td>
@@ -255,10 +255,10 @@ export default function AccountManagementPage({ currentUser, onNavigate }) {
           <table style={{ width: '100%', tableLayout: 'fixed', fontSize: '0.78rem' }}>
               <colgroup>
                 <col style={{ width: '4%' }} />
-                <col style={{ width: '22%' }} />
+                <col style={{ width: '20%' }} />
                 <col style={{ width: '7%' }} />
-                <col style={{ width: '6%' }} />
-                <col style={{ width: '27%' }} />
+                <col style={{ width: '9%' }} />
+                <col style={{ width: '26%' }} />
                 <col style={{ width: '34%' }} />
               </colgroup>
               <thead>
@@ -266,7 +266,7 @@ export default function AccountManagementPage({ currentUser, onNavigate }) {
                   <SortTh col="id">ID</SortTh>
                   <SortTh col="username">Username</SortTh>
                   <SortTh col="is_admin">Admin</SortTh>
-                  <SortTh col="is_bot">Bot</SortTh>
+                  <SortTh col="is_bot">Test Bot</SortTh>
                   <SortTh col="created_at">Created / New password</SortTh>
                   <th>Actions</th>
                 </tr>
