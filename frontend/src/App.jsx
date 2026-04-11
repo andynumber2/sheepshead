@@ -5,6 +5,7 @@ import RegisterPage from './pages/RegisterPage.jsx'
 import LobbyPage from './pages/LobbyPage.jsx'
 import GamePage from './pages/GamePage.jsx'
 import AccountManagementPage from './pages/AccountManagementPage.jsx'
+import AdminPanelPage from './pages/AdminPanelPage.jsx'
 
 function getRoute() {
   return window.location.hash.replace('#', '') || '/'
@@ -15,6 +16,7 @@ function parseRoute(route) {
   if (gameMatch) return { page: 'game', gameId: gameMatch[1] }
   if (route === '/register')           return { page: 'register' }
   if (route === '/lobby')              return { page: 'lobby' }
+  if (route === '/admin')              return { page: 'admin' }
   if (route === '/account-management') return { page: 'account-management' }
   return { page: 'login' }
 }
@@ -68,6 +70,11 @@ export default function App() {
 
   if (page === 'game' && gameId) {
     return <GamePage gameId={gameId} user={user} onNavigate={navigate} />
+  }
+
+  if (page === 'admin') {
+    if (!user.is_admin) { navigate('/lobby'); return null }
+    return <AdminPanelPage onNavigate={navigate} />
   }
 
   if (page === 'account-management') {
