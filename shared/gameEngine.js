@@ -107,6 +107,8 @@ export function dealHand(playerIds, dealerSeat, handNumber, doublerMultiplier) {
     currentTrick: [],          // in-progress: [{userId, card}]
     lastTrick: [],             // last completed trick — shown between tricks
     currentLeader: null,       // userId who leads next trick
+    handCrackMultiplier: 1,    // 1 | 2 | 4 — crack/recrack multiplier for this hand only
+    crackState: null,          // null | 'cracked' | 'recracked'
     log: [],                   // string messages
     scores: {},                // { userId: delta } — populated at scoring
   }
@@ -358,6 +360,47 @@ export function callKing(state, userId, suit) {
   newState.phase = 'playing'
   newState.currentLeader = newState.pickOrder[0]
   newState.log.push(`${userId} called the ${kingId}.`)
+  return newState
+}
+
+// ─── Crack / Recrack ─────────────────────────────────────────────────────────
+// Opponents crack before the first card is played to double the hand's stakes.
+// Picker/partner can recrack to double again (×4 total on top of doublerMultiplier).
+// Cracking is unavailable in leasters (no teams).
+
+function assertCrackWindow(state) {
+  assertPhase(state, 'playing')
+  if (state.isLeaster) throw new Error('Cannot crack during a leaster.')
+  if (state.tricks.length > 0 || state.currentTrick.length > 0) {
+    throw new Error('Cracking window is closed once the first card is played.')
+  }
+}
+
+function isOpponent(state, userId) {
+  return userId !== state.picker && userId !== state.partner
+}
+
+export function crack(state, userId) {
+  assertCrackWindow(state)
+  if (!isOpponent(state, userId)) throw new Error('Only opponents may crack.')
+  if (state.crackState !== null) throw new Error('Already cracked.')
+
+  const newState = deepClone(state)
+  newState.crackState = 'cracked'
+  newState.handCrackMultiplier = 2
+  newState.log.push(`${userId} cracked! Hand stakes ×2.`)
+  return newState
+}
+
+export function recrack(state, userId) {
+  assertCrackWindow(state)
+  if (isOpponent(state, userId)) throw new Error('Only the picker or partner may recrack.')
+  if (state.crackState !== 'cracked') throw new Error('Can only recrack after a crack.')
+
+  const newState = deepClone(state)
+  newState.crackState = 'recracked'
+  newState.handCrackMultiplier = 4
+  newState.log.push(`${userId} recracked! Hand stakes ×4.`)
   return newState
 }
 
@@ -630,7 +673,7 @@ function computeScores(state) {
   if (pickerTeamPoints >= 91 || (!pickerWon && pickerTeamPoints <= 29)) baseMultiplier = 2  // schneider
   if (pickerTeamTricks === 6 || pickerTeamTricks === 0) baseMultiplier = 3  // schwarz
 
-  const multiplier = baseMultiplier * doublerMultiplier
+  const multiplier = baseMultiplier * doublerMultiplier * (state.handCrackMultiplier ?? 1)
 
   const scores = {}
   for (const uid of Object.keys(state.hands)) scores[uid] = 0

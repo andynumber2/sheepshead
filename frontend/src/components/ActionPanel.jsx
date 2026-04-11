@@ -61,7 +61,8 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
 
   if (!state) return null
 
-  const { phase, picker, pickOrder, pickIndex, currentTrick, isLeaster, doublerMultiplier } = state
+  const { phase, picker, pickOrder, pickIndex, currentTrick, isLeaster, doublerMultiplier,
+          crackState, handCrackMultiplier } = state
 
   // ── Picking phase ─────────────────────────────────────────
   if (phase === 'picking') {
@@ -289,11 +290,56 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
   if (phase === 'playing') {
     const myTurn = currentPlayer(state) === myUserId
 
+    // Crack / recrack window: before the first card of the hand is played
+    const crackWindowOpen = !isLeaster && state.tricks.length === 0 && currentTrick.length === 0
+    const iAmOpponent = myUserId !== state.picker && myUserId !== state.partner
+    const canCrack = crackWindowOpen && iAmOpponent && crackState === null
+    const canRecrack = crackWindowOpen && !iAmOpponent && crackState === 'cracked'
+
+    if (crackWindowOpen && (canCrack || canRecrack || crackState !== null)) {
+      const crackLabel =
+        crackState === 'recracked' ? 'Recracked! Stakes ×4 for this hand.'
+        : crackState === 'cracked' ? 'Opponents cracked! Stakes ×2 for this hand.'
+        : null
+
+      return (
+        <div className="action-panel">
+          {crackLabel && (
+            <p style={{ color: '#fbbf24', fontWeight: 'bold', marginBottom: 8 }}>{crackLabel}</p>
+          )}
+          {canCrack && (
+            <div>
+              <p style={{ fontSize: '0.85rem', color: '#ccc', marginBottom: 6 }}>
+                Double this hand's stakes before play begins.
+              </p>
+              <button onClick={() => act('crack')} disabled={loading}>
+                Crack (×2)
+              </button>
+            </div>
+          )}
+          {canRecrack && (
+            <div>
+              <p style={{ fontSize: '0.85rem', color: '#ccc', marginBottom: 6 }}>
+                Double again — opponents cracked first.
+              </p>
+              <button onClick={() => act('recrack')} disabled={loading}>
+                Recrack (×4)
+              </button>
+            </div>
+          )}
+          {!canCrack && !canRecrack && crackState !== null && (
+            <p style={{ fontSize: '0.85rem', color: '#aaa' }}>Waiting for others to play…</p>
+          )}
+          {error && <p style={{ color: '#f87171', marginTop: 6 }}>{error}</p>}
+        </div>
+      )
+    }
+
     if (!myTurn) {
       return (
         <div className="action-panel">
           <p>Waiting for others to play…</p>
-          {isLeaster && <p style={{ color: '#f59e0b' }}>🃏 Leaster — fewest points wins!</p>}
+          {isLeaster && <p style={{ color: '#f59e0b' }}>Leaster — fewest points wins!</p>}
         </div>
       )
     }
@@ -303,7 +349,7 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
       return (
         <div className="action-panel" style={botStyle}>
           <h4>{turnLabel} — play a card</h4>
-          {isLeaster && <p style={{ color: '#f59e0b', marginBottom: 4 }}>🃏 Leaster — fewest points wins!</p>}
+          {isLeaster && <p style={{ color: '#f59e0b', marginBottom: 4 }}>Leaster — fewest points wins!</p>}
         </div>
       )
     }

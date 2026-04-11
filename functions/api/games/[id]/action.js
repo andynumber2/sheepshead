@@ -1,6 +1,7 @@
 import { json, err, requireUser, AuthError } from '../../_helpers.js'
 import {
   pick, pass, discard, callAce, callAceUnknown, callTen, callKing, goAlone, playCard,
+  crack, recrack,
   setupLeaster, awardLeasterBlind, resolveLeaster,
   dealHand,
 } from '../../../../shared/gameEngine.js'
@@ -99,6 +100,14 @@ export async function onRequestPost({ request, env, params }) {
 
       case 'go_alone':
         state = goAlone(state, userId)
+        break
+
+      case 'crack':
+        state = crack(state, userId)
+        break
+
+      case 'recrack':
+        state = recrack(state, userId)
         break
 
       case 'play_card': {
