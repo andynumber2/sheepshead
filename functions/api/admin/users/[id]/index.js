@@ -2,8 +2,9 @@ import { json, err, requireAdmin, hashPassword, randomHex, AuthError } from '../
 
 export async function onRequest({ request, env, params }) {
   try {
-    if (request.method === 'GET')   return await getUser({ request, env, params })
-    if (request.method === 'PATCH') return await updateUser({ request, env, params })
+    if (request.method === 'GET')    return await getUser({ request, env, params })
+    if (request.method === 'PATCH')  return await updateUser({ request, env, params })
+    if (request.method === 'DELETE') return await deleteUser({ request, env, params })
     return err('Method not allowed.', 405)
   } catch (e) {
     if (e instanceof AuthError) return err(e.message, e.message === 'Admin access required.' ? 403 : 401)
@@ -97,4 +98,34 @@ async function updateUser({ request, env, params }) {
   const removedOwnAdmin = userId === admin.user_id && body.is_admin === false
 
   return json({ ...updated, removedOwnAdmin })
+}
+
+async function deleteUser({ request, env, params }) {
+  const admin = await requireAdmin(request, env.DB)
+  const userId = Number(params.id)
+
+  if (userId === admin.user_id) return err('You cannot delete your own account.', 403)
+
+  const target = await env.DB.prepare(
+    'SELECT id FROM users WHERE id = ?'
+  ).bind(userId).first()
+  if (!target) return err('User not found.', 404)
+
+  // Block deletion if user is in an active or waiting game
+  const activeGame = await env.DB.prepare(`
+    SELECT g.name FROM game_players gp
+    JOIN games g ON g.id = gp.game_id
+    WHERE gp.user_id = ? AND g.status IN ('waiting', 'active')
+    LIMIT 1
+  `).bind(userId).first()
+  if (activeGame) return err(`Cannot delete: user is currently in game "${activeGame.name}".`, 409)
+
+  // Clean up related rows (sessions will cascade, but clean others explicitly)
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM game_players WHERE user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM score_events WHERE user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId),
+  ])
+
+  return json({ deleted: true, id: userId })
 }

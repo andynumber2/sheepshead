@@ -75,8 +75,8 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
         </hgroup>
         <div style={{ display: 'flex', gap: 8 }}>
           {user.is_admin && (
-            <button className="outline" onClick={() => onNavigate('/account-management')} style={{ fontSize: '0.85rem' }}>
-              ⚙ Accounts
+            <button className="outline" onClick={() => onNavigate('/admin')} style={{ fontSize: '0.85rem' }}>
+              ⚙ Admin
             </button>
           )}
           <button
