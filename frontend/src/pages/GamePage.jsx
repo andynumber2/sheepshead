@@ -509,12 +509,15 @@ export default function GamePage({ gameId, user, onNavigate }) {
       ? () => handleAction('recrack', {}, actAs)
       : undefined
 
+    const blitz = (state.blitzes ?? []).find(b => b.userId === uid)
+
     return {
       isDealer:      uid === dealerUserId,
       isPicker:      uid === pickerUserId,
       isPartner:     uid === partnerUserId,
       isYou:         uid === myUserId,
       isActiveTurn:  uid === turnUserId,
+      blitzType:     uid === pickerUserId ? blitz?.type : undefined,
       cardCount:     hand.length,
       dayScore:      player.day_score      ?? 0,
       lifetimeScore: player.lifetime_score ?? 0,

@@ -9,6 +9,7 @@ export default function PlayerSeat({
   isPartner,
   isYou,
   isActiveTurn,
+  blitzType,
   dayScore,
   lifetimeScore,
   hand,
@@ -36,6 +37,8 @@ export default function PlayerSeat({
         {isYou     && <span className="badge badge-you">you</span>}
         {isDealer  && <span className="badge badge-dealer">D</span>}
         {isPicker  && <span className="badge badge-picker">picker</span>}
+        {isPicker && blitzType === 'black' && <span className="badge badge-blitz-black">Black Blitz</span>}
+        {isPicker && blitzType === 'red'   && <span className="badge badge-blitz-red">Red Blitz</span>}
         {isPartner && <span className="badge badge-partner">partner</span>}
         {onCrack   && (
           <button onClick={onCrack} style={{ fontSize: '0.6rem', padding: '1px 4px', lineHeight: 1.4, marginLeft: 2 }}>

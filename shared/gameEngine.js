@@ -81,6 +81,23 @@ export function dealHand(playerIds, dealerSeat, handNumber, doublerMultiplier) {
     pickOrder.push(playerIds[(dealerSeat + i) % 5])
   }
 
+  // Detect blitzes: a player holding 2 queens of the same color must pick
+  const blitzes = []
+  for (const pid of playerIds) {
+    const hand = hands[pid]
+    const hasQC = hand.some(c => c.id === 'QC')
+    const hasQS = hand.some(c => c.id === 'QS')
+    const hasQH = hand.some(c => c.id === 'QH')
+    const hasQD = hand.some(c => c.id === 'QD')
+    if (hasQC && hasQS) blitzes.push({ userId: pid, type: 'black' })
+    else if (hasQH && hasQD) blitzes.push({ userId: pid, type: 'red' })
+  }
+
+  const log = []
+  for (const b of blitzes) {
+    log.push(`${b.userId} ${b.type === 'black' ? 'Black' : 'Red'} Blitzed!`)
+  }
+
   return {
     phase: 'picking',          // picking | discarding | calling | playing | scoring | complete
     handNumber,
@@ -109,7 +126,8 @@ export function dealHand(playerIds, dealerSeat, handNumber, doublerMultiplier) {
     currentLeader: null,       // userId who leads next trick
     handCrackMultiplier: 1,    // 1 | 2 | 4 — crack/recrack multiplier for this hand only
     crackState: null,          // null | 'cracked' | 'recracked'
-    log: [],                   // string messages
+    blitzes,                   // [{ userId, type: 'black'|'red' }] — players who must pick
+    log,                       // string messages
     scores: {},                // { userId: delta } — populated at scoring
   }
 }
@@ -133,6 +151,11 @@ export function pick(state, userId) {
 export function pass(state, userId) {
   assertPhase(state, 'picking')
   assertTurn(state, userId, currentPicker(state))
+
+  const blitz = (state.blitzes ?? []).find(b => b.userId === userId)
+  if (blitz) {
+    throw new Error(`Cannot pass — you ${blitz.type === 'black' ? 'Black' : 'Red'} Blitzed and must pick.`)
+  }
 
   const newState = deepClone(state)
   newState.pickIndex++
@@ -675,7 +698,8 @@ function computeScores(state) {
   if (pickerTeamPoints >= 91 || (!pickerWon && pickerTeamPoints <= 29)) baseMultiplier = 2  // schneider
   if (pickerTeamTricks === 6 || pickerTeamTricks === 0) baseMultiplier = 3  // schwarz
 
-  const multiplier = baseMultiplier * doublerMultiplier * (state.handCrackMultiplier ?? 1)
+  const blitzMultiplier = (state.blitzes?.length ?? 0) > 0 ? 2 : 1
+  const multiplier = baseMultiplier * doublerMultiplier * (state.handCrackMultiplier ?? 1) * blitzMultiplier
 
   const scores = {}
   for (const uid of Object.keys(state.hands)) scores[uid] = 0
