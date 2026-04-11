@@ -186,10 +186,12 @@ body {
   margin-left: 4px;
 }
 
-.badge-dealer  { background: #f59e0b; color: #000; }
-.badge-picker  { background: #3b82f6; color: #fff; }
-.badge-partner { background: #10b981; color: #fff; }
-.badge-you     { background: #8b5cf6; color: #fff; }
+.badge-dealer       { background: #f59e0b; color: #000; }
+.badge-picker       { background: #3b82f6; color: #fff; }
+.badge-partner      { background: #10b981; color: #fff; }
+.badge-you          { background: #8b5cf6; color: #fff; }
+.badge-blitz-black  { background: #1f2937; color: #fff; border: 1px solid #6b7280; }
+.badge-blitz-red    { background: #dc2626; color: #fff; }
 
 .player-scores {
   font-size: 0.7rem;
