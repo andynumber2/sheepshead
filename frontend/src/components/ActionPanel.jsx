@@ -293,7 +293,9 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
     // Crack / recrack window: before the first card of the hand is played
     const crackWindowOpen = !isLeaster && state.tricks.length === 0 && currentTrick.length === 0
     const iAmOpponent = myUserId !== state.picker && myUserId !== state.partner
-    const canCrack = crackWindowOpen && iAmOpponent && crackState === null
+    const passedAtPicking = state.pickOrder.slice(0, state.pickIndex)
+    const iPassedAtPicking = passedAtPicking.includes(myUserId)
+    const canCrack = crackWindowOpen && iAmOpponent && crackState === null && !iPassedAtPicking
     const canRecrack = crackWindowOpen && !iAmOpponent && crackState === 'cracked'
 
     if (crackWindowOpen && (canCrack || canRecrack || crackState !== null)) {

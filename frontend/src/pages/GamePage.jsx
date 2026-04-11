@@ -500,8 +500,9 @@ export default function GamePage({ gameId, user, onNavigate }) {
 
     // Crack/recrack buttons: show in test mode during the cracking window
     const isSeatOpponent = uid !== state.picker && uid !== state.partner
+    const seatPassedAtPicking = state.pickOrder.slice(0, state.pickIndex).includes(uid)
     const actAs = uid !== myUserId ? uid : null
-    const onCrack   = crackWindowOpen && isSeatOpponent && state.crackState === null
+    const onCrack   = crackWindowOpen && isSeatOpponent && state.crackState === null && !seatPassedAtPicking
       ? () => handleAction('crack', {}, actAs)
       : undefined
     const onRecrack = crackWindowOpen && !isSeatOpponent && state.crackState === 'cracked'

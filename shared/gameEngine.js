@@ -384,6 +384,8 @@ export function crack(state, userId) {
   assertCrackWindow(state)
   if (!isOpponent(state, userId)) throw new Error('Only opponents may crack.')
   if (state.crackState !== null) throw new Error('Already cracked.')
+  const passedAtPicking = state.pickOrder.slice(0, state.pickIndex)
+  if (passedAtPicking.includes(userId)) throw new Error('Cannot crack — you passed at picking.')
 
   const newState = deepClone(state)
   newState.crackState = 'cracked'

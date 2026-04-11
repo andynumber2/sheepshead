@@ -42,7 +42,7 @@ export default function PlayerSeat({
             crack
           </button>
         )}
-        {onRecrack && (
+{onRecrack && (
           <button onClick={onRecrack} style={{ fontSize: '0.6rem', padding: '1px 4px', lineHeight: 1.4, marginLeft: 2 }}>
             recrack
           </button>
