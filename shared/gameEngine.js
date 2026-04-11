@@ -93,11 +93,6 @@ export function dealHand(playerIds, dealerSeat, handNumber, doublerMultiplier) {
     else if (hasQH && hasQD) blitzes.push({ userId: pid, type: 'red' })
   }
 
-  const log = []
-  for (const b of blitzes) {
-    log.push(`${b.userId} ${b.type === 'black' ? 'Black' : 'Red'} Blitzed!`)
-  }
-
   return {
     phase: 'picking',          // picking | discarding | calling | playing | scoring | complete
     handNumber,
@@ -127,7 +122,7 @@ export function dealHand(playerIds, dealerSeat, handNumber, doublerMultiplier) {
     handCrackMultiplier: 1,    // 1 | 2 | 4 — crack/recrack multiplier for this hand only
     crackState: null,          // null | 'cracked' | 'recracked'
     blitzes,                   // [{ userId, type: 'black'|'red' }] — players who must pick
-    log,                       // string messages
+    log: [],                   // string messages
     scores: {},                // { userId: delta } — populated at scoring
   }
 }
@@ -144,7 +139,14 @@ export function pick(state, userId) {
   newState.hands[userId] = [...newState.hands[userId], ...newState.blind]
   newState.blind = []
   newState.phase = 'discarding'
-  newState.log.push(`${userId} picked.`)
+
+  const blitz = (newState.blitzes ?? []).find(b => b.userId === userId)
+  if (blitz) {
+    newState.log.push(`${userId} ${blitz.type === 'black' ? 'Black' : 'Red'} Blitzed!`)
+  } else {
+    newState.log.push(`${userId} picked.`)
+  }
+
   return newState
 }
 

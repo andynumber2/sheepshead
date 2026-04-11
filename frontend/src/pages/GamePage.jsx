@@ -511,16 +511,6 @@ export default function GamePage({ gameId, user, onNavigate }) {
 
     const blitz = (state.blitzes ?? []).find(b => b.userId === uid)
 
-    // Blitz button: test mode admin can force-pick on behalf of a blitzing bot
-    // when it's that player's turn in the pick order
-    const onBlitz = isTestMode && user.is_admin
-      && state.phase === 'picking'
-      && blitz
-      && state.pickOrder[state.pickIndex] === uid
-      && uid !== myUserId
-      ? () => handleAction('pick', {}, actAs)
-      : undefined
-
     return {
       isDealer:      uid === dealerUserId,
       isPicker:      uid === pickerUserId,
@@ -543,8 +533,6 @@ export default function GamePage({ gameId, user, onNavigate }) {
         : undefined,
       onCrack,
       onRecrack,
-      onBlitz,
-      blitzLabel:    blitz ? `${blitz.type === 'black' ? 'Black' : 'Red'} Blitz?` : undefined,
     }
   }
 

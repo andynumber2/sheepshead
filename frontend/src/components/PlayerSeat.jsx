@@ -19,8 +19,6 @@ export default function PlayerSeat({
   noOverlap,
   onCrack,
   onRecrack,
-  onBlitz,
-  blitzLabel,
 }) {
   if (!player) {
     return (
@@ -42,11 +40,6 @@ export default function PlayerSeat({
         {isPicker && blitzType === 'black' && <span className="badge badge-blitz-black">Black Blitz</span>}
         {isPicker && blitzType === 'red'   && <span className="badge badge-blitz-red">Red Blitz</span>}
         {isPartner && <span className="badge badge-partner">partner</span>}
-        {onBlitz   && (
-          <button onClick={onBlitz} style={{ fontSize: '0.6rem', padding: '1px 4px', lineHeight: 1.4, marginLeft: 2 }}>
-            {blitzLabel}
-          </button>
-        )}
         {onCrack   && (
           <button onClick={onCrack} style={{ fontSize: '0.6rem', padding: '1px 4px', lineHeight: 1.4, marginLeft: 2 }}>
             crack

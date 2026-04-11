@@ -77,12 +77,19 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
         </div>
       )
     }
+    const playerBlitz = (state.blitzes ?? []).find(b => b.userId === myUserId)
     return (
       <div className="action-panel" style={botStyle}>
         <h4>{turnLabel} — pick or pass?</h4>
         {doublerMultiplier > 1 && <p style={{ color: '#f59e0b' }}>⚠ Stakes are ×{doublerMultiplier}</p>}
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 8 }}>
-          <button onClick={() => act('pick')} disabled={loading}>Pick the blind</button>
+          {playerBlitz?.type === 'black' && (
+            <button onClick={() => act('pick')} disabled={loading}>Black Blitz?</button>
+          )}
+          {playerBlitz?.type === 'red' && (
+            <button onClick={() => act('pick')} disabled={loading}>Red Blitz?</button>
+          )}
+          <button onClick={() => act('pick')} disabled={loading}>Pick the Blind?</button>
           <button className="secondary" onClick={() => act('pass')} disabled={loading}>Pass</button>
         </div>
         {error && <p style={{ color: '#f87171', marginTop: 6 }}>{error}</p>}
