@@ -98,7 +98,7 @@ async function createGame({ request, env }) {
       'SELECT id FROM users WHERE is_bot = 1 ORDER BY username LIMIT 4'
     ).all()
 
-    if (bots.length < 4) return err('Not enough bot accounts found. Run migrations to seed bots.', 500)
+    if (bots.length < 4) return err('Not enough test bot accounts found. Run migrations to seed test bots.', 500)
 
     const botStmts = bots.map((bot, i) =>
       env.DB.prepare('INSERT INTO game_players (game_id, user_id, seat) VALUES (?, ?, ?)')

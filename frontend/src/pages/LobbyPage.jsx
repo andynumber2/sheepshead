@@ -147,7 +147,7 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
                 <span>
                   <strong>Test mode</strong>
                   <small style={{ display: 'block', color: '#888', marginTop: 2 }}>
-                    Bots auto-fill seats. You can see all hands and play for bots. Max 1 active at a time.
+                    Test bots auto-fill seats. You can see all hands and play for test bots. Max 1 active at a time.
                   </small>
                 </span>
               </label>
