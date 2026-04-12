@@ -809,6 +809,46 @@ export function resolveLeaster(state) {
   return { winner, scores }
 }
 
+// ─── Schwanzer ────────────────────────────────────────────────────────────────
+// No tricks are played. Each player's dealt hand is scored using Schwanzer point
+// values. The player with the most points is the loser (-4); all others gain +1.
+// Tie-break: most powerful trump (lowest TRUMP_ORDER index) loses.
+// Fallback: if all tied players hold no trump, first tied player in pickOrder loses.
+export function resolveSchwanzer(state) {
+  const pointsByPlayer = {}
+  for (const [uid, hand] of Object.entries(state.hands)) {
+    pointsByPlayer[uid] = hand.reduce((sum, card) => sum + schwanzerCardPoints(card), 0)
+  }
+
+  const maxPoints = Math.max(...Object.values(pointsByPlayer))
+  // Preserve pickOrder sequence so fallback tie-break is deterministic
+  const tied = state.pickOrder.filter(uid => pointsByPlayer[uid] === maxPoints)
+
+  function bestTrumpIndex(uid) {
+    const trumps = state.hands[uid].filter(c => isTrump(c))
+    if (trumps.length === 0) return TRUMP_ORDER.length  // no trump → least powerful
+    return Math.min(...trumps.map(c => trumpRank(c)))
+  }
+
+  // Among tied players: lowest trump index (most powerful) loses.
+  // pickOrder preserves insertion order, so the first element wins the fallback.
+  const loser = tied.reduce((worst, uid) =>
+    bestTrumpIndex(uid) < bestTrumpIndex(worst) ? uid : worst
+  )
+
+  const scores = {}
+  for (const uid of Object.keys(state.hands)) {
+    scores[uid] = uid === loser ? -4 : 1
+  }
+
+  const breakdown = state.pickOrder
+    .map(uid => `${uid}: ${pointsByPlayer[uid]}pts`)
+    .join(', ')
+  state.log.push(`Schwanzer! Points — ${breakdown}. ${loser} had the most and loses.`)
+
+  return { loser, scores }
+}
+
 // ─── Player view (redact other hands) ────────────────────────────────────────
 export function getPlayerView(state, userId) {
   const view = deepClone(state)
