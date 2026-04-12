@@ -81,16 +81,16 @@ export function dealHand(playerIds, dealerSeat, handNumber, doublerMultiplier) {
     pickOrder.push(playerIds[(dealerSeat + i) % 5])
   }
 
-  // Detect blitzes: a player holding 2 queens of the same color must pick
-  const blitzes = []
+  // Detect potential blitzes: a player holding 2 queens of the same color may blitz
+  const potentialBlitzes = []
   for (const pid of playerIds) {
     const hand = hands[pid]
     const hasQC = hand.some(c => c.id === 'QC')
     const hasQS = hand.some(c => c.id === 'QS')
     const hasQH = hand.some(c => c.id === 'QH')
     const hasQD = hand.some(c => c.id === 'QD')
-    if (hasQC && hasQS) blitzes.push({ userId: pid, type: 'black' })
-    else if (hasQH && hasQD) blitzes.push({ userId: pid, type: 'red' })
+    if (hasQC && hasQS) potentialBlitzes.push({ userId: pid, type: 'black' })
+    else if (hasQH && hasQD) potentialBlitzes.push({ userId: pid, type: 'red' })
   }
 
   return {
@@ -121,7 +121,8 @@ export function dealHand(playerIds, dealerSeat, handNumber, doublerMultiplier) {
     currentLeader: null,       // userId who leads next trick
     handCrackMultiplier: 1,    // 1 | 2 | 4 — crack/recrack multiplier for this hand only
     crackState: null,          // null | 'cracked' | 'recracked'
-    blitzes,                   // [{ userId, type: 'black'|'red' }] — players who must pick
+    potentialBlitzes,          // [{ userId, type: 'black'|'red' }] — players who may blitz
+    blitzes: [],               // [{ userId, type: 'black'|'red' }] — players who declared a blitz
     log: [],                   // string messages
     scores: {},                // { userId: delta } — populated at scoring
   }
@@ -139,13 +140,29 @@ export function pick(state, userId) {
   newState.hands[userId] = [...newState.hands[userId], ...newState.blind]
   newState.blind = []
   newState.phase = 'discarding'
+  newState.log.push(`${userId} picked.`)
 
-  const blitz = (newState.blitzes ?? []).find(b => b.userId === userId)
-  if (blitz) {
-    newState.log.push(`${userId} ${blitz.type === 'black' ? 'Black' : 'Red'} Blitzed!`)
-  } else {
-    newState.log.push(`${userId} picked.`)
+  return newState
+}
+
+export function blitz(state, userId) {
+  assertPhase(state, 'picking')
+  assertTurn(state, userId, currentPicker(state))
+
+  const potentialBlitz = (state.potentialBlitzes ?? []).find(b => b.userId === userId)
+  if (!potentialBlitz) {
+    throw new Error('Cannot blitz — you do not hold 2 queens of the same color.')
   }
+
+  const newState = deepClone(state)
+  newState.picker = userId
+  newState.blitzes = [...(newState.blitzes ?? []), { userId, type: potentialBlitz.type }]
+
+  // Give picker the blind
+  newState.hands[userId] = [...newState.hands[userId], ...newState.blind]
+  newState.blind = []
+  newState.phase = 'discarding'
+  newState.log.push(`${userId} ${potentialBlitz.type === 'black' ? 'Black' : 'Red'} Blitzed!`)
 
   return newState
 }
@@ -153,11 +170,6 @@ export function pick(state, userId) {
 export function pass(state, userId) {
   assertPhase(state, 'picking')
   assertTurn(state, userId, currentPicker(state))
-
-  const blitz = (state.blitzes ?? []).find(b => b.userId === userId)
-  if (blitz) {
-    throw new Error(`Cannot pass — you ${blitz.type === 'black' ? 'Black' : 'Red'} Blitzed and must pick.`)
-  }
 
   const newState = deepClone(state)
   newState.pickIndex++

@@ -1,6 +1,6 @@
 import { json, err, requireUser, AuthError } from '../../_helpers.js'
 import {
-  pick, pass, discard, callAce, callAceUnknown, callTen, callKing, goAlone, playCard,
+  pick, blitz, pass, discard, callAce, callAceUnknown, callTen, callKing, goAlone, playCard,
   crack, recrack,
   setupLeaster, awardLeasterBlind, resolveLeaster,
   dealHand,
@@ -51,6 +51,10 @@ export async function onRequestPost({ request, env, params }) {
     switch (type) {
       case 'pick':
         state = pick(state, userId)
+        break
+
+      case 'blitz':
+        state = blitz(state, userId)
         break
 
       case 'pass':
