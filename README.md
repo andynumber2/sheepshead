@@ -132,7 +132,7 @@ Note: the Queen of Diamonds scores as a queen (3 points), and the Jack of Diamon
 
 The player with the **most** Schwanzer points in their hand is the Schwanzer: they lose 4 points, and all other players gain 1 point.
 
-**Tie-break:** If two or more players are tied for the most points, the player holding the most powerful trump card (Queen of Clubs > Queen of Spades > … > 7 of Diamonds) loses. If all tied players hold no trump, the first tied player in seat order loses.
+**Tie-break:** If two or more players are tied for the most points, the player holding the most powerful trump card (Queen of Clubs > Queen of Spades > … > 7 of Diamonds) loses. If all tied players hold no trump, the first tied player in pick order loses.
 
 The blind cards are not scored — only each player's 6 dealt cards count.
 
