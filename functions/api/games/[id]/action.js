@@ -5,8 +5,6 @@ import {
   setupLeaster, awardLeasterBlind, resolveLeaster,
   resolveSchwanzer,
   dealHand, currentPlayer,
-  resolveSchwanzer,
-  dealHand,
 } from '../../../../shared/gameEngine.js'
 import { finishHand, processBotTurns } from '../../_botHelpers.js'
 
