@@ -117,6 +117,25 @@ The final multiplier is: `base × doubler × crack`.
 
 When all five players pass, a Leaster is played. There is no picker or partner — everyone plays for themselves. The blind cards are awarded to the winner of the first trick. The player who takes at least one trick and ends with the **fewest points** wins. The winner gains 4 points; all others lose 1 point.
 
+### Schwanzer
+
+When all five players pass and the no-pick variant is set to Schwanzers, hands are scored immediately — no tricks are played. Each player's dealt hand is scored using the following point scheme:
+
+| Card | Schwanzer Points |
+|------|-----------------|
+| Queen (any suit) | 3 |
+| Jack (any suit) | 2 |
+| Diamond pip (Ace, 10, King, 9, 8, 7 of Diamonds) | 1 |
+| All other cards | 0 |
+
+Note: the Queen of Diamonds scores as a queen (3 points), and the Jack of Diamonds scores as a jack (2 points) — not as diamond pips.
+
+The player with the **most** Schwanzer points in their hand is the Schwanzer: they lose 4 points, and all other players gain 1 point.
+
+**Tie-break:** If two or more players are tied for the most points, the player holding the most powerful trump card (Queen of Clubs > Queen of Spades > … > 7 of Diamonds) loses. If all tied players hold no trump, the first tied player in pick order loses.
+
+The blind cards are not scored — only each player's 6 dealt cards count.
+
 ---
 
 > **Maintainer note:** When rules change in `shared/gameEngine.js`, update the Rules section of this file to match.
