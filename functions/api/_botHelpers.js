@@ -157,14 +157,15 @@ export async function processBotTurns(state, gameId, DB, game) {
       if (current.isLeaster && current.leasterBlind?.length > 0 && current.tricks.length === 1) {
         current = awardLeasterBlind(current)
       }
-      // If the bot played the last card of the hand, score and deal the next hand
-      // before stopping — otherwise the scoring state would be left unresolved.
+      // If the bot played the last card of the hand, score and deal the next hand.
       if (current.phase === 'scoring') {
         current = await finishHand(DB, gameId, current)
       }
       await persistState(DB, gameId, current)
-      // Stop here — the frontend will trigger the next bot play (or human acts next).
-      break
+      // If still in playing phase, stop — the frontend drives the next bot card.
+      // If a new hand was dealt (picking phase), continue so picking-phase bots run.
+      if (current.phase === 'playing') break
+      continue
     }
 
     // Award leaster blind after trick 1 (non-playing-phase path)

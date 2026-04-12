@@ -55,10 +55,19 @@ function getLegalCards(state, userId) {
     if (heldForced.length > 0) return handCards.filter(c => heldForced.includes(c.id))
   }
 
-  const hasSuit = handCards.some(c => effectiveSuit(c) === ledSuit)
-  return hasSuit
-    ? handCards.filter(c => effectiveSuit(c) === ledSuit)
+  // Called card cannot be played unless the called suit is led (mirrors gameEngine restriction)
+  const playableCards = (
+    calledCardId &&
+    ledSuit !== calledSuit &&
+    handCards.some(c => c.id !== calledCardId)
+  )
+    ? handCards.filter(c => c.id !== calledCardId)
     : handCards
+
+  const hasSuit = playableCards.some(c => effectiveSuit(c) === ledSuit)
+  return hasSuit
+    ? playableCards.filter(c => effectiveSuit(c) === ledSuit)
+    : playableCards
 }
 
 // ─── Card comparison helpers ──────────────────────────────────────────────────
