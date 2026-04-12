@@ -62,6 +62,16 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
     }
   }
 
+  async function handleFillWithBots(gameId) {
+    setError(null)
+    try {
+      await api.games.fillWithBots(gameId)
+      onNavigate(`/game/${gameId}`)
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
   return (
     <div className="lobby-container">
       {/* Header */}
@@ -192,7 +202,9 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 {game.is_member ? (
-                  <button onClick={() => onNavigate(`/game/${game.id}`)}>Rejoin</button>
+                  <>
+                    <button onClick={() => onNavigate(`/game/${game.id}`)}>Rejoin</button>
+                  </>
                 ) : (
                   <>
                     {game.status === 'active' && (

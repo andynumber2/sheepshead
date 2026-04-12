@@ -95,7 +95,7 @@ async function createGame({ request, env }) {
   if (testMode) {
     // Auto-join bot accounts as seats 1-4
     const { results: bots } = await env.DB.prepare(
-      'SELECT id FROM users WHERE is_bot = 1 ORDER BY username LIMIT 4'
+      "SELECT id FROM users WHERE is_bot = 1 AND bot_type = 'test' ORDER BY username LIMIT 4"
     ).all()
 
     if (bots.length < 4) return err('Not enough test bot accounts found. Run migrations to seed test bots.', 500)

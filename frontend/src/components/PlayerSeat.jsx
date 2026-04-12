@@ -34,6 +34,7 @@ export default function PlayerSeat({
     <div className={`player-seat${isActiveTurn ? ' active-turn' : ''}${noOverlap ? ' player-seat-wide' : ''}`}>
       <div style={{ fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 3 }}>
         {player.username}
+        {player.bot_type === 'play' && <span className="badge badge-bot">BOT</span>}
         {isYou     && <span className="badge badge-you">you</span>}
         {isDealer  && <span className="badge badge-dealer">D</span>}
         {isPicker  && <span className="badge badge-picker">picker</span>}

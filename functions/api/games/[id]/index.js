@@ -12,7 +12,7 @@ export async function onRequestGet({ request, env, params }) {
     if (!game) return err('Game not found.', 404)
 
     const { results: players } = await env.DB.prepare(
-      `SELECT gp.seat, gp.user_id, u.username, u.is_bot
+      `SELECT gp.seat, gp.user_id, u.username, u.is_bot, u.bot_type
        FROM game_players gp
        JOIN users u ON u.id = gp.user_id
        WHERE gp.game_id = ?

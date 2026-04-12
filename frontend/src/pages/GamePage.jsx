@@ -204,7 +204,8 @@ export default function GamePage({ gameId, user, onNavigate }) {
   // Tracks the auto-play timer for the last trick. We key by
   // `${turnUserId}:${trickLen}` so each "pending play" only schedules once,
   // even though state polling produces a new state object every 2s.
-  const autoPlayRef = useRef({ key: null, timer: null })
+  const autoPlayRef   = useRef({ key: null, timer: null })
+  const botPlayRef    = useRef({ key: null, timer: null })
   // Displayed trick — trails the server state by 1 s after each trick completes
   // so the completed trick stays visible before clearing.
   const [displayedTrick, setDisplayedTrick] = useState([])
@@ -287,6 +288,46 @@ export default function GamePage({ gameId, user, onNavigate }) {
     }
   }, [])
 
+  // ── Play bot card trigger ───────────────────────────────────────────────────
+  // When the current player is a play bot, wait 700 ms then fire a bot_play
+  // action so their card appears sequentially rather than all at once.
+  // Test mode is excluded — admins drive bot plays manually there.
+  useEffect(() => {
+    const state   = gameData?.state
+    const players = gameData?.players
+    if (!state || state.phase !== 'playing') return
+    if (gameData?.is_test_mode) return
+
+    const turnUserId = currentTurnPlayer(state)
+    if (!turnUserId) return
+
+    const currentPlayerData = players?.find(p => String(p.user_id) === turnUserId)
+    if (currentPlayerData?.bot_type !== 'play') return
+
+    const key = `${turnUserId}:${state.tricks?.length ?? 0}:${state.currentTrick?.length ?? 0}`
+    if (botPlayRef.current.key === key) return
+    if (botPlayRef.current.timer) clearTimeout(botPlayRef.current.timer)
+    botPlayRef.current.key = key
+    botPlayRef.current.timer = setTimeout(async () => {
+      botPlayRef.current.timer = null
+      try {
+        await api.games.action(gameId, 'bot_play', {})
+        await fetchGame()
+      } catch {
+        // State may have already advanced (e.g. another client acted); ignore.
+      }
+    }, 700)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameData, gameId, fetchGame])
+
+  // Cancel any pending bot-play timer on unmount.
+  useEffect(() => () => {
+    if (botPlayRef.current.timer) {
+      clearTimeout(botPlayRef.current.timer)
+      botPlayRef.current.timer = null
+    }
+  }, [])
+
   // ── Trick clear delay ───────────────────────────────────────────────────────
   // When a trick completes the server returns currentTrick: []. Keep the cards
   // visible for 1 s before clearing, so players can see who played what.
@@ -344,6 +385,15 @@ export default function GamePage({ gameId, user, onNavigate }) {
   function handleSettingsUpdate(result) {
     if (result.no_pick_variant !== undefined) setCurrentVariant(result.no_pick_variant)
     if (result.reveal_partner  !== undefined) setRevealPartner(result.reveal_partner)
+  }
+
+  async function handleFillWithBots() {
+    try {
+      await api.games.fillWithBots(gameId)
+      await fetchGame()
+    } catch (e) {
+      setError(e.message)
+    }
   }
 
   async function handleLeave() {
@@ -424,9 +474,16 @@ export default function GamePage({ gameId, user, onNavigate }) {
 
         <p style={{ marginTop: 16 }}>Waiting for players… ({players.length}/5)</p>
         <ul>{players.map(p => <li key={p.user_id}>{p.username}</li>)}</ul>
-        <button className="outline" onClick={() => onNavigate('/lobby')} style={{ marginTop: 8 }}>
-          Back to lobby
-        </button>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          {isGameAdmin && !isTestMode && players.length < 5 && (
+            <button className="secondary" onClick={handleFillWithBots}>
+              Fill with Bots
+            </button>
+          )}
+          <button className="outline" onClick={() => onNavigate('/lobby')}>
+            Back to lobby
+          </button>
+        </div>
       </div>
     )
   }
