@@ -308,6 +308,9 @@ export default function GamePage({ gameId, user, onNavigate }) {
     if (botPlayRef.current.key === key) return
     if (botPlayRef.current.timer) clearTimeout(botPlayRef.current.timer)
     botPlayRef.current.key = key
+    const isLeadingTrick1 = (state.tricks?.length ?? 0) === 0
+                         && (state.currentTrick?.length ?? 0) === 0
+    const delay = isLeadingTrick1 ? 5000 : 700
     botPlayRef.current.timer = setTimeout(async () => {
       botPlayRef.current.timer = null
       try {
@@ -316,7 +319,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
       } catch {
         // State may have already advanced (e.g. another client acted); ignore.
       }
-    }, 700)
+    }, delay)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameData, gameId, fetchGame])
 
