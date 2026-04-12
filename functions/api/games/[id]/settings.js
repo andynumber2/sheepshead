@@ -18,8 +18,8 @@ export async function onRequestPatch({ request, env, params }) {
 
     const { no_pick_variant, reveal_partner } = body ?? {}
 
-    if (no_pick_variant !== undefined && !['leasters', 'doublers'].includes(no_pick_variant)) {
-      return err('no_pick_variant must be "leasters" or "doublers".')
+    if (no_pick_variant !== undefined && !['leasters', 'doublers', 'schwanzers'].includes(no_pick_variant)) {
+      return err('no_pick_variant must be "leasters", "doublers", or "schwanzers".')
     }
     if (reveal_partner !== undefined && typeof reveal_partner !== 'boolean') {
       return err('reveal_partner must be a boolean.')
