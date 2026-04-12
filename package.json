@@ -2,7 +2,9 @@
   "name": "sheepshead",
   "version": "0.0.1",
   "private": true,
-  "workspaces": ["frontend"],
+  "workspaces": [
+    "frontend"
+  ],
   "scripts": {
     "dev": "concurrently -n frontend,wrangler -c cyan,yellow \"npm run dev:frontend\" \"npm run dev:wrangler\"",
     "dev:frontend": "npm run dev -w frontend",
@@ -11,10 +13,12 @@
     "deploy": "npm run build && wrangler pages deploy frontend/dist",
     "db:migrate:local": "wrangler d1 migrations apply sheepshead-db --local",
     "db:migrate": "wrangler d1 migrations apply sheepshead-db --remote",
+    "test": "vitest run --passWithNoTests",
     "postinstall": "git config core.hooksPath .githooks"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
+    "vitest": "^4.1.4",
     "wrangler": "^3.0.0"
   }
 }
