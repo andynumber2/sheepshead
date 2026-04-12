@@ -2,9 +2,11 @@ import { json, err, requireUser, AuthError } from '../../_helpers.js'
 import {
   pick, blitz, pass, discard, callAce, callAceUnknown, callTen, callKing, goAlone, playCard,
   crack, recrack,
-  setupLeaster, awardLeasterBlind,
+  setupLeaster, awardLeasterBlind, resolveLeaster,
   resolveSchwanzer,
   dealHand, currentPlayer,
+  resolveSchwanzer,
+  dealHand,
 } from '../../../../shared/gameEngine.js'
 import { finishHand, processBotTurns } from '../../_botHelpers.js'
 
