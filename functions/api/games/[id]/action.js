@@ -3,6 +3,7 @@ import {
   pick, blitz, pass, discard, callAce, callAceUnknown, callTen, callKing, goAlone, playCard,
   crack, recrack,
   setupLeaster, awardLeasterBlind, resolveLeaster,
+  resolveSchwanzer,
   dealHand,
 } from '../../../../shared/gameEngine.js'
 
@@ -64,6 +65,11 @@ export async function onRequestPost({ request, env, params }) {
           const freshGame = await env.DB.prepare('SELECT no_pick_variant FROM games WHERE id = ?').bind(gameId).first()
           if (freshGame.no_pick_variant === 'leasters') {
             state = setupLeaster(state)
+          } else if (freshGame.no_pick_variant === 'schwanzers') {
+            const { scores } = resolveSchwanzer(state)
+            state.scores = scores
+            state.phase = 'scoring'
+            state = await finishHand(env.DB, gameId, state)
           } else {
             const newMultiplier = state.doublerMultiplier * 2
             const { results: players } = await env.DB.prepare(
