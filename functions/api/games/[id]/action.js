@@ -4,8 +4,11 @@ import {
   crack, recrack,
   setupLeaster, awardLeasterBlind, resolveLeaster,
   resolveSchwanzer,
+  dealHand, currentPlayer,
+  resolveSchwanzer,
   dealHand,
 } from '../../../../shared/gameEngine.js'
+import { finishHand, processBotTurns } from '../../_botHelpers.js'
 
 export async function onRequestPost({ request, env, params }) {
   try {
@@ -133,12 +136,36 @@ export async function onRequestPost({ request, env, params }) {
         break
       }
 
+      case 'bot_play': {
+        // Triggered by the frontend when it detects a play bot's turn.
+        // Validate the current player is actually a play bot, then let
+        // processBotTurns execute the single card play below.
+        if (state.phase !== 'playing') return err('Game is not in playing phase.')
+        const botId = currentPlayer(state)
+        if (!botId) return err('No current player.')
+        const botRow = await env.DB.prepare(
+          `SELECT u.bot_type FROM game_players gp
+           JOIN users u ON u.id = gp.user_id
+           WHERE gp.game_id = ? AND gp.user_id = ?`
+        ).bind(gameId, Number(botId)).first()
+        if (!botRow || botRow.bot_type !== 'play') return err('Current player is not a play bot.', 400)
+        break
+      }
+
       case 'next_hand':
         // No-op — hands now auto-advance; kept for backward compatibility
         break
 
       default:
         return err(`Unknown action type: ${type}`)
+    }
+
+    // After a card play that leaves us in the playing phase, skip processBotTurns —
+    // the frontend's bot_play trigger applies the same 700 ms delay for bots as for
+    // the human who just played. If the hand ended (new picking phase), still run
+    // processBotTurns so bot picks/passes resolve instantly as normal.
+    if (type !== 'play_card' || state.phase !== 'playing') {
+      state = await processBotTurns(state, gameId, env.DB, game)
     }
 
     await env.DB.prepare(
@@ -155,43 +182,4 @@ export async function onRequestPost({ request, env, params }) {
     console.error(e)
     return err(e.message, 400)
   }
-}
-
-async function finishHand(DB, gameId, state) {
-  let scores = state.scores
-
-  if (state.isLeaster) {
-    const { scores: leasterScores } = resolveLeaster(state)
-    scores = leasterScores
-    state.scores = scores
-  }
-
-  const stmts = Object.entries(scores).map(([userId, delta]) =>
-    DB.prepare(
-      'INSERT INTO score_events (user_id, game_id, hand_number, delta) VALUES (?, ?, ?, ?)'
-    ).bind(Number(userId), gameId, state.handNumber, delta)
-  )
-  await DB.batch(stmts)
-
-  const { results: players } = await DB.prepare(
-    'SELECT user_id FROM game_players WHERE game_id = ? ORDER BY seat'
-  ).bind(gameId).all()
-  const playerIds = players.map(p => String(p.user_id))
-  const nextDealer = (state.dealerSeat + 1) % 5
-  const nextState = dealHand(playerIds, nextDealer, state.handNumber + 1, 1)
-
-  // Carry log forward so history is preserved across hands
-  nextState.log = [
-    ...state.log,
-    `--- Hand ${state.handNumber} complete ---`,
-  ]
-
-  // Carry last trick forward so players can see it at the start of the new hand
-  nextState.lastTrick = state.lastTrick
-
-  await DB.prepare(
-    "UPDATE games SET doubler_multiplier = 1, updated_at = datetime('now') WHERE id = ?"
-  ).bind(gameId).run()
-
-  return nextState
 }

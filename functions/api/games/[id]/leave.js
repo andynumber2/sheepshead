@@ -22,7 +22,9 @@ export async function onRequestPost({ request, env, params }) {
 
     // Check remaining players
     const { results: remaining } = await env.DB.prepare(
-      'SELECT id FROM game_players WHERE game_id = ?'
+      `SELECT gp.id, u.bot_type FROM game_players gp
+       JOIN users u ON u.id = gp.user_id
+       WHERE gp.game_id = ?`
     ).bind(gameId).all()
 
     if (remaining.length === 0) {
@@ -35,6 +37,14 @@ export async function onRequestPost({ request, env, params }) {
 
     if (game.status === 'active' && game.is_test_mode) {
       // Test mode: end the game immediately when anyone leaves
+      await env.DB.prepare(
+        "UPDATE games SET status = 'complete', updated_at = datetime('now') WHERE id = ?"
+      ).bind(gameId).run()
+      return json({ left: true, ended: true })
+    }
+
+    if (game.status === 'active' && remaining.some(p => p.bot_type === 'play')) {
+      // Play bot game: end immediately when any human leaves
       await env.DB.prepare(
         "UPDATE games SET status = 'complete', updated_at = datetime('now') WHERE id = ?"
       ).bind(gameId).run()

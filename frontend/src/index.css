@@ -186,6 +186,7 @@ body {
   margin-left: 4px;
 }
 
+.badge-bot          { background: #dc2626; color: #fff; }
 .badge-dealer       { background: #f59e0b; color: #000; }
 .badge-picker       { background: #3b82f6; color: #fff; }
 .badge-partner      { background: #10b981; color: #fff; }
