@@ -45,6 +45,15 @@ export function cardPoints(card) {
   return POINT_VALUES[card.rank] ?? 0
 }
 
+// Schwanzer point value — used only when scoring a Schwanzer no-pick hand
+// Queens=3, Jacks=2, diamond pips (non-Q, non-J, suit=D)=1, all else=0
+export function schwanzerCardPoints(card) {
+  if (card.rank === 'Q') return 3
+  if (card.rank === 'J') return 2
+  if (card.suit === 'D') return 1
+  return 0
+}
+
 // Effective suit for following-suit purposes (trump = 'T')
 export function effectiveSuit(card) {
   return isTrump(card) ? 'T' : card.suit
