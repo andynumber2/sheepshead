@@ -8,7 +8,7 @@ import GameLog from '../components/GameLog.jsx'
 import ScoreBoard from '../components/ScoreBoard.jsx'
 
 const SUIT_SYMBOLS   = { C: '♣', D: '♦', H: '♥', S: '♠' }
-const VARIANT_LABELS = { leasters: 'Leasters', doublers: 'Doublers' }
+const VARIANT_LABELS = { leasters: 'Leasters', doublers: 'Doublers', schwanzers: 'Schwanzers' }
 
 // ── Seat layout (you at bottom, 4 opponents around the arc) ──────────────────
 // 5-seat positions: bottom, left, top-left, top-right, right
@@ -90,7 +90,7 @@ function AdminSettingsPanel({ gameId, currentVariant, revealPartner, onUpdated }
       <div style={{ marginBottom: 8 }}>
         <div style={{ color: '#ccc', marginBottom: 4 }}>No-pick variant:</div>
         <div style={{ display: 'flex', gap: 8 }}>
-          {['leasters', 'doublers'].map(v => (
+          {['leasters', 'doublers', 'schwanzers'].map(v => (
             <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
               <input type="radio" name={`variant-${gameId}`} value={v}
                 checked={variant === v} onChange={() => handleVariantChange(v)} disabled={saving} />
