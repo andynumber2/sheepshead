@@ -336,3 +336,46 @@ describe('pick / pass / blitz', () => {
     })
   })
 })
+
+describe('discard', () => {
+  function makeDiscardingState() {
+    const state = dealHand(['p1','p2','p3','p4','p5'], 0, 1, 1)
+    return pick(state, state.pickOrder[0])
+    // picker now has 8 cards; phase = 'discarding'
+  }
+
+  it('transitions to calling phase', () => {
+    const state = makeDiscardingState()
+    const cardIds = state.hands[state.picker].slice(-2).map(cd => cd.id)
+    const next = discard(state, state.picker, cardIds)
+    expect(next.phase).toBe('calling')
+  })
+
+  it('picker ends with 6 cards', () => {
+    const state = makeDiscardingState()
+    const cardIds = state.hands[state.picker].slice(-2).map(cd => cd.id)
+    const next = discard(state, state.picker, cardIds)
+    expect(next.hands[next.picker]).toHaveLength(6)
+  })
+
+  it('stores the 2 discarded cards in state.discard', () => {
+    const state = makeDiscardingState()
+    const cardIds = state.hands[state.picker].slice(-2).map(cd => cd.id)
+    const next = discard(state, state.picker, cardIds)
+    expect(next.discard).toHaveLength(2)
+    expect(next.discard.map(cd => cd.id)).toEqual(expect.arrayContaining(cardIds))
+  })
+
+  it('throws when not exactly 2 cards are discarded', () => {
+    const state = makeDiscardingState()
+    const oneCard = [state.hands[state.picker][0].id]
+    expect(() => discard(state, state.picker, oneCard)).toThrow('Must discard exactly 2 cards.')
+  })
+
+  it('throws if a non-picker tries to discard', () => {
+    const state = makeDiscardingState()
+    const nonPicker = state.pickOrder.find(p => p !== state.picker)
+    const cardIds = state.hands[state.picker].slice(-2).map(cd => cd.id)
+    expect(() => discard(state, nonPicker, cardIds)).toThrow('Only the picker can discard.')
+  })
+})
