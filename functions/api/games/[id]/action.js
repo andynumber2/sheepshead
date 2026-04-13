@@ -163,7 +163,7 @@ export async function onRequestPost({ request, env, params }) {
     // the human who just played. If the hand ended (new picking phase), still run
     // processBotTurns so bot picks/passes resolve instantly as normal.
     if (type !== 'play_card' || state.phase !== 'playing') {
-      state = await processBotTurns(state, gameId, env.DB, game)
+      state = await processBotTurns(state, gameId, env.DB, game, { allowTrick1Lead: type === 'bot_play' })
     }
 
     await env.DB.prepare(
