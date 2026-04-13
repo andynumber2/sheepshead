@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api.js'
+import GameOptionsPanel from '../components/GameOptionsPanel.jsx'
 
 const STATUS_LABELS  = { waiting: 'Open', active: 'In progress' }
 const VARIANT_LABELS = { leasters: 'Leasters', doublers: 'Doublers' }
@@ -9,7 +10,8 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
   const [loading, setLoading]   = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [gameName, setGameName] = useState(`${user.username}'s game`)
-  const [variant, setVariant]   = useState('leasters')
+  const [gameOptions, setGameOptions] = useState({ no_pick_variant: 'leasters', reveal_partner: true })
+  const [showOptions, setShowOptions] = useState(false)
   const [testMode, setTestMode] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError]       = useState(null)
@@ -41,8 +43,9 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
     try {
       const game = await api.games.create(
         gameName.trim() || `${user.username}'s game`,
-        variant,
+        gameOptions.no_pick_variant,
         user.is_admin ? testMode : false,
+        { reveal_partner: gameOptions.reveal_partner },
       )
       onNavigate(`/game/${game.id}`)
     } catch (e) {
@@ -133,19 +136,27 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
                 maxLength={60}
               />
             </label>
-            <fieldset>
-              <legend>No-pick variant</legend>
-              <label>
-                <input type="radio" name="variant" value="leasters"
-                  checked={variant === 'leasters'} onChange={() => setVariant('leasters')} />
-                Leasters — fewest points wins
-              </label>
-              <label>
-                <input type="radio" name="variant" value="doublers"
-                  checked={variant === 'doublers'} onChange={() => setVariant('doublers')} />
-                Doublers — stakes double each pass
-              </label>
-            </fieldset>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '8px 0' }}>
+              <span style={{ fontSize: '0.85rem', color: '#aaa' }}>
+                {gameOptions.no_pick_variant.charAt(0).toUpperCase() + gameOptions.no_pick_variant.slice(1)} ·{' '}
+                Identify partner: {gameOptions.reveal_partner ? 'Yes' : 'No'}
+              </span>
+              <button
+                type="button"
+                className="outline"
+                style={{ fontSize: '0.8rem', padding: '2px 10px' }}
+                onClick={() => setShowOptions(true)}
+              >
+                ⚙ Options
+              </button>
+            </div>
+            <GameOptionsPanel
+              mode="create"
+              open={showOptions}
+              values={gameOptions}
+              onChange={setGameOptions}
+              onClose={() => setShowOptions(false)}
+            />
 
             {user.is_admin && (
               <label className="test-mode-label">
