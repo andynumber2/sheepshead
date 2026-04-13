@@ -46,6 +46,10 @@ Total points in the deck: 120.
 
 Two blind cards are dealt face-down. Starting left of the dealer, each player may **pick** (take the blind and become the picker) or **pass**. If all five players pass, the hand is played as a **Leaster**.
 
+**Blitzing**
+
+A player holding both black queens (Queen of Clubs + Queen of Spades) or both red queens (Queen of Hearts + Queen of Diamonds) may **blitz** when it is their turn to pick. Blitzing forces the player to pick (they take the blind and proceed to discarding), and doubles the hand's final payout (×2 on top of all other multipliers).
+
 #### 2. Discarding
 
 The picker adds the 2 blind cards to their hand (8 total) and buries 2 cards face-down. The buried cards count toward the picker's point pile at scoring. The picker may not bury cards required for the partner call (see below).
@@ -103,7 +107,7 @@ The picker team needs **61 or more points** out of 120 to win.
 | Schneider (winner ≥91 pts, or loser ≤29 pts) | ×2 |
 | Schwarz (one side takes all 6 tricks) | ×3 |
 
-The final multiplier is: `base × doubler × crack`.
+The final multiplier is: `base × doubler × crack × blitz`.
 
 **Picker wins:**
 - With partner: picker earns 2 points, partner earns 1 point; each opponent loses 1 point (all × multiplier).
