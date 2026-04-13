@@ -9,6 +9,81 @@ import {
 
 const c = (rank, suit) => ({ id: `${rank}${suit}`, rank, suit })
 
+describe('isTrump', () => {
+  it('returns true for all queens', () => {
+    expect(isTrump(c('Q','C'))).toBe(true)
+    expect(isTrump(c('Q','S'))).toBe(true)
+    expect(isTrump(c('Q','H'))).toBe(true)
+    expect(isTrump(c('Q','D'))).toBe(true)
+  })
+  it('returns true for all jacks', () => {
+    expect(isTrump(c('J','C'))).toBe(true)
+    expect(isTrump(c('J','S'))).toBe(true)
+    expect(isTrump(c('J','H'))).toBe(true)
+    expect(isTrump(c('J','D'))).toBe(true)
+  })
+  it('returns true for diamond pip cards', () => {
+    expect(isTrump(c('A','D'))).toBe(true)
+    expect(isTrump(c('10','D'))).toBe(true)
+    expect(isTrump(c('K','D'))).toBe(true)
+    expect(isTrump(c('9','D'))).toBe(true)
+  })
+  it('returns false for non-trump fail cards', () => {
+    expect(isTrump(c('A','C'))).toBe(false)
+    expect(isTrump(c('10','H'))).toBe(false)
+    expect(isTrump(c('K','S'))).toBe(false)
+    expect(isTrump(c('9','C'))).toBe(false)
+  })
+})
+
+describe('trumpRank', () => {
+  it('assigns rank 0 to QC (strongest trump)', () => {
+    expect(trumpRank(c('Q','C'))).toBe(0)
+  })
+  it('assigns rank 13 to 7D (weakest trump)', () => {
+    expect(trumpRank(c('7','D'))).toBe(13)
+  })
+  it('ranks queens before jacks before diamond pips', () => {
+    expect(trumpRank(c('Q','C'))).toBeLessThan(trumpRank(c('J','C')))
+    expect(trumpRank(c('J','C'))).toBeLessThan(trumpRank(c('A','D')))
+    expect(trumpRank(c('A','D'))).toBeLessThan(trumpRank(c('10','D')))
+  })
+  it('returns -1 for non-trump cards (not in TRUMP_ORDER)', () => {
+    expect(trumpRank(c('A','C'))).toBe(-1)
+    expect(trumpRank(c('K','S'))).toBe(-1)
+  })
+})
+
+describe('suitRank', () => {
+  it('ranks A as 0 (highest)', () => {
+    expect(suitRank(c('A','C'))).toBe(0)
+  })
+  it('ranks 7 as 5 (lowest)', () => {
+    expect(suitRank(c('7','C'))).toBe(5)
+  })
+  it('ranks in order: A > 10 > K > 9 > 8 > 7', () => {
+    expect(suitRank(c('A','C'))).toBeLessThan(suitRank(c('10','C')))
+    expect(suitRank(c('10','C'))).toBeLessThan(suitRank(c('K','C')))
+    expect(suitRank(c('K','C'))).toBeLessThan(suitRank(c('9','C')))
+    expect(suitRank(c('9','C'))).toBeLessThan(suitRank(c('8','C')))
+    expect(suitRank(c('8','C'))).toBeLessThan(suitRank(c('7','C')))
+  })
+})
+
+describe('effectiveSuit', () => {
+  it('returns "T" for trump cards (queens, jacks, diamonds)', () => {
+    expect(effectiveSuit(c('Q','C'))).toBe('T')
+    expect(effectiveSuit(c('J','S'))).toBe('T')
+    expect(effectiveSuit(c('A','D'))).toBe('T')
+    expect(effectiveSuit(c('9','D'))).toBe('T')
+  })
+  it('returns the card suit for non-trump fail cards', () => {
+    expect(effectiveSuit(c('A','C'))).toBe('C')
+    expect(effectiveSuit(c('10','H'))).toBe('H')
+    expect(effectiveSuit(c('K','S'))).toBe('S')
+  })
+})
+
 describe('schwanzerCardPoints', () => {
   it('returns 3 for any queen', () => {
     expect(schwanzerCardPoints(c('Q', 'C'))).toBe(3)
