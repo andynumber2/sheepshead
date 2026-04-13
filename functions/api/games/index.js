@@ -70,8 +70,10 @@ async function createGame({ request, env }) {
   }
 
   const name         = body?.name?.trim() || `${user.username}'s game`
-  const noPickVariant = body?.no_pick_variant === 'doublers' ? 'doublers' : 'leasters'
-  const testMode     = !!(body?.test_mode && user.is_admin)
+  const VALID_VARIANTS = ['leasters', 'doublers', 'schwanzers']
+  const noPickVariant  = VALID_VARIANTS.includes(body?.no_pick_variant) ? body.no_pick_variant : 'leasters'
+  const revealPartner  = typeof body?.reveal_partner === 'boolean' ? body.reveal_partner : true
+  const testMode       = !!(body?.test_mode && user.is_admin)
 
   if (testMode) {
     // Only admins can create test games, and only one at a time
@@ -82,8 +84,8 @@ async function createGame({ request, env }) {
   }
 
   const result = await env.DB.prepare(
-    'INSERT INTO games (name, no_pick_variant, is_test_mode, created_by) VALUES (?, ?, ?, ?)'
-  ).bind(name, noPickVariant, testMode ? 1 : 0, user.user_id).run()
+    'INSERT INTO games (name, no_pick_variant, reveal_partner, is_test_mode, created_by) VALUES (?, ?, ?, ?, ?)'
+  ).bind(name, noPickVariant, revealPartner ? 1 : 0, testMode ? 1 : 0, user.user_id).run()
 
   const gameId = result.meta.last_row_id
 
@@ -109,6 +111,7 @@ async function createGame({ request, env }) {
     // All 5 seats filled — start the game immediately
     const allPlayers = [user.user_id, ...bots.map(b => b.id)]
     const state = dealHand(allPlayers.map(String), 0, 1, 1)
+    state.reveal_partner = revealPartner
 
     await env.DB.prepare(
       "INSERT INTO game_state (game_id, state_json, updated_at) VALUES (?, ?, datetime('now'))"
