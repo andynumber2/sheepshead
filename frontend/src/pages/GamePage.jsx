@@ -542,6 +542,11 @@ export default function GamePage({ gameId, user, onNavigate }) {
     && (state.tricks ?? []).length === 0
     && (state.currentTrick ?? []).length === 0
 
+  const rewindHistory = state.rewindHistory ?? []
+  const canRewindPlay  = isTestMode && user.is_admin && state.phase === 'playing' && rewindHistory.length > 0
+  const canRewindTrick = isTestMode && user.is_admin && state.phase === 'playing'
+    && !(rewindHistory.length === 0 && (state.tricks ?? []).length === 0 && (state.currentTrick ?? []).length === 0)
+
   function seatProps(player) {
     if (!player) return {}
     const uid  = String(player.user_id)
@@ -689,6 +694,34 @@ export default function GamePage({ gameId, user, onNavigate }) {
             loading={actionLoading}
             actingForName={isActingForBot ? (actingForPlayer?.username ?? turnUserId) : null}
           />
+        </div>
+      )}
+
+      {/* ── Test controls (admin rewind) ── */}
+      {isTestMode && user.is_admin && state.phase === 'playing' && (
+        <div style={{
+          gridColumn: '1 / -1',
+          display: 'flex',
+          gap: 8,
+          justifyContent: 'center',
+          padding: '4px 0',
+        }}>
+          <button
+            className="secondary"
+            onClick={() => handleAction('rewind_play', {})}
+            disabled={!canRewindPlay || actionLoading}
+            style={{ fontSize: '0.8rem' }}
+          >
+            Rewind Play
+          </button>
+          <button
+            className="secondary"
+            onClick={() => handleAction('rewind_trick', {})}
+            disabled={!canRewindTrick || actionLoading}
+            style={{ fontSize: '0.8rem' }}
+          >
+            Rewind Trick
+          </button>
         </div>
       )}
 
