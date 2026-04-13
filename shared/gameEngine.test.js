@@ -1,5 +1,11 @@
-import { describe, it, expect } from 'vitest'
-import { schwanzerCardPoints, resolveSchwanzer } from './gameEngine.js'
+import { describe, it, expect, beforeEach } from 'vitest'
+import {
+  isTrump, trumpRank, suitRank, effectiveSuit, cardPoints,
+  schwanzerCardPoints, resolveSchwanzer,
+  dealHand, pick, pass, blitz,
+  discard, callAce, goAlone, callTen, callKing,
+  playCard, computeScores, resolveLeaster,
+} from './gameEngine.js'
 
 const c = (rank, suit) => ({ id: `${rank}${suit}`, rank, suit })
 
