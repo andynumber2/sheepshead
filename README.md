@@ -44,7 +44,7 @@ Total points in the deck: 120.
 
 #### 1. Picking
 
-Two blind cards are dealt face-down. Starting left of the dealer, each player may **pick** (take the blind and become the picker) or **pass**. If all five players pass, the hand is played as a **Leaster**.
+Two blind cards are dealt face-down. Starting left of the dealer, each player may **pick** (take the blind and become the picker) or **pass**. If all five players pass, what happens depends on the game's no-pick variant: the hand is played as a **Leaster**, the stakes double (**Doublers**), or the hand is scored immediately as a **Schwanzer**.
 
 **Blitzing**
 
@@ -120,6 +120,10 @@ The final multiplier is: `base × doubler × crack × blitz`.
 ### Leaster
 
 When all five players pass, a Leaster is played. There is no picker or partner — everyone plays for themselves. The blind cards are awarded to the winner of the first trick. The player who takes at least one trick and ends with the **fewest points** wins. The winner gains 4 points; all others lose 1 point.
+
+### Doublers
+
+When all five players pass and the no-pick variant is Doublers, no hand is played. Instead, the session-wide stakes multiplier doubles (×2, stacking on each successive no-pick), a new hand is dealt, and play continues until someone picks. The accumulated doubler multiplier applies to the final payout of the next played hand, then resets to ×1.
 
 ### Schwanzer
 
