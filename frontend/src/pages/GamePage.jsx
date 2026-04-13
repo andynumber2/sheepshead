@@ -171,11 +171,6 @@ function getLegalCardIds(state, userId, hand) {
     return ['UNDER_CARD']
   }
 
-  const hasSuit = handCards.some(c => effectiveSuit(c) === ledSuit)
-  const mustFollow = hasSuit
-    ? handCards.filter(c => effectiveSuit(c) === ledSuit).map(c => c.id)
-    : handCards.map(c => c.id)
-
   // Partner must play the called card when called suit is led
   const calledCardId = calledAce?.aceId || calledTen?.tenId || calledKing?.kingId
   if (calledCardId && userId === partner && !partnerRevealed && ledSuit === calledSuit) {
@@ -189,7 +184,20 @@ function getLegalCardIds(state, userId, hand) {
     if (heldForced.length > 0) return heldForced
   }
 
-  return mustFollow
+  // Called card cannot be played unless the called suit is led
+  // (except when it's the player's only remaining card)
+  const playableCards = (
+    calledCardId &&
+    ledSuit !== calledSuit &&
+    handCards.some(c => c.id !== calledCardId)
+  )
+    ? handCards.filter(c => c.id !== calledCardId)
+    : handCards
+
+  const hasSuit = playableCards.some(c => effectiveSuit(c) === ledSuit)
+  return hasSuit
+    ? playableCards.filter(c => effectiveSuit(c) === ledSuit).map(c => c.id)
+    : playableCards.map(c => c.id)
 }
 
 // ── Main GamePage ─────────────────────────────────────────────────────────────
