@@ -84,6 +84,31 @@ describe('effectiveSuit', () => {
   })
 })
 
+describe('cardPoints', () => {
+  it('returns 11 for aces', () => {
+    expect(cardPoints(c('A','C'))).toBe(11)
+    expect(cardPoints(c('A','D'))).toBe(11)
+  })
+  it('returns 10 for tens', () => {
+    expect(cardPoints(c('10','C'))).toBe(10)
+    expect(cardPoints(c('10','H'))).toBe(10)
+  })
+  it('returns 4 for kings', () => {
+    expect(cardPoints(c('K','C'))).toBe(4)
+  })
+  it('returns 3 for queens', () => {
+    expect(cardPoints(c('Q','C'))).toBe(3)
+  })
+  it('returns 2 for jacks', () => {
+    expect(cardPoints(c('J','C'))).toBe(2)
+  })
+  it('returns 0 for 9, 8, 7', () => {
+    expect(cardPoints(c('9','C'))).toBe(0)
+    expect(cardPoints(c('8','H'))).toBe(0)
+    expect(cardPoints(c('7','S'))).toBe(0)
+  })
+})
+
 describe('schwanzerCardPoints', () => {
   it('returns 3 for any queen', () => {
     expect(schwanzerCardPoints(c('Q', 'C'))).toBe(3)
