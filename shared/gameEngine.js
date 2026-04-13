@@ -556,6 +556,33 @@ export function rewindPlay(state) {
   return restored
 }
 
+export function rewindTrick(state) {
+  assertPhase(state, 'playing')
+  const history = state.rewindHistory ?? []
+  if (history.length === 0) return state  // no-op at start of hand
+
+  let entries = [...history]
+  let poppedSnapshot
+
+  // Pop snapshots until we land at the start of a trick (currentTrick empty).
+  // Works for both mid-trick and start-of-trick cases: if we're already at
+  // currentTrick=[], the first pop goes back into the previous trick's plays,
+  // then we keep popping until we hit the previous trick's start.
+  do {
+    poppedSnapshot = entries[entries.length - 1]
+    entries = entries.slice(0, -1)
+  } while (entries.length > 0 && poppedSnapshot.currentTrick.length > 0)
+
+  const restored = { ...poppedSnapshot, rewindHistory: entries }
+
+  // Rewinding to the start of the hand resets crack/recrack state
+  if (restored.tricks.length === 0) {
+    return { ...restored, crackState: null, handCrackMultiplier: 1 }
+  }
+
+  return restored
+}
+
 // Who plays next in the current trick?
 export function currentPlayer(state) {
   const played = state.currentTrick.map(p => p.userId)

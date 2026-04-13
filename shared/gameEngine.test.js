@@ -964,6 +964,106 @@ describe('rewindPlay', () => {
   })
 })
 
+describe('rewindTrick', () => {
+  function makeHandStartSnapshot(overrides = {}) {
+    return {
+      phase: 'playing',
+      picker: 'p1', partner: 'p3', goingAlone: false,
+      calledAce: { suit: 'S', aceId: 'AS' }, calledSuit: 'S',
+      calledTen: null, calledKing: null,
+      partnerRevealed: true, pickerForcedPlays: [], underCard: null,
+      pickOrder: ['p1','p2','p3','p4','p5'],
+      doublerMultiplier: 1, handCrackMultiplier: 1, crackState: null,
+      blitzes: [], discard: [],
+      tricks: [], currentTrick: [], currentLeader: 'p1',
+      lastTrick: [], log: [], scores: {},
+      rewindHistory: [],
+      hands: {
+        p1: [c('K','H')], p2: [c('7','H')], p3: [c('8','H')],
+        p4: [c('9','H')], p5: [c('10','H')],
+      },
+      ...overrides,
+    }
+  }
+
+  it('is a no-op when rewindHistory is empty', () => {
+    const state = makeHandStartSnapshot()
+    const result = rewindTrick(state)
+    expect(result).toBe(state)
+  })
+
+  it('rewinds mid-trick to the start of the current trick', () => {
+    const s0 = makeHandStartSnapshot()
+    const s1 = { ...makeHandStartSnapshot(), hands: { ...makeHandStartSnapshot().hands, p1: [] }, currentTrick: [{ userId: 'p1', card: c('K','H') }], rewindHistory: [] }
+    const state = {
+      ...s1,
+      hands: { ...s1.hands, p2: [] },
+      currentTrick: [{ userId: 'p1', card: c('K','H') }, { userId: 'p2', card: c('7','H') }],
+      rewindHistory: [s0, s1],
+    }
+    const rewound = rewindTrick(state)
+    expect(rewound.currentTrick).toHaveLength(0)
+    expect(rewound.tricks).toHaveLength(0)
+  })
+
+  it('rewinds to the previous trick when currentTrick is already empty', () => {
+    const s0 = makeHandStartSnapshot()
+    const s1 = { ...s0, currentTrick: [{ userId: 'p1', card: c('K','H') }], rewindHistory: [] }
+    const s2 = { ...s0, currentTrick: [{ userId: 'p1', card: c('K','H') }, { userId: 'p2', card: c('7','H') }], rewindHistory: [] }
+    const s3 = { ...s0, currentTrick: [{ userId: 'p1', card: c('K','H') }, { userId: 'p2', card: c('7','H') }, { userId: 'p3', card: c('8','H') }], rewindHistory: [] }
+    const s4 = { ...s0, currentTrick: [{ userId: 'p1', card: c('K','H') }, { userId: 'p2', card: c('7','H') }, { userId: 'p3', card: c('8','H') }, { userId: 'p4', card: c('9','H') }], rewindHistory: [] }
+    const state = {
+      ...makeHandStartSnapshot(),
+      tricks: [{ leader: 'p1', plays: [], winner: 'p1' }],
+      currentTrick: [],
+      currentLeader: 'p1',
+      rewindHistory: [s0, s1, s2, s3, s4],
+    }
+    const rewound = rewindTrick(state)
+    expect(rewound.currentTrick).toHaveLength(0)
+    expect(rewound.tricks).toHaveLength(0)
+  })
+
+  it('resets crackState and handCrackMultiplier when rewinding to hand start', () => {
+    const s0 = makeHandStartSnapshot({ crackState: 'cracked', handCrackMultiplier: 2 })
+    const s1 = { ...s0, hands: { ...s0.hands, p1: [] }, currentTrick: [{ userId: 'p1', card: c('K','H') }], rewindHistory: [] }
+    const state = {
+      ...s1,
+      hands: { ...s1.hands, p2: [] },
+      currentTrick: [{ userId: 'p1', card: c('K','H') }, { userId: 'p2', card: c('7','H') }],
+      rewindHistory: [s0, s1],
+    }
+    const rewound = rewindTrick(state)
+    expect(rewound.tricks).toHaveLength(0)
+    expect(rewound.crackState).toBeNull()
+    expect(rewound.handCrackMultiplier).toBe(1)
+  })
+
+  it('does NOT reset crackState when rewinding to a mid-hand trick boundary', () => {
+    const s5 = makeHandStartSnapshot({
+      tricks: [{ leader: 'p1', plays: [], winner: 'p1' }],
+      currentTrick: [],
+      crackState: 'cracked',
+      handCrackMultiplier: 2,
+    })
+    const s6 = { ...s5, currentTrick: [{ userId: 'p1', card: c('K','H') }], rewindHistory: [] }
+    const state = {
+      ...s5,
+      currentTrick: [{ userId: 'p1', card: c('K','H') }, { userId: 'p2', card: c('7','H') }],
+      rewindHistory: [s5, s6],
+    }
+    const rewound = rewindTrick(state)
+    expect(rewound.currentTrick).toHaveLength(0)
+    expect(rewound.tricks).toHaveLength(1)
+    expect(rewound.crackState).toBe('cracked')
+  })
+
+  it('throws when phase is not playing', () => {
+    const state = makeHandStartSnapshot({ phase: 'picking' })
+    expect(() => rewindTrick(state)).toThrow()
+  })
+})
+
 describe('computeScores', () => {
   // Create a fake card with a specific point rank (suit doesn't affect scoring)
   let fakeId = 0
