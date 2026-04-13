@@ -265,6 +265,8 @@ async function resolveNoPick(state, game, DB, gameId) {
   const nextDealer = (state.dealerSeat + 1) % 5
   const newState = dealHand(playerIds, nextDealer, state.handNumber + 1, newMultiplier)
   newState.doublerMultiplier = newMultiplier
+  const gameRow = await DB.prepare('SELECT reveal_partner FROM games WHERE id = ?').bind(gameId).first()
+  newState.reveal_partner = gameRow.reveal_partner === 1
   newState.log = [...state.log, ...newState.log, `Doubler! Stakes are now ×${newMultiplier}.`]
 
   await DB.prepare(
