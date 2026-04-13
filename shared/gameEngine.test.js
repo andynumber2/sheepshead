@@ -767,3 +767,208 @@ describe('playCard', () => {
     expect(final.tricks).toHaveLength(6)
   })
 })
+
+describe('computeScores', () => {
+  // Create a fake card with a specific point rank (suit doesn't affect scoring)
+  let fakeId = 0
+  beforeEach(() => { fakeId = 0 })
+  const fk = (rank) => ({ id: `fk${fakeId++}`, rank, suit: 'C' })
+
+  // Build a trick: `winner` takes all points from `cards`
+  const makeTrick = (winner, cards) => ({
+    leader: winner,
+    plays: ['p1','p2','p3','p4','p5'].map((uid, i) => ({ userId: uid, card: cards[i] ?? fk('7') })),
+    winner,
+  })
+
+  function baseState(tricks, overrides = {}) {
+    return {
+      phase: 'scoring',
+      picker: 'p1',
+      partner: 'p2',
+      goingAlone: false,
+      doublerMultiplier: 1,
+      handCrackMultiplier: 1,
+      blitzes: [],
+      discard: [],
+      log: [],
+      hands: { p1:[], p2:[], p3:[], p4:[], p5:[] },
+      tricks,
+      ...overrides,
+    }
+  }
+
+  it('picker wins when picker team has 61+ points', () => {
+    // p1 wins 3 tricks with 25 pts each = 75 pts; opponents win 3 tricks with 0 pts
+    const tricks = [
+      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),  // 11+10+4 = 25
+      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),  // 25
+      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),  // 25
+      makeTrick('p3', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
+      makeTrick('p4', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
+      makeTrick('p5', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
+    ]
+    const scores = computeScores(baseState(tricks))
+    expect(scores.p1).toBe(2)   // picker wins: +2
+    expect(scores.p2).toBe(1)   // partner wins: +1
+    expect(scores.p3).toBe(-1)
+    expect(scores.p4).toBe(-1)
+    expect(scores.p5).toBe(-1)
+  })
+
+  it('opponents win when picker team has fewer than 61 points', () => {
+    // Picker team wins 2 tricks with 32 pts total (>29, <61); opponents win 4 tricks
+    // 32 pts < 61 → picker loses; 32 > 29 → no schneider; 2 tricks won → no schwarz
+    // baseMultiplier = 1
+    const tricks = [
+      makeTrick('p1', [fk('A'), fk('10'), fk('9'), fk('8'), fk('7')]),  // 11+10 = 21 pts
+      makeTrick('p2', [fk('A'), fk('9'), fk('8'), fk('7'), fk('7')]),   // 11 pts → total = 32
+      makeTrick('p3', [fk('A'), fk('10'), fk('K'), fk('9'), fk('8')]),  // opponents
+      makeTrick('p3', [fk('A'), fk('10'), fk('K'), fk('9'), fk('8')]),  // opponents
+      makeTrick('p4', [fk('9'), fk('8'), fk('7'), fk('7'), fk('7')]),
+      makeTrick('p5', [fk('9'), fk('8'), fk('7'), fk('7'), fk('7')]),
+    ]
+    const scores = computeScores(baseState(tricks))
+    expect(scores.p1).toBe(-2)   // picker loses: -2
+    expect(scores.p2).toBe(-1)   // partner loses: -1
+    expect(scores.p3).toBe(1)
+    expect(scores.p4).toBe(1)
+    expect(scores.p5).toBe(1)
+  })
+
+  it('schneider doubles the base multiplier when picker team has 91+ points', () => {
+    // p1 wins 2 tricks with 53+33=86 pts, p1 wins 1 more with ≥5 pts → 91+
+    const tricks = [
+      makeTrick('p1', [fk('A'), fk('A'), fk('A'), fk('10'), fk('10')]),   // 53 pts
+      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('K'), fk('K')]),    // 33 pts  (total=86)
+      makeTrick('p1', [fk('Q'), fk('J'), fk('7'), fk('7'), fk('7')]),     // 3+2=5 pts (total=91)
+      makeTrick('p3', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
+      makeTrick('p3', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
+      makeTrick('p3', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
+    ]
+    // baseMultiplier=2 (schneider), doublerMultiplier=1, handCrackMultiplier=1
+    const scores = computeScores(baseState(tricks))
+    expect(scores.p1).toBe(4)   // 2 × 2 = +4
+    expect(scores.p2).toBe(2)   // 1 × 2 = +2
+    expect(scores.p3).toBe(-2)
+  })
+
+  it('discard points count toward the picker\'s total', () => {
+    // p1 wins 1 trick with 39 pts + discard has 2 aces (22 pts) = 61 → wins
+    const tricks = [
+      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('10'), fk('K')]),  // 11+10+4+10+4 = 39
+      makeTrick('p3', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
+      makeTrick('p3', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
+      makeTrick('p3', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
+      makeTrick('p3', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
+      makeTrick('p3', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
+    ]
+    // discard: [A, A] = 22 pts → picker total = 39+22 = 61 → wins
+    const state = baseState(tricks, { discard: [fk('A'), fk('A')] })
+    const scores = computeScores(state)
+    expect(scores.p1).toBe(2)   // picker wins
+  })
+
+  it('going alone: picker earns points from all 4 opponents', () => {
+    const tricks = [
+      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),  // 25 pts each
+      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),
+      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),
+      makeTrick('p3', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
+      makeTrick('p4', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
+      makeTrick('p5', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
+    ]
+    const scores = computeScores(baseState(tricks, { goingAlone: true, partner: null }))
+    expect(scores.p1).toBe(4)   // 4 opponents × 1 = +4
+    expect(scores.p2).toBe(-1)
+    expect(scores.p3).toBe(-1)
+    expect(scores.p4).toBe(-1)
+    expect(scores.p5).toBe(-1)
+  })
+})
+
+describe('resolveLeaster', () => {
+  let fkId = 0
+  beforeEach(() => { fkId = 0 })
+  const fk = (rank) => ({ id: `lk${fkId++}`, rank, suit: 'C' })
+
+  const makeTrick = (winner, pointRanks) => ({
+    leader: winner,
+    plays: ['p1','p2','p3','p4','p5'].map((uid, i) => ({
+      userId: uid,
+      card: fk(pointRanks[i] ?? '7'),
+    })),
+    winner,
+  })
+
+  function leasterState(tricks) {
+    return {
+      hands: { p1:[], p2:[], p3:[], p4:[], p5:[] },
+      tricks,
+      log: [],
+    }
+  }
+
+  it('player with fewest points who took ≥1 trick wins', () => {
+    const tricks = [
+      makeTrick('p1', ['A','10','K','7','7']),    // p1 gets 25 pts
+      makeTrick('p2', ['A','10','K','7','7']),    // p2 gets 25 pts
+      makeTrick('p3', ['7','7','7','7','7']),     // p3 gets 0 pts ← winner
+      makeTrick('p4', ['A','7','7','7','7']),     // p4 gets 11 pts
+      makeTrick('p5', ['10','7','7','7','7']),    // p5 gets 10 pts
+      makeTrick('p3', ['7','7','7','7','7']),     // p3 gets 0 pts more
+    ]
+    const { winner, scores } = resolveLeaster(leasterState(tricks))
+    expect(winner).toBe('p3')
+    expect(scores.p3).toBe(4)
+    expect(scores.p1).toBe(-1)
+    expect(scores.p2).toBe(-1)
+    expect(scores.p4).toBe(-1)
+    expect(scores.p5).toBe(-1)
+  })
+
+  it('tie-break: when points are equal, player with fewer tricks wins', () => {
+    const tricks = [
+      makeTrick('p1', ['A','7','7','7','7']),    // p1: 11 pts, 1 trick
+      makeTrick('p2', ['7','7','7','7','7']),    // p2: 0 pts, 1st trick
+      makeTrick('p2', ['7','7','7','7','7']),    // p2: 0 pts, 2nd trick → 2 tricks total
+      makeTrick('p3', ['7','7','7','7','7']),    // p3: 0 pts, 1 trick ← tied with p2 on pts, fewer tricks
+      makeTrick('p4', ['10','7','7','7','7']),   // p4: 10 pts
+      makeTrick('p5', ['K','7','7','7','7']),    // p5: 4 pts
+    ]
+    // p2 and p3 both have 0 pts. p3 has 1 trick, p2 has 2 tricks → p3 wins
+    const { winner } = resolveLeaster(leasterState(tricks))
+    expect(winner).toBe('p3')
+  })
+
+  it('player who won no tricks is not eligible', () => {
+    const tricks = [
+      makeTrick('p1', ['A','10','K','7','7']),
+      makeTrick('p1', ['A','10','K','7','7']),
+      makeTrick('p2', ['7','7','7','7','7']),
+      makeTrick('p2', ['7','7','7','7','7']),
+      makeTrick('p3', ['7','7','7','7','7']),
+      makeTrick('p3', ['7','7','7','7','7']),
+    ]
+    // p4 and p5 never won a trick — they should not win leaster
+    const { winner } = resolveLeaster(leasterState(tricks))
+    expect(['p1','p2','p3']).toContain(winner)
+    expect(winner).not.toBe('p4')
+    expect(winner).not.toBe('p5')
+  })
+
+  it('pushes a log entry naming the winner', () => {
+    const tricks = [
+      makeTrick('p1', ['A','7','7','7','7']),
+      makeTrick('p2', ['7','7','7','7','7']),
+      makeTrick('p3', ['7','7','7','7','7']),
+      makeTrick('p4', ['7','7','7','7','7']),
+      makeTrick('p5', ['7','7','7','7','7']),
+      makeTrick('p3', ['7','7','7','7','7']),
+    ]
+    const state = leasterState(tricks)
+    resolveLeaster(state)
+    expect(state.log.length).toBe(1)
+    expect(state.log[0]).toContain('Leaster')
+  })
+})
