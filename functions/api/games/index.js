@@ -71,8 +71,8 @@ async function createGame({ request, env }) {
 
   const name         = body?.name?.trim() || `${user.username}'s game`
   const VALID_VARIANTS = ['leasters', 'doublers', 'schwanzers']
-  const noPickVariant  = VALID_VARIANTS.includes(body?.no_pick_variant) ? body.no_pick_variant : 'leasters'
-  const revealPartner  = typeof body?.reveal_partner === 'boolean' ? body.reveal_partner : true
+  const noPickVariant  = VALID_VARIANTS.includes(body?.no_pick_variant) ? body.no_pick_variant : 'doublers'
+  const revealPartner  = typeof body?.reveal_partner === 'boolean' ? body.reveal_partner : false
   const testMode       = !!(body?.test_mode && user.is_admin)
 
   if (testMode) {

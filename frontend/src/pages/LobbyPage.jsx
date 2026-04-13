@@ -10,7 +10,7 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
   const [loading, setLoading]   = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [gameName, setGameName] = useState(`${user.username}'s game`)
-  const [gameOptions, setGameOptions] = useState({ no_pick_variant: 'leasters', reveal_partner: true })
+  const [gameOptions, setGameOptions] = useState({ no_pick_variant: 'doublers', reveal_partner: false })
   const [showOptions, setShowOptions] = useState(false)
   const [testMode, setTestMode] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -136,19 +136,22 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
                 maxLength={60}
               />
             </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '8px 0' }}>
-              <span style={{ fontSize: '0.85rem', color: '#aaa' }}>
-                {gameOptions.no_pick_variant.charAt(0).toUpperCase() + gameOptions.no_pick_variant.slice(1)} ·{' '}
-                Identify partner: {gameOptions.reveal_partner ? 'Yes' : 'No'}
-              </span>
-              <button
-                type="button"
-                className="outline"
-                style={{ fontSize: '0.8rem', padding: '2px 10px' }}
-                onClick={() => setShowOptions(true)}
-              >
-                ⚙ Options
-              </button>
+            <div style={{ margin: '8px 0' }}>
+              <div style={{ fontSize: '0.72rem', color: '#888', marginBottom: 3 }}>Game options</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <span style={{ fontSize: '0.85rem', color: '#ccc' }}>
+                  {gameOptions.no_pick_variant.charAt(0).toUpperCase() + gameOptions.no_pick_variant.slice(1)} ·{' '}
+                  Partner: {gameOptions.reveal_partner ? 'shown' : 'hidden'}
+                </span>
+                <button
+                  type="button"
+                  className="outline"
+                  style={{ fontSize: '0.8rem', padding: '2px 10px' }}
+                  onClick={() => setShowOptions(true)}
+                >
+                  ⚙ Edit
+                </button>
+              </div>
             </div>
             <GameOptionsPanel
               mode="create"

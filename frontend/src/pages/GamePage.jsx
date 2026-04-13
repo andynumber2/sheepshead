@@ -394,15 +394,18 @@ export default function GamePage({ gameId, user, onNavigate }) {
         {/* Game creator controls settings */}
         {isGameAdmin ? (
           <>
-            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ color: '#aaa', fontSize: '0.85rem' }}>
-                {VARIANT_LABELS[currentVariant ?? noPickVariant]} ·{' '}
-                Identify partner: {(revealPartner ?? gameData.reveal_partner ?? true) ? 'Yes' : 'No'}
-              </span>
-              <button className="outline" style={{ fontSize: '0.8rem', padding: '2px 10px' }}
-                onClick={() => setShowOptions(true)}>
-                ⚙ Options
-              </button>
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: '0.72rem', color: '#888', marginBottom: 3 }}>Game options</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <span style={{ color: '#ccc', fontSize: '0.85rem' }}>
+                  {VARIANT_LABELS[currentVariant ?? noPickVariant]} ·{' '}
+                  Partner: {(revealPartner ?? gameData.reveal_partner ?? true) ? 'shown' : 'hidden'}
+                </span>
+                <button className="outline" style={{ fontSize: '0.8rem', padding: '2px 10px' }}
+                  onClick={() => setShowOptions(true)}>
+                  ⚙ Edit
+                </button>
+              </div>
             </div>
             <GameOptionsPanel
               mode="update"
@@ -666,15 +669,18 @@ export default function GamePage({ gameId, user, onNavigate }) {
 
       {/* ── Game admin settings (game creator only) ── */}
       {isGameAdmin && (
-        <div className="score-board" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ color: '#aaa', fontSize: '0.78rem' }}>
-            {VARIANT_LABELS[currentVariant ?? noPickVariant]} ·{' '}
-            Partner: {(revealPartner ?? gameData.reveal_partner ?? true) ? 'shown' : 'hidden'}
-          </span>
-          <button className="outline" style={{ fontSize: '0.78rem', padding: '2px 8px' }}
-            onClick={() => setShowOptions(true)}>
-            ⚙
-          </button>
+        <div className="score-board">
+          <div style={{ fontSize: '0.68rem', color: '#666', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Game options</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <span style={{ color: '#aaa', fontSize: '0.78rem' }}>
+              {VARIANT_LABELS[currentVariant ?? noPickVariant]} ·{' '}
+              Partner: {(revealPartner ?? gameData.reveal_partner ?? true) ? 'shown' : 'hidden'}
+            </span>
+            <button className="outline" style={{ fontSize: '0.78rem', padding: '2px 8px' }}
+              onClick={() => setShowOptions(true)}>
+              ⚙ Edit
+            </button>
+          </div>
           <GameOptionsPanel
             mode="update"
             gameId={gameId}

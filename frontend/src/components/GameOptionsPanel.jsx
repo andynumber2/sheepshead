@@ -13,8 +13,8 @@ const VARIANT_LABELS = { leasters: 'Leasters', doublers: 'Doublers', schwanzers:
  */
 export default function GameOptionsPanel({ mode, gameId, open, values, onChange, onUpdated, onClose }) {
   const dialogRef  = useRef(null)
-  const [variant, setVariant] = useState(values?.no_pick_variant ?? 'leasters')
-  const [reveal,  setReveal]  = useState(values?.reveal_partner  ?? true)
+  const [variant, setVariant] = useState(values?.no_pick_variant ?? 'doublers')
+  const [reveal,  setReveal]  = useState(values?.reveal_partner  ?? false)
   const [saving,  setSaving]  = useState(false)
   const [saved,   setSaved]   = useState(false)
 
@@ -71,16 +71,8 @@ export default function GameOptionsPanel({ mode, gameId, open, values, onChange,
   return (
     <dialog
       ref={dialogRef}
+      className="game-options-dialog"
       onClose={onClose}
-      style={{
-        background: '#1a1a2e',
-        border: '1px solid rgba(255,255,255,0.15)',
-        borderRadius: 10,
-        padding: '18px 22px',
-        color: '#fff',
-        minWidth: 300,
-        maxWidth: 420,
-      }}
     >
       <strong style={{ fontSize: '0.95rem' }}>⚙ Game options</strong>
       {mode === 'update' && (
@@ -94,9 +86,9 @@ export default function GameOptionsPanel({ mode, gameId, open, values, onChange,
 
       {/* No-pick variant */}
       <div style={{ marginBottom: 12 }}>
-        <div style={{ color: '#ccc', fontSize: '0.82rem', marginBottom: 4 }}>No-pick variant:</div>
+        <div style={{ color: '#ccc', fontSize: '0.82rem', marginBottom: 4 }}>No-pick variant</div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          {['leasters', 'doublers', 'schwanzers'].map(v => (
+          {['doublers', 'leasters', 'schwanzers'].map(v => (
             <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: '0.85rem' }}>
               <input
                 type="radio"
@@ -115,10 +107,10 @@ export default function GameOptionsPanel({ mode, gameId, open, values, onChange,
       {/* Identify partner */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ color: '#ccc', fontSize: '0.82rem', marginBottom: 4 }}>
-          Identify partner after ace is played?
+          Partner Visibility
         </div>
         <div style={{ display: 'flex', gap: 12 }}>
-          {[true, false].map(v => (
+          {[false, true].map(v => (
             <label key={String(v)} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: '0.85rem' }}>
               <input
                 type="radio"
@@ -128,7 +120,7 @@ export default function GameOptionsPanel({ mode, gameId, open, values, onChange,
                 onChange={() => handleRevealChange(v)}
                 disabled={saving}
               />
-              {v ? 'Yes' : 'No'}
+              {v ? 'Shown' : 'Hidden'}
             </label>
           ))}
         </div>
@@ -140,6 +132,7 @@ export default function GameOptionsPanel({ mode, gameId, open, values, onChange,
           {mode === 'update' && saved  && <span style={{ color: '#4ade80' }}>✓ Saved</span>}
         </div>
         <button
+          type="button"
           onClick={onClose}
           style={{ fontSize: '0.85rem', padding: '4px 16px' }}
         >

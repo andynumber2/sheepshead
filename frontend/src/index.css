@@ -418,3 +418,35 @@ body {
   font-size: 0.8rem;
   margin-top: 4px;
 }
+
+/* ── Game options dialog ─────────────────────────────────── */
+/* Pico CSS turns <dialog> into a full-screen transparent flex overlay
+   (display: flex, min-height: 100%, min-width: 100%). Scope all overrides
+   to [open] so the dialog stays hidden when closed (browser default). */
+dialog.game-options-dialog:not([open]) {
+  display: none;
+}
+
+dialog.game-options-dialog[open] {
+  display: block;
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: fit-content;
+  min-width: 300px;
+  max-width: 420px;
+  height: fit-content;
+  min-height: unset;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 18px 22px;
+  background: #1a1a2e;
+  background-color: #1a1a2e;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  color: #fff;
+}
+
+dialog.game-options-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
