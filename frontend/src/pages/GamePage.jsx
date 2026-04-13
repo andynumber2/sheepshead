@@ -348,10 +348,13 @@ export default function GamePage({ gameId, user, onNavigate }) {
 
     if (trick.length > 0) {
       // Cards are being played — update immediately and cancel any pending clear.
+      // Also sync the ref so a rewind-reduced trickCount is tracked; otherwise
+      // re-completing the same trick won't trigger the completion branch below.
       if (trickClearTimerRef.current) {
         clearTimeout(trickClearTimerRef.current)
         trickClearTimerRef.current = null
       }
+      lastProcessedTrickCountRef.current = trickCount
       setDisplayedTrick(trick)
     } else if (trickCount !== lastProcessedTrickCountRef.current) {
       // A new trick just completed — guard by trickCount so repeated polls of
