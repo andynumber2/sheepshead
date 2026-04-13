@@ -492,3 +492,101 @@ describe('partner calling', () => {
     })
   })
 })
+
+describe('playCard', () => {
+  // State: p1 has led KH; p2 & p3 have played; p4 is next; partner is p3 (already revealed)
+  function makeMidTrickState() {
+    return {
+      phase: 'playing',
+      picker: 'p1',
+      partner: 'p3',
+      goingAlone: false,
+      calledAce: { suit: 'S', aceId: 'AS' },
+      calledSuit: 'S',
+      calledTen: null,
+      calledKing: null,
+      partnerRevealed: true,
+      pickerForcedPlays: [],
+      underCard: null,
+      pickOrder: ['p1','p2','p3','p4','p5'],
+      doublerMultiplier: 1,
+      handCrackMultiplier: 1,
+      blitzes: [],
+      discard: [],
+      tricks: [],
+      currentTrick: [
+        { userId: 'p1', card: c('K','H') },
+        { userId: 'p2', card: c('A','H') },
+        { userId: 'p3', card: c('7','C') },
+      ],
+      currentLeader: 'p1',
+      log: [],
+      scores: {},
+      hands: {
+        p1: [],                              // already played
+        p2: [],                              // already played
+        p3: [],                              // already played
+        p4: [c('9','H'), c('K','S')],        // has hearts (led suit) — p4 is next
+        p5: [c('10','H'), c('9','C')],
+      },
+    }
+  }
+
+  it('throws when player has the led suit but plays a different suit', () => {
+    const state = makeMidTrickState()
+    // p4 has 9H (the led suit) but tries to play KS instead
+    expect(() => playCard(state, 'p4', 'KS')).toThrow('Must follow suit')
+  })
+
+  it('allows playing any card when void in the led suit', () => {
+    // Create a separate state where p4 is void in the led suit
+    const state = {
+      phase: 'playing',
+      picker: 'p1',
+      partner: 'p3',
+      goingAlone: false,
+      calledAce: { suit: 'S', aceId: 'AS' },
+      calledSuit: 'S',
+      calledTen: null,
+      calledKing: null,
+      partnerRevealed: true,
+      pickerForcedPlays: [],
+      underCard: null,
+      pickOrder: ['p1','p2','p3','p4','p5'],
+      doublerMultiplier: 1,
+      handCrackMultiplier: 1,
+      blitzes: [],
+      discard: [],
+      tricks: [],
+      currentTrick: [
+        { userId: 'p1', card: c('K','H') },
+        { userId: 'p2', card: c('A','H') },
+        { userId: 'p3', card: c('8','C') },
+      ],
+      currentLeader: 'p1',
+      log: [],
+      scores: {},
+      hands: {
+        p1: [],
+        p2: [],
+        p3: [],
+        p4: [c('7','C'), c('K','S')],        // void in hearts — can play 7C or KS
+        p5: [c('10','H'), c('9','C')],
+      },
+    }
+    // p4 has no hearts — can play 7C freely
+    expect(() => playCard(state, 'p4', '7C')).not.toThrow()
+  })
+
+  it('throws when playing a card not in hand', () => {
+    const state = makeMidTrickState()
+    // p4 does not have QC in hand
+    expect(() => playCard(state, 'p4', 'QC')).toThrow()
+  })
+
+  it('throws when it is not the player\'s turn', () => {
+    const state = makeMidTrickState()
+    // p5's turn comes after p4 — p5 cannot play before p4
+    expect(() => playCard(state, 'p5', '10H')).toThrow()
+  })
+})
