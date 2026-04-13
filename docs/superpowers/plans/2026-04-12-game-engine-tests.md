@@ -1,16 +1,96 @@
+# Game Engine Tests Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Write comprehensive tests for all major game engine functions in `shared/gameEngine.test.js` and update `CLAUDE.md` to require tests for future feature work.
+
+**Architecture:** Export `computeScores` for direct testing. Pure unit tests for stateless helpers; state-construction tests for stateful functions. Single test file organized by `describe` blocks.
+
+**Tech Stack:** Vitest (`npm run test`)
+
+---
+
+### Task 1: Export `computeScores` for testability
+
+**Files:**
+- Modify: `shared/gameEngine.js:691`
+
+- [ ] **Step 1: Export `computeScores`**
+
+In `shared/gameEngine.js`, change line 691:
+```js
+// Before:
+function computeScores(state) {
+
+// After:
+export function computeScores(state) {
+```
+
+- [ ] **Step 2: Run tests to confirm nothing broke**
+
+```bash
+npm run test
+```
+Expected: 8 passed
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add shared/gameEngine.js
+git commit -m "feat: export computeScores for testability"
+```
+
+---
+
+### Task 2: Update imports in test file
+
+**Files:**
+- Modify: `shared/gameEngine.test.js:1-3`
+
+- [ ] **Step 1: Replace the existing import line**
+
+```js
+// Replace:
+import { describe, it, expect } from 'vitest'
+import { schwanzerCardPoints, resolveSchwanzer } from './gameEngine.js'
+
+// With:
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
   isTrump, trumpRank, suitRank, effectiveSuit, cardPoints,
   schwanzerCardPoints, resolveSchwanzer,
   dealHand, pick, pass, blitz,
   discard, callAce, goAlone, callTen, callKing,
-  callAceUnknown, crack, recrack,
   playCard, computeScores, resolveLeaster,
-  setupLeaster, awardLeasterBlind, getPlayerView,
 } from './gameEngine.js'
+```
 
-const c = (rank, suit) => ({ id: `${rank}${suit}`, rank, suit })
+Also ensure the shared card factory `const c = (rank, suit) => ({ id: `${rank}${suit}`, rank, suit })` is at the top of the file (before any describe blocks). If it already exists inside a describe block, move it to file scope.
 
+- [ ] **Step 2: Run tests**
+
+```bash
+npm run test
+```
+Expected: 8 passed (no regressions)
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add shared/gameEngine.test.js
+git commit -m "test: update imports in gameEngine.test.js"
+```
+
+---
+
+### Task 3: Pure unit tests — trump helpers
+
+**Files:**
+- Modify: `shared/gameEngine.test.js`
+
+- [ ] **Step 1: Add trump helper describe blocks before the `schwanzerCardPoints` block**
+
+```js
 describe('isTrump', () => {
   it('returns true for all queens', () => {
     expect(isTrump(c('Q','C'))).toBe(true)
@@ -85,7 +165,32 @@ describe('effectiveSuit', () => {
     expect(effectiveSuit(c('K','S'))).toBe('S')
   })
 })
+```
 
+- [ ] **Step 2: Run tests**
+
+```bash
+npm run test
+```
+Expected: all pass
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add shared/gameEngine.test.js
+git commit -m "test: add unit tests for isTrump, trumpRank, suitRank, effectiveSuit"
+```
+
+---
+
+### Task 4: Pure unit tests — `cardPoints`
+
+**Files:**
+- Modify: `shared/gameEngine.test.js`
+
+- [ ] **Step 1: Add `cardPoints` describe block**
+
+```js
 describe('cardPoints', () => {
   it('returns 11 for aces', () => {
     expect(cardPoints(c('A','C'))).toBe(11)
@@ -110,110 +215,32 @@ describe('cardPoints', () => {
     expect(cardPoints(c('7','S'))).toBe(0)
   })
 })
+```
 
-describe('schwanzerCardPoints', () => {
-  it('returns 3 for any queen', () => {
-    expect(schwanzerCardPoints(c('Q', 'C'))).toBe(3)
-    expect(schwanzerCardPoints(c('Q', 'S'))).toBe(3)
-    expect(schwanzerCardPoints(c('Q', 'H'))).toBe(3)
-    expect(schwanzerCardPoints(c('Q', 'D'))).toBe(3)  // QD is a queen, not a diamond pip
-  })
+- [ ] **Step 2: Run tests**
 
-  it('returns 2 for any jack', () => {
-    expect(schwanzerCardPoints(c('J', 'C'))).toBe(2)
-    expect(schwanzerCardPoints(c('J', 'S'))).toBe(2)
-    expect(schwanzerCardPoints(c('J', 'H'))).toBe(2)
-    expect(schwanzerCardPoints(c('J', 'D'))).toBe(2)  // JD is a jack, not a diamond pip
-  })
+```bash
+npm run test
+```
+Expected: all pass
 
-  it('returns 1 for diamond pip cards (non-Q, non-J diamonds)', () => {
-    expect(schwanzerCardPoints(c('A',  'D'))).toBe(1)
-    expect(schwanzerCardPoints(c('10', 'D'))).toBe(1)
-    expect(schwanzerCardPoints(c('K',  'D'))).toBe(1)
-    expect(schwanzerCardPoints(c('9',  'D'))).toBe(1)
-    expect(schwanzerCardPoints(c('8',  'D'))).toBe(1)
-    expect(schwanzerCardPoints(c('7',  'D'))).toBe(1)
-  })
+- [ ] **Step 3: Commit**
 
-  it('returns 0 for non-trump fail cards', () => {
-    expect(schwanzerCardPoints(c('A',  'C'))).toBe(0)
-    expect(schwanzerCardPoints(c('10', 'H'))).toBe(0)
-    expect(schwanzerCardPoints(c('K',  'S'))).toBe(0)
-    expect(schwanzerCardPoints(c('9',  'C'))).toBe(0)
-    expect(schwanzerCardPoints(c('8',  'H'))).toBe(0)
-    expect(schwanzerCardPoints(c('7',  'S'))).toBe(0)
-  })
-})
+```bash
+git add shared/gameEngine.test.js
+git commit -m "test: add unit tests for cardPoints"
+```
 
-// ─── helpers for resolveSchwanzer tests ──────────────────────────────────────
-function makeState(hands, pickOrder) {
-  return { hands, pickOrder, log: [] }
-}
+---
 
-describe('resolveSchwanzer', () => {
-  it('identifies the player with the most schwanzer points as the loser', () => {
-    const hands = {
-      p1: [c('Q','C'), c('7','C'), c('8','C'), c('9','C'), c('A','C'), c('10','C')],  // 3 pts
-      p2: [c('Q','S'), c('Q','H'), c('7','S'), c('8','S'), c('9','S'), c('A','S')],   // 6 pts → loses
-      p3: [c('J','C'), c('7','H'), c('8','H'), c('9','H'), c('A','H'), c('10','H')],  // 2 pts
-      p4: [c('7','C'), c('8','C'), c('9','S'), c('A','S'), c('10','S'), c('K','S')],  // 0 pts
-      p5: [c('K','C'), c('A','H'), c('10','C'), c('K','H'), c('A','C'), c('K','S')],  // 0 pts
-    }
-    const { loser, scores } = resolveSchwanzer(makeState(hands, ['p1','p2','p3','p4','p5']))
-    expect(loser).toBe('p2')
-    expect(scores.p2).toBe(-4)
-    expect(scores.p1).toBe(1)
-    expect(scores.p3).toBe(1)
-    expect(scores.p4).toBe(1)
-    expect(scores.p5).toBe(1)
-  })
+### Task 5: `dealHand` tests
 
-  it('tie-break: tied player with the most powerful trump loses', () => {
-    // p1 has QC (TRUMP_ORDER index 0) — most powerful trump → loses
-    // p2 has QS (TRUMP_ORDER index 1) — less powerful
-    // both have 3 schwanzer points
-    const hands = {
-      p1: [c('Q','C'), c('7','S'), c('8','S'), c('9','S'), c('A','S'), c('10','S')],  // 3 pts, trump=QC(idx 0)
-      p2: [c('Q','S'), c('7','H'), c('8','H'), c('9','H'), c('A','H'), c('10','H')],  // 3 pts, trump=QS(idx 1)
-      p3: [c('K','C'), c('A','C'), c('10','C'), c('K','H'), c('A','H'), c('K','S')],  // 0 pts
-      p4: [c('7','C'), c('8','C'), c('9','C'), c('K','H'), c('A','S'), c('10','S')],  // 0 pts
-      p5: [c('8','H'), c('9','H'), c('10','H'), c('7','S'), c('9','S'), c('K','S')],  // 0 pts
-    }
-    const { loser } = resolveSchwanzer(makeState(hands, ['p1','p2','p3','p4','p5']))
-    expect(loser).toBe('p1')  // QC is more powerful than QS
-  })
+**Files:**
+- Modify: `shared/gameEngine.test.js`
 
-  it('fallback tie-break: when tied players hold no trump, first in pickOrder loses', () => {
-    // All players have 0 schwanzer points — no Q, J, or D cards in any hand
-    const noTrumpHand = [c('A','C'), c('10','C'), c('K','C'), c('A','H'), c('10','H'), c('K','H')]
-    const hands = {
-      p1: noTrumpHand,
-      p2: noTrumpHand,
-      p3: noTrumpHand,
-      p4: noTrumpHand,
-      p5: noTrumpHand,
-    }
-    // p2 is first in pickOrder → p2 loses
-    const { loser } = resolveSchwanzer(makeState(hands, ['p2','p1','p3','p4','p5']))
-    expect(loser).toBe('p2')
-  })
+- [ ] **Step 1: Add `dealHand` describe block**
 
-  it('pushes a log entry naming the loser and listing point totals', () => {
-    const hands = {
-      p1: [c('Q','C'), c('7','C'), c('8','C'), c('9','C'), c('A','C'), c('10','C')],  // 3 pts
-      p2: [c('7','S'), c('8','S'), c('9','S'), c('A','S'), c('10','S'), c('K','S')],  // 0 pts
-      p3: [c('7','H'), c('8','H'), c('9','H'), c('A','H'), c('10','H'), c('K','H')],  // 0 pts
-      p4: [c('K','C'), c('A','H'), c('10','C'), c('K','H'), c('9','C'), c('8','H')],  // 0 pts
-      p5: [c('8','C'), c('9','S'), c('K','S'), c('A','C'), c('10','H'), c('K','C')],  // 0 pts
-    }
-    const state = makeState(hands, ['p1','p2','p3','p4','p5'])
-    resolveSchwanzer(state)
-    expect(state.log.length).toBe(1)
-    expect(state.log[0]).toContain('p1')
-    expect(state.log[0]).toContain('loses')
-  })
-})
-
+```js
 describe('dealHand', () => {
   const playerIds = ['p1','p2','p3','p4','p5']
 
@@ -251,7 +278,34 @@ describe('dealHand', () => {
     expect(state.pickIndex).toBe(0)
   })
 })
+```
 
+- [ ] **Step 2: Run tests**
+
+```bash
+npm run test
+```
+Expected: all pass
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add shared/gameEngine.test.js
+git commit -m "test: add tests for dealHand"
+```
+
+---
+
+### Task 6: `pick`, `pass`, `blitz` tests
+
+**Files:**
+- Modify: `shared/gameEngine.test.js`
+
+- [ ] **Step 1: Add picking-phase describe block**
+
+`dealHand(['p1','p2','p3','p4','p5'], 0, 1, 1)` sets dealerSeat=0 (p1 is dealer), so `pickOrder = ['p2','p3','p4','p5','p1']` — p2 picks first.
+
+```js
 describe('pick / pass / blitz', () => {
   function makePickingState() {
     return dealHand(['p1','p2','p3','p4','p5'], 0, 1, 1)
@@ -338,7 +392,32 @@ describe('pick / pass / blitz', () => {
     })
   })
 })
+```
 
+- [ ] **Step 2: Run tests**
+
+```bash
+npm run test
+```
+Expected: all pass
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add shared/gameEngine.test.js
+git commit -m "test: add tests for pick, pass, blitz"
+```
+
+---
+
+### Task 7: `discard` tests
+
+**Files:**
+- Modify: `shared/gameEngine.test.js`
+
+- [ ] **Step 1: Add `discard` describe block**
+
+```js
 describe('discard', () => {
   function makeDiscardingState() {
     const state = dealHand(['p1','p2','p3','p4','p5'], 0, 1, 1)
@@ -348,21 +427,21 @@ describe('discard', () => {
 
   it('transitions to calling phase', () => {
     const state = makeDiscardingState()
-    const cardIds = state.hands[state.picker].slice(-2).map(cd => cd.id)
+    const cardIds = state.hands[state.picker].slice(0, 2).map(cd => cd.id)
     const next = discard(state, state.picker, cardIds)
     expect(next.phase).toBe('calling')
   })
 
   it('picker ends with 6 cards', () => {
     const state = makeDiscardingState()
-    const cardIds = state.hands[state.picker].slice(-2).map(cd => cd.id)
+    const cardIds = state.hands[state.picker].slice(0, 2).map(cd => cd.id)
     const next = discard(state, state.picker, cardIds)
     expect(next.hands[next.picker]).toHaveLength(6)
   })
 
   it('stores the 2 discarded cards in state.discard', () => {
     const state = makeDiscardingState()
-    const cardIds = state.hands[state.picker].slice(-2).map(cd => cd.id)
+    const cardIds = state.hands[state.picker].slice(0, 2).map(cd => cd.id)
     const next = discard(state, state.picker, cardIds)
     expect(next.discard).toHaveLength(2)
     expect(next.discard.map(cd => cd.id)).toEqual(expect.arrayContaining(cardIds))
@@ -377,27 +456,38 @@ describe('discard', () => {
   it('throws if a non-picker tries to discard', () => {
     const state = makeDiscardingState()
     const nonPicker = state.pickOrder.find(p => p !== state.picker)
-    const cardIds = state.hands[state.picker].slice(-2).map(cd => cd.id)
+    const cardIds = state.hands[state.picker].slice(0, 2).map(cd => cd.id)
     expect(() => discard(state, nonPicker, cardIds)).toThrow('Only the picker can discard.')
   })
-
-  it('throws when trying to bury a card the picker must keep for the partner call', () => {
-    // Picker holds all 3 fail aces → callMode becomes 'ten', mustHold = [AC, AH, AS]
-    const state = {
-      phase: 'discarding',
-      picker: 'p1',
-      pickOrder: ['p1','p2','p3','p4','p5'],
-      blind: [],
-      log: [],
-      hands: {
-        p1: [c('A','C'), c('A','H'), c('A','S'), c('Q','C'), c('J','C'), c('K','D'), c('9','D'), c('8','D')],
-        p2: [], p3: [], p4: [], p5: [],
-      },
-    }
-    expect(() => discard(state, 'p1', ['AC', 'QC'])).toThrow('Cannot bury AC')
-  })
 })
+```
 
+- [ ] **Step 2: Run tests**
+
+```bash
+npm run test
+```
+Expected: all pass
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add shared/gameEngine.test.js
+git commit -m "test: add tests for discard"
+```
+
+---
+
+### Task 8: Partner calling tests — `callAce`, `goAlone`, `callTen`, `callKing`
+
+**Files:**
+- Modify: `shared/gameEngine.test.js`
+
+- [ ] **Step 1: Add calling-phase describe block**
+
+Note on hand construction: p1 holds no AC (can't call what you hold) and holds fail clubs (KC, 9C, 8C — required to make a normal ace call). p2 holds AC.
+
+```js
 describe('partner calling', () => {
   function makeCallingState({ callMode = 'ace' } = {}) {
     return {
@@ -510,9 +600,36 @@ describe('partner calling', () => {
     })
   })
 })
+```
 
+- [ ] **Step 2: Run tests**
+
+```bash
+npm run test
+```
+Expected: all pass
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add shared/gameEngine.test.js
+git commit -m "test: add tests for callAce, goAlone, callTen, callKing"
+```
+
+---
+
+### Task 9: `playCard` — suit-following validation
+
+**Files:**
+- Modify: `shared/gameEngine.test.js`
+
+- [ ] **Step 1: Add playCard describe block with suit-following tests**
+
+The helper builds a state mid-trick: p1 has already led KH (hearts). currentTrick has p1's play. p2 is next and holds both a heart and a club.
+
+```js
 describe('playCard', () => {
-  // State: p1 has led KH; p2 & p3 have played; p4 is next; partner is p3 (already revealed)
+  // State: p1 has led KH; p2 is next; partner is p3 (already revealed)
   function makeMidTrickState() {
     return {
       phase: 'playing',
@@ -532,19 +649,15 @@ describe('playCard', () => {
       blitzes: [],
       discard: [],
       tricks: [],
-      currentTrick: [
-        { userId: 'p1', card: c('K','H') },
-        { userId: 'p2', card: c('A','H') },
-        { userId: 'p3', card: c('7','C') },
-      ],
+      currentTrick: [{ userId: 'p1', card: c('K','H') }],  // p1 led hearts
       currentLeader: 'p1',
       log: [],
       scores: {},
       hands: {
         p1: [],                              // already played
-        p2: [],                              // already played
-        p3: [],                              // already played
-        p4: [c('9','H'), c('K','S')],        // has hearts (led suit) — p4 is next
+        p2: [c('A','H'), c('7','C')],        // has a heart — must follow
+        p3: [c('7','C'), c('8','C')],        // void in hearts — can play anything
+        p4: [c('9','H'), c('K','S')],
         p5: [c('10','H'), c('9','C')],
       },
     }
@@ -552,62 +665,55 @@ describe('playCard', () => {
 
   it('throws when player has the led suit but plays a different suit', () => {
     const state = makeMidTrickState()
-    // p4 has 9H (the led suit) but tries to play KS instead
-    expect(() => playCard(state, 'p4', 'KS')).toThrow('Must follow suit')
+    // p2 has AH but tries to play 7C
+    expect(() => playCard(state, 'p2', '7C')).toThrow('Must follow suit')
   })
 
   it('allows playing any card when void in the led suit', () => {
-    // Create a separate state where p4 is void in the led suit
-    const state = {
-      phase: 'playing',
-      picker: 'p1',
-      partner: 'p3',
-      goingAlone: false,
-      calledAce: { suit: 'S', aceId: 'AS' },
-      calledSuit: 'S',
-      calledTen: null,
-      calledKing: null,
-      partnerRevealed: true,
-      pickerForcedPlays: [],
-      underCard: null,
-      pickOrder: ['p1','p2','p3','p4','p5'],
-      doublerMultiplier: 1,
-      handCrackMultiplier: 1,
-      blitzes: [],
-      discard: [],
-      tricks: [],
-      currentTrick: [
-        { userId: 'p1', card: c('K','H') },
-        { userId: 'p2', card: c('A','H') },
-        { userId: 'p3', card: c('8','C') },
-      ],
-      currentLeader: 'p1',
-      log: [],
-      scores: {},
-      hands: {
-        p1: [],
-        p2: [],
-        p3: [],
-        p4: [c('7','C'), c('K','S')],        // void in hearts — can play 7C or KS
-        p5: [c('10','H'), c('9','C')],
-      },
-    }
-    // p4 has no hearts — can play 7C freely
-    expect(() => playCard(state, 'p4', '7C')).not.toThrow()
+    const state = makeMidTrickState()
+    // p3 has no hearts — can play 7C freely
+    expect(() => playCard(state, 'p3', '7C')).not.toThrow()
   })
 
   it('throws when playing a card not in hand', () => {
     const state = makeMidTrickState()
-    // p4 does not have QC in hand
-    expect(() => playCard(state, 'p4', 'QC')).toThrow()
+    expect(() => playCard(state, 'p2', 'QC')).toThrow()
   })
 
   it('throws when it is not the player\'s turn', () => {
     const state = makeMidTrickState()
-    // p5's turn comes after p4 — p5 cannot play before p4
-    expect(() => playCard(state, 'p5', '10H')).toThrow()
+    // p3's turn is after p2 — p3 cannot play before p2
+    expect(() => playCard(state, 'p3', '7C')).toThrow()
   })
+})
+```
 
+- [ ] **Step 2: Run tests**
+
+```bash
+npm run test
+```
+Expected: all pass
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add shared/gameEngine.test.js
+git commit -m "test: add playCard suit-following validation tests"
+```
+
+---
+
+### Task 10: `playCard` — trick resolution
+
+**Files:**
+- Modify: `shared/gameEngine.test.js`
+
+- [ ] **Step 1: Add trick resolution tests inside the `playCard` describe block**
+
+Add these tests after the existing suit-following tests, still inside `describe('playCard', ...)`:
+
+```js
   // State: empty trick, p1 leads first
   function makeOpenTrickState() {
     return {
@@ -733,7 +839,7 @@ describe('playCard', () => {
   })
 
   it('transitions to scoring phase after 6 tricks', () => {
-    // Build a state with 5 complete tricks already done, then play the last card
+    // Build a state with 5 complete tricks, then play the 6th card to trigger scoring
     const tricksComplete = Array(5).fill(null).map(() => ({
       leader: 'p1',
       plays: [
@@ -784,8 +890,34 @@ describe('playCard', () => {
     expect(final.phase).toBe('scoring')
     expect(final.tricks).toHaveLength(6)
   })
-})
+```
 
+- [ ] **Step 2: Run tests**
+
+```bash
+npm run test
+```
+Expected: all pass
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add shared/gameEngine.test.js
+git commit -m "test: add playCard trick resolution tests"
+```
+
+---
+
+### Task 11: `computeScores` tests
+
+**Files:**
+- Modify: `shared/gameEngine.test.js`
+
+- [ ] **Step 1: Add `computeScores` describe block**
+
+`computeScores` takes a full game state, mutates `state.log`, and returns `{ userId: scoreDelta }`. It reads `tricks`, `discard`, `picker`, `partner`, `goingAlone`, `doublerMultiplier`, `handCrackMultiplier`, `blitzes`, and `hands`.
+
+```js
 describe('computeScores', () => {
   // Create a fake card with a specific point rank (suit doesn't affect scoring)
   let fakeId = 0
@@ -835,16 +967,14 @@ describe('computeScores', () => {
   })
 
   it('opponents win when picker team has fewer than 61 points', () => {
-    // Picker team wins 2 tricks with 32 pts total (>29, <61); opponents win 4 tricks
-    // 32 pts < 61 → picker loses; 32 > 29 → no schneider; 2 tricks won → no schwarz
-    // baseMultiplier = 1
+    // Opponents win all tricks — picker team gets 0 pts
     const tricks = [
-      makeTrick('p1', [fk('A'), fk('10'), fk('9'), fk('8'), fk('7')]),  // 11+10 = 21 pts
-      makeTrick('p2', [fk('A'), fk('9'), fk('8'), fk('7'), fk('7')]),   // 11 pts → total = 32
-      makeTrick('p3', [fk('A'), fk('10'), fk('K'), fk('9'), fk('8')]),  // opponents
-      makeTrick('p3', [fk('A'), fk('10'), fk('K'), fk('9'), fk('8')]),  // opponents
-      makeTrick('p4', [fk('9'), fk('8'), fk('7'), fk('7'), fk('7')]),
-      makeTrick('p5', [fk('9'), fk('8'), fk('7'), fk('7'), fk('7')]),
+      makeTrick('p3', [fk('A'), fk('A'), fk('A'), fk('10'), fk('10')]),
+      makeTrick('p3', [fk('A'), fk('10'), fk('K'), fk('K'), fk('K')]),
+      makeTrick('p4', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
+      makeTrick('p4', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
+      makeTrick('p5', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
+      makeTrick('p5', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
     ]
     const scores = computeScores(baseState(tricks))
     expect(scores.p1).toBe(-2)   // picker loses: -2
@@ -872,7 +1002,8 @@ describe('computeScores', () => {
   })
 
   it('discard points count toward the picker\'s total', () => {
-    // p1 wins 1 trick with 39 pts + discard has 2 aces (22 pts) = 61 → wins
+    // p1 wins 0 tricks but has 61 pts in discard (shouldn't happen in real game, but tests the logic)
+    // Simpler: p1 wins 1 trick with 50 pts + 11 pts in discard = 61 pts → wins
     const tricks = [
       makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('10'), fk('K')]),  // 11+10+4+10+4 = 39
       makeTrick('p3', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
@@ -903,60 +1034,35 @@ describe('computeScores', () => {
     expect(scores.p4).toBe(-1)
     expect(scores.p5).toBe(-1)
   })
-
-  it('picker team wins all 6 tricks (schwarz) — baseMultiplier is 3', () => {
-    // pickerTeamTricks=6 → schwarz overrides schneider → baseMultiplier=3
-    const tricks = [
-      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),  // 25 pts
-      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),
-      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),
-      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),
-      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),
-      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),
-    ]
-    const scores = computeScores(baseState(tricks))
-    expect(scores.p1).toBe(6)   // 2×3 (picker)
-    expect(scores.p2).toBe(3)   // 1×3 (partner)
-    expect(scores.p3).toBe(-3)
-  })
-
-  it('picker team has ≤29 points (schneider loss) — baseMultiplier doubles on loss', () => {
-    // p1 wins 1 trick with 0 pts → ≤29, not schwarz, picker loses
-    const tricks = [
-      makeTrick('p1', [fk('9'), fk('8'), fk('7'), fk('7'), fk('7')]),  // 0 pts, p1 wins 1 trick
-      makeTrick('p3', [fk('A'), fk('10'), fk('K'), fk('9'), fk('8')]),
-      makeTrick('p3', [fk('A'), fk('10'), fk('K'), fk('9'), fk('8')]),
-      makeTrick('p4', [fk('A'), fk('10'), fk('K'), fk('9'), fk('8')]),
-      makeTrick('p4', [fk('A'), fk('10'), fk('K'), fk('9'), fk('8')]),
-      makeTrick('p5', [fk('A'), fk('10'), fk('K'), fk('9'), fk('8')]),
-    ]
-    const scores = computeScores(baseState(tricks))
-    // pickerTeamPoints=0 ≤ 29 → schneider → baseMultiplier=2, pickerWon=false
-    expect(scores.p1).toBe(-4)   // -2×2
-    expect(scores.p2).toBe(-2)   // -1×2
-    expect(scores.p3).toBe(2)
-  })
-
-  it('doublerMultiplier is applied to all scores', () => {
-    // Normal picker win (75 pts) with doublerMultiplier=2
-    const tricks = [
-      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),  // 25 pts
-      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),
-      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),
-      makeTrick('p3', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
-      makeTrick('p4', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
-      makeTrick('p5', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
-    ]
-    const scores = computeScores(baseState(tricks, { doublerMultiplier: 2 }))
-    // baseMultiplier=1, doublerMultiplier=2 → multiplier=2
-    expect(scores.p1).toBe(4)   // 2×2
-    expect(scores.p2).toBe(2)   // 1×2
-    expect(scores.p3).toBe(-2)
-    expect(scores.p4).toBe(-2)
-    expect(scores.p5).toBe(-2)
-  })
 })
+```
 
+- [ ] **Step 2: Run tests**
+
+```bash
+npm run test
+```
+Expected: all pass
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add shared/gameEngine.test.js
+git commit -m "test: add tests for computeScores"
+```
+
+---
+
+### Task 12: `resolveLeaster` tests
+
+**Files:**
+- Modify: `shared/gameEngine.test.js`
+
+- [ ] **Step 1: Add `resolveLeaster` describe block**
+
+`resolveLeaster` reads `state.tricks` and `state.hands` (for player IDs). Winner is the eligible player (took ≥1 trick) with fewest points; tie-break is fewest tricks.
+
+```js
 describe('resolveLeaster', () => {
   let fkId = 0
   beforeEach(() => { fkId = 0 })
@@ -1000,9 +1106,9 @@ describe('resolveLeaster', () => {
   it('tie-break: when points are equal, player with fewer tricks wins', () => {
     const tricks = [
       makeTrick('p1', ['A','7','7','7','7']),    // p1: 11 pts, 1 trick
-      makeTrick('p2', ['7','7','7','7','7']),    // p2: 0 pts, 1st trick
-      makeTrick('p2', ['7','7','7','7','7']),    // p2: 0 pts, 2nd trick → 2 tricks total
-      makeTrick('p3', ['7','7','7','7','7']),    // p3: 0 pts, 1 trick ← tied with p2 on pts, fewer tricks
+      makeTrick('p2', ['7','7','7','7','7']),    // p2: 0 pts, 1 trick ← wins (fewer pts)
+      makeTrick('p2', ['7','7','7','7','7']),    // p2: 0 pts, 2 tricks total
+      makeTrick('p3', ['7','7','7','7','7']),    // p3: 0 pts, 1 trick ← p3 tied with p2 on pts, p3 has fewer tricks
       makeTrick('p4', ['10','7','7','7','7']),   // p4: 10 pts
       makeTrick('p5', ['K','7','7','7','7']),    // p5: 4 pts
     ]
@@ -1042,182 +1148,57 @@ describe('resolveLeaster', () => {
     expect(state.log[0]).toContain('Leaster')
   })
 })
+```
 
-describe('callAceUnknown', () => {
-  function makeUnknownCallingState() {
-    return {
-      phase: 'calling',
-      picker: 'p1',
-      callMode: 'ace',
-      pickOrder: ['p1','p2','p3','p4','p5'],
-      hands: {
-        // p1: all trump, no fail cards → no normal call available for any suit
-        p1: [c('Q','C'), c('Q','S'), c('Q','H'), c('Q','D'), c('J','C'), c('J','S')],
-        // p2: holds AC → becomes partner when clubs ace is called
-        p2: [c('A','C'), c('7','C'), c('8','H'), c('9','H'), c('A','H'), c('10','H')],
-        p3: [c('K','H'), c('A','S'), c('K','S'), c('9','S'), c('8','S'), c('7','S')],
-        p4: [c('7','H'), c('10','C'), c('K','D'), c('9','D'), c('8','D'), c('7','D')],
-        p5: [c('J','H'), c('J','D'), c('10','D'), c('A','D'), c('8','C'), c('9','C')],
-      },
-      discard: [c('K','C'), c('8','S')],  // AC not buried
-      log: [],
-    }
-  }
+- [ ] **Step 2: Run tests**
 
-  it('sets underCard, calledAce (unknown:true), partner, and advances to playing', () => {
-    const next = callAceUnknown(makeUnknownCallingState(), 'p1', 'C', 'QS')
-    expect(next.phase).toBe('playing')
-    expect(next.underCard).toMatchObject({ id: 'QS', ownerId: 'p1', played: false })
-    expect(next.calledAce).toEqual({ suit: 'C', aceId: 'AC', unknown: true })
-    expect(next.partner).toBe('p2')
-  })
+```bash
+npm run test
+```
+Expected: all pass
 
-  it('throws when a normal ace call is available for another suit', () => {
-    const state = makeUnknownCallingState()
-    // Add a fail heart (KH) — p1 doesn't hold AH, AH not in discard → normal call available for H
-    state.hands.p1 = [c('Q','C'), c('Q','S'), c('Q','H'), c('Q','D'), c('J','C'), c('K','H')]
-    expect(() => callAceUnknown(state, 'p1', 'C', 'QS')).toThrow('normal ace call is available')
-  })
-})
+- [ ] **Step 3: Commit**
 
-describe('crack / recrack', () => {
-  function makeCrackState() {
-    return {
-      phase: 'playing',
-      picker: 'p1',
-      partner: 'p2',
-      goingAlone: false,
-      isLeaster: false,
-      tricks: [],
-      currentTrick: [],
-      crackState: null,
-      handCrackMultiplier: 1,
-      pickOrder: ['p1','p2','p3','p4','p5'],
-      pickIndex: 0,  // p1 picked first — no one passed → all opponents eligible to crack
-      log: [],
-      hands: { p1:[], p2:[], p3:[], p4:[], p5:[] },
-    }
-  }
+```bash
+git add shared/gameEngine.test.js
+git commit -m "test: add tests for resolveLeaster"
+```
 
-  it('opponent cracks before any card is played — sets crackState and doubles multiplier', () => {
-    const next = crack(makeCrackState(), 'p3')
-    expect(next.crackState).toBe('cracked')
-    expect(next.handCrackMultiplier).toBe(2)
-  })
+---
 
-  it('throws if the picker tries to crack', () => {
-    expect(() => crack(makeCrackState(), 'p1')).toThrow('Only opponents may crack.')
-  })
+### Task 13: Update CLAUDE.md
 
-  it('picker recrack after crack — multiplier becomes 4', () => {
-    const cracked = crack(makeCrackState(), 'p3')
-    const recracked = recrack(cracked, 'p1')
-    expect(recracked.crackState).toBe('recracked')
-    expect(recracked.handCrackMultiplier).toBe(4)
-  })
+**Files:**
+- Modify: `CLAUDE.md`
 
-  it('throws if an opponent tries to recrack', () => {
-    const cracked = crack(makeCrackState(), 'p3')
-    expect(() => recrack(cracked, 'p5')).toThrow('Only the picker or partner may recrack.')
-  })
-})
+- [ ] **Step 1: Add test requirement to the README Sync section**
 
-describe('setupLeaster', () => {
-  function makeNoPickState() {
-    return {
-      phase: 'no_pick',
-      pickOrder: ['p1','p2','p3','p4','p5'],
-      dealerSeat: 0,
-      blind: [c('Q','D'), c('J','D')],
-      hands: { p1:[], p2:[], p3:[], p4:[], p5:[] },
-      log: [],
-    }
-  }
+In `CLAUDE.md`, append to the end of the README Sync section:
 
-  it('sets isLeaster, moves blind to leasterBlind, and advances to playing', () => {
-    const next = setupLeaster(makeNoPickState())
-    expect(next.isLeaster).toBe(true)
-    expect(next.phase).toBe('playing')
-    expect(next.leasterBlind).toHaveLength(2)
-    expect(next.blind).toHaveLength(0)
-  })
+```markdown
+When implementing any new game feature in `shared/gameEngine.js`, write corresponding tests in `shared/gameEngine.test.js` — unit tests for pure functions, state-construction tests for stateful functions. Run `npm run test` to confirm they pass before committing.
+```
 
-  it('sets currentLeader to the player left of the dealer', () => {
-    const next = setupLeaster(makeNoPickState())
-    // dealerSeat=0 → pickOrder[(0+1)%5] = pickOrder[1] = 'p2'
-    expect(next.currentLeader).toBe('p2')
-  })
-})
+The section should look like:
 
-describe('awardLeasterBlind', () => {
-  it('adds blind cards as plays to trick 1 winner after trick 1 resolves', () => {
-    const state = {
-      tricks: [{
-        leader: 'p1',
-        winner: 'p2',
-        plays: [
-          { userId: 'p1', card: c('K','H') },
-          { userId: 'p2', card: c('A','H') },
-          { userId: 'p3', card: c('9','H') },
-          { userId: 'p4', card: c('8','H') },
-          { userId: 'p5', card: c('7','H') },
-        ],
-      }],
-      leasterBlind: [c('Q','D'), c('J','D')],
-    }
-    const next = awardLeasterBlind(state)
-    expect(next.tricks[0].plays).toHaveLength(7)   // 5 plays + 2 blind cards
-    expect(next.leasterBlind).toHaveLength(0)
-    const blindPlays = next.tricks[0].plays.slice(5)
-    expect(blindPlays.every(p => p.userId === 'p2')).toBe(true)
-  })
-})
+```markdown
+## README Sync
 
-describe('getPlayerView', () => {
-  function makeViewState() {
-    return {
-      phase: 'playing',
-      picker: 'p1',
-      partner: 'p2',
-      partnerRevealed: false,
-      goingAlone: false,
-      blind: [],
-      discard: [c('Q','D'), c('J','D')],
-      underCard: null,
-      tricks: [],
-      currentTrick: [],
-      lastTrick: [],
-      log: [],
-      hands: {
-        p1: [c('Q','C'), c('J','C'), c('A','D')],
-        p2: [c('A','C'), c('K','H'), c('9','S')],
-        p3: [c('10','H'), c('8','C'), c('7','S')],
-        p4: [c('K','S'), c('9','H'), c('8','H')],
-        p5: [c('10','S'), c('7','H'), c('8','S')],
-      },
-    }
-  }
+`README.md` contains a plain-English description of the game rules. **Whenever you change game rules in `shared/gameEngine.js`, also update the Rules section of `README.md` to match.**
 
-  it('player sees their own hand; opponent hands are hidden', () => {
-    const view = getPlayerView(makeViewState(), 'p1')
-    expect(view.hands.p1.every(card => card.hidden !== true)).toBe(true)
-    expect(view.hands.p2.every(card => card.hidden === true)).toBe(true)
-    expect(view.hands.p3.every(card => card.hidden === true)).toBe(true)
-  })
+When implementing any new game feature in `shared/gameEngine.js`, write corresponding tests in `shared/gameEngine.test.js` — unit tests for pure functions, state-construction tests for stateful functions. Run `npm run test` to confirm they pass before committing.
+```
 
-  it('picker can see the discard; opponents see hidden placeholders', () => {
-    const pickerView = getPlayerView(makeViewState(), 'p1')
-    expect(pickerView.discard.every(card => card.hidden !== true)).toBe(true)
+- [ ] **Step 2: Run tests to confirm nothing broke**
 
-    const oppView = getPlayerView(makeViewState(), 'p3')
-    expect(oppView.discard.every(card => card.hidden === true)).toBe(true)
-  })
+```bash
+npm run test
+```
+Expected: all pass
 
-  it('partner identity is hidden from opponents when partnerRevealed is false', () => {
-    const pickerView = getPlayerView(makeViewState(), 'p1')
-    expect(pickerView.partner).toBe('p2')   // picker always sees partner
+- [ ] **Step 3: Commit**
 
-    const oppView = getPlayerView(makeViewState(), 'p3')
-    expect(oppView.partner).toBeNull()      // opponent sees null until revealed
-  })
-})
+```bash
+git add CLAUDE.md
+git commit -m "docs: require tests alongside new game engine features"
+```
