@@ -4,7 +4,9 @@ import {
   schwanzerCardPoints, resolveSchwanzer,
   dealHand, pick, pass, blitz,
   discard, callAce, goAlone, callTen, callKing,
+  callAceUnknown, crack, recrack,
   playCard, computeScores, resolveLeaster,
+  setupLeaster, awardLeasterBlind, getPlayerView,
 } from './gameEngine.js'
 
 const c = (rank, suit) => ({ id: `${rank}${suit}`, rank, suit })
@@ -377,6 +379,22 @@ describe('discard', () => {
     const nonPicker = state.pickOrder.find(p => p !== state.picker)
     const cardIds = state.hands[state.picker].slice(-2).map(cd => cd.id)
     expect(() => discard(state, nonPicker, cardIds)).toThrow('Only the picker can discard.')
+  })
+
+  it('throws when trying to bury a card the picker must keep for the partner call', () => {
+    // Picker holds all 3 fail aces → callMode becomes 'ten', mustHold = [AC, AH, AS]
+    const state = {
+      phase: 'discarding',
+      picker: 'p1',
+      pickOrder: ['p1','p2','p3','p4','p5'],
+      blind: [],
+      log: [],
+      hands: {
+        p1: [c('A','C'), c('A','H'), c('A','S'), c('Q','C'), c('J','C'), c('K','D'), c('9','D'), c('8','D')],
+        p2: [], p3: [], p4: [], p5: [],
+      },
+    }
+    expect(() => discard(state, 'p1', ['AC', 'QC'])).toThrow('Cannot bury AC')
   })
 })
 
@@ -885,6 +903,58 @@ describe('computeScores', () => {
     expect(scores.p4).toBe(-1)
     expect(scores.p5).toBe(-1)
   })
+
+  it('picker team wins all 6 tricks (schwarz) — baseMultiplier is 3', () => {
+    // pickerTeamTricks=6 → schwarz overrides schneider → baseMultiplier=3
+    const tricks = [
+      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),  // 25 pts
+      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),
+      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),
+      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),
+      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),
+      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),
+    ]
+    const scores = computeScores(baseState(tricks))
+    expect(scores.p1).toBe(6)   // 2×3 (picker)
+    expect(scores.p2).toBe(3)   // 1×3 (partner)
+    expect(scores.p3).toBe(-3)
+  })
+
+  it('picker team has ≤29 points (schneider loss) — baseMultiplier doubles on loss', () => {
+    // p1 wins 1 trick with 0 pts → ≤29, not schwarz, picker loses
+    const tricks = [
+      makeTrick('p1', [fk('9'), fk('8'), fk('7'), fk('7'), fk('7')]),  // 0 pts, p1 wins 1 trick
+      makeTrick('p3', [fk('A'), fk('10'), fk('K'), fk('9'), fk('8')]),
+      makeTrick('p3', [fk('A'), fk('10'), fk('K'), fk('9'), fk('8')]),
+      makeTrick('p4', [fk('A'), fk('10'), fk('K'), fk('9'), fk('8')]),
+      makeTrick('p4', [fk('A'), fk('10'), fk('K'), fk('9'), fk('8')]),
+      makeTrick('p5', [fk('A'), fk('10'), fk('K'), fk('9'), fk('8')]),
+    ]
+    const scores = computeScores(baseState(tricks))
+    // pickerTeamPoints=0 ≤ 29 → schneider → baseMultiplier=2, pickerWon=false
+    expect(scores.p1).toBe(-4)   // -2×2
+    expect(scores.p2).toBe(-2)   // -1×2
+    expect(scores.p3).toBe(2)
+  })
+
+  it('doublerMultiplier is applied to all scores', () => {
+    // Normal picker win (75 pts) with doublerMultiplier=2
+    const tricks = [
+      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),  // 25 pts
+      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),
+      makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),
+      makeTrick('p3', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
+      makeTrick('p4', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
+      makeTrick('p5', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
+    ]
+    const scores = computeScores(baseState(tricks, { doublerMultiplier: 2 }))
+    // baseMultiplier=1, doublerMultiplier=2 → multiplier=2
+    expect(scores.p1).toBe(4)   // 2×2
+    expect(scores.p2).toBe(2)   // 1×2
+    expect(scores.p3).toBe(-2)
+    expect(scores.p4).toBe(-2)
+    expect(scores.p5).toBe(-2)
+  })
 })
 
 describe('resolveLeaster', () => {
@@ -970,5 +1040,184 @@ describe('resolveLeaster', () => {
     resolveLeaster(state)
     expect(state.log.length).toBe(1)
     expect(state.log[0]).toContain('Leaster')
+  })
+})
+
+describe('callAceUnknown', () => {
+  function makeUnknownCallingState() {
+    return {
+      phase: 'calling',
+      picker: 'p1',
+      callMode: 'ace',
+      pickOrder: ['p1','p2','p3','p4','p5'],
+      hands: {
+        // p1: all trump, no fail cards → no normal call available for any suit
+        p1: [c('Q','C'), c('Q','S'), c('Q','H'), c('Q','D'), c('J','C'), c('J','S')],
+        // p2: holds AC → becomes partner when clubs ace is called
+        p2: [c('A','C'), c('7','C'), c('8','H'), c('9','H'), c('A','H'), c('10','H')],
+        p3: [c('K','H'), c('A','S'), c('K','S'), c('9','S'), c('8','S'), c('7','S')],
+        p4: [c('7','H'), c('10','C'), c('K','D'), c('9','D'), c('8','D'), c('7','D')],
+        p5: [c('J','H'), c('J','D'), c('10','D'), c('A','D'), c('8','C'), c('9','C')],
+      },
+      discard: [c('K','C'), c('8','S')],  // AC not buried
+      log: [],
+    }
+  }
+
+  it('sets underCard, calledAce (unknown:true), partner, and advances to playing', () => {
+    const next = callAceUnknown(makeUnknownCallingState(), 'p1', 'C', 'QS')
+    expect(next.phase).toBe('playing')
+    expect(next.underCard).toMatchObject({ id: 'QS', ownerId: 'p1', played: false })
+    expect(next.calledAce).toEqual({ suit: 'C', aceId: 'AC', unknown: true })
+    expect(next.partner).toBe('p2')
+  })
+
+  it('throws when a normal ace call is available for another suit', () => {
+    const state = makeUnknownCallingState()
+    // Add a fail heart (KH) — p1 doesn't hold AH, AH not in discard → normal call available for H
+    state.hands.p1 = [c('Q','C'), c('Q','S'), c('Q','H'), c('Q','D'), c('J','C'), c('K','H')]
+    expect(() => callAceUnknown(state, 'p1', 'C', 'QS')).toThrow('normal ace call is available')
+  })
+})
+
+describe('crack / recrack', () => {
+  function makeCrackState() {
+    return {
+      phase: 'playing',
+      picker: 'p1',
+      partner: 'p2',
+      goingAlone: false,
+      isLeaster: false,
+      tricks: [],
+      currentTrick: [],
+      crackState: null,
+      handCrackMultiplier: 1,
+      pickOrder: ['p1','p2','p3','p4','p5'],
+      pickIndex: 0,  // p1 picked first — no one passed → all opponents eligible to crack
+      log: [],
+      hands: { p1:[], p2:[], p3:[], p4:[], p5:[] },
+    }
+  }
+
+  it('opponent cracks before any card is played — sets crackState and doubles multiplier', () => {
+    const next = crack(makeCrackState(), 'p3')
+    expect(next.crackState).toBe('cracked')
+    expect(next.handCrackMultiplier).toBe(2)
+  })
+
+  it('throws if the picker tries to crack', () => {
+    expect(() => crack(makeCrackState(), 'p1')).toThrow('Only opponents may crack.')
+  })
+
+  it('picker recrack after crack — multiplier becomes 4', () => {
+    const cracked = crack(makeCrackState(), 'p3')
+    const recracked = recrack(cracked, 'p1')
+    expect(recracked.crackState).toBe('recracked')
+    expect(recracked.handCrackMultiplier).toBe(4)
+  })
+
+  it('throws if an opponent tries to recrack', () => {
+    const cracked = crack(makeCrackState(), 'p3')
+    expect(() => recrack(cracked, 'p5')).toThrow('Only the picker or partner may recrack.')
+  })
+})
+
+describe('setupLeaster', () => {
+  function makeNoPickState() {
+    return {
+      phase: 'no_pick',
+      pickOrder: ['p1','p2','p3','p4','p5'],
+      dealerSeat: 0,
+      blind: [c('Q','D'), c('J','D')],
+      hands: { p1:[], p2:[], p3:[], p4:[], p5:[] },
+      log: [],
+    }
+  }
+
+  it('sets isLeaster, moves blind to leasterBlind, and advances to playing', () => {
+    const next = setupLeaster(makeNoPickState())
+    expect(next.isLeaster).toBe(true)
+    expect(next.phase).toBe('playing')
+    expect(next.leasterBlind).toHaveLength(2)
+    expect(next.blind).toHaveLength(0)
+  })
+
+  it('sets currentLeader to the player left of the dealer', () => {
+    const next = setupLeaster(makeNoPickState())
+    // dealerSeat=0 → pickOrder[(0+1)%5] = pickOrder[1] = 'p2'
+    expect(next.currentLeader).toBe('p2')
+  })
+})
+
+describe('awardLeasterBlind', () => {
+  it('adds blind cards as plays to trick 1 winner after trick 1 resolves', () => {
+    const state = {
+      tricks: [{
+        leader: 'p1',
+        winner: 'p2',
+        plays: [
+          { userId: 'p1', card: c('K','H') },
+          { userId: 'p2', card: c('A','H') },
+          { userId: 'p3', card: c('9','H') },
+          { userId: 'p4', card: c('8','H') },
+          { userId: 'p5', card: c('7','H') },
+        ],
+      }],
+      leasterBlind: [c('Q','D'), c('J','D')],
+    }
+    const next = awardLeasterBlind(state)
+    expect(next.tricks[0].plays).toHaveLength(7)   // 5 plays + 2 blind cards
+    expect(next.leasterBlind).toHaveLength(0)
+    const blindPlays = next.tricks[0].plays.slice(5)
+    expect(blindPlays.every(p => p.userId === 'p2')).toBe(true)
+  })
+})
+
+describe('getPlayerView', () => {
+  function makeViewState() {
+    return {
+      phase: 'playing',
+      picker: 'p1',
+      partner: 'p2',
+      partnerRevealed: false,
+      goingAlone: false,
+      blind: [],
+      discard: [c('Q','D'), c('J','D')],
+      underCard: null,
+      tricks: [],
+      currentTrick: [],
+      lastTrick: [],
+      log: [],
+      hands: {
+        p1: [c('Q','C'), c('J','C'), c('A','D')],
+        p2: [c('A','C'), c('K','H'), c('9','S')],
+        p3: [c('10','H'), c('8','C'), c('7','S')],
+        p4: [c('K','S'), c('9','H'), c('8','H')],
+        p5: [c('10','S'), c('7','H'), c('8','S')],
+      },
+    }
+  }
+
+  it('player sees their own hand; opponent hands are hidden', () => {
+    const view = getPlayerView(makeViewState(), 'p1')
+    expect(view.hands.p1.every(card => card.hidden !== true)).toBe(true)
+    expect(view.hands.p2.every(card => card.hidden === true)).toBe(true)
+    expect(view.hands.p3.every(card => card.hidden === true)).toBe(true)
+  })
+
+  it('picker can see the discard; opponents see hidden placeholders', () => {
+    const pickerView = getPlayerView(makeViewState(), 'p1')
+    expect(pickerView.discard.every(card => card.hidden !== true)).toBe(true)
+
+    const oppView = getPlayerView(makeViewState(), 'p3')
+    expect(oppView.discard.every(card => card.hidden === true)).toBe(true)
+  })
+
+  it('partner identity is hidden from opponents when partnerRevealed is false', () => {
+    const pickerView = getPlayerView(makeViewState(), 'p1')
+    expect(pickerView.partner).toBe('p2')   // picker always sees partner
+
+    const oppView = getPlayerView(makeViewState(), 'p3')
+    expect(oppView.partner).toBeNull()      // opponent sees null until revealed
   })
 })
