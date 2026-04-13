@@ -1499,6 +1499,25 @@ describe('getPlayerView', () => {
     expect(oppView.partner).toBeNull()      // opponent sees null until revealed
   })
 
+  it('partner identity is hidden from opponents when reveal_partner is false, even if partnerRevealed is true', () => {
+    const state = { ...makeViewState(), partnerRevealed: true, reveal_partner: false }
+
+    const oppView = getPlayerView(state, 'p3')
+    expect(oppView.partner).toBeNull()
+
+    const pickerView = getPlayerView(state, 'p1')
+    expect(pickerView.partner).toBe('p2')   // picker always sees partner
+
+    const partnerView = getPlayerView(state, 'p2')
+    expect(partnerView.partner).toBe('p2')  // partner sees themselves
+  })
+
+  it('partner identity is visible to opponents when reveal_partner is true and partnerRevealed is true', () => {
+    const state = { ...makeViewState(), partnerRevealed: true, reveal_partner: true }
+    const oppView = getPlayerView(state, 'p3')
+    expect(oppView.partner).toBe('p2')
+  })
+
   it('strips rewindHistory from the player view', () => {
     // Build a minimal state with a non-empty rewindHistory
     const snapshot = { phase: 'playing', tricks: [], currentTrick: [], rewindHistory: [] }
