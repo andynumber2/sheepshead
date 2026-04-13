@@ -27,6 +27,10 @@ Queen of Clubs, Queen of Spades, Queen of Hearts, Queen of Diamonds,
 Jack of Clubs, Jack of Spades, Jack of Hearts, Jack of Diamonds,
 Ace of Diamonds, 10 of Diamonds, King of Diamonds, 9 of Diamonds, 8 of Diamonds, 7 of Diamonds
 
+### Non-Trump Suit Rank (highest → lowest)
+
+Ace, 10, King, 9, 8, 7. Note that the 10 outranks the King.
+
 ### Card Point Values
 
 | Card | Points |
@@ -119,7 +123,7 @@ The final multiplier is: `base × doubler × crack × blitz`.
 
 ### Leaster
 
-When all five players pass and the no-pick variant is Leasters, a Leaster is played. There is no picker or partner — everyone plays for themselves. The blind cards are awarded to the winner of the first trick. The player who takes at least one trick and ends with the **fewest points** wins. The winner gains 4 points; all others lose 1 point.
+When all five players pass and the no-pick variant is Leasters, a Leaster is played. There is no picker or partner — everyone plays for themselves. The blind cards are awarded to the winner of the first trick. The player who takes at least one trick and ends with the **fewest points** wins. **Tie-break:** if two or more eligible players are tied on points, the one who took the fewest tricks wins. The winner gains 4 points; all others lose 1 point.
 
 ### Doubler
 
