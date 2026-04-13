@@ -379,3 +379,116 @@ describe('discard', () => {
     expect(() => discard(state, nonPicker, cardIds)).toThrow('Only the picker can discard.')
   })
 })
+
+describe('partner calling', () => {
+  function makeCallingState({ callMode = 'ace' } = {}) {
+    return {
+      phase: 'calling',
+      picker: 'p1',
+      callMode,
+      pickOrder: ['p1','p2','p3','p4','p5'],
+      hands: {
+        // p1: trump + clubs fail (no AC) — can call AC
+        p1: [c('Q','C'), c('J','C'), c('A','D'), c('K','C'), c('9','C'), c('8','C')],
+        // p2: holds AC → will be partner when clubs called
+        p2: [c('A','C'), c('7','C'), c('8','H'), c('9','H'), c('A','H'), c('10','H')],
+        p3: [c('K','H'), c('A','S'), c('K','S'), c('9','S'), c('8','S'), c('7','S')],
+        p4: [c('7','H'), c('10','C'), c('K','D'), c('9','D'), c('8','D'), c('7','D')],
+        p5: [c('Q','S'), c('Q','H'), c('J','S'), c('J','H'), c('10','D'), c('10','S')],
+      },
+      discard: [c('Q','D'), c('J','D')],
+      log: [],
+    }
+  }
+
+  describe('callAce', () => {
+    it('advances to playing phase and sets calledAce', () => {
+      const next = callAce(makeCallingState(), 'p1', 'C')
+      expect(next.phase).toBe('playing')
+      expect(next.calledAce).toEqual({ suit: 'C', aceId: 'AC' })
+    })
+
+    it('identifies the holder of the called ace as partner', () => {
+      const next = callAce(makeCallingState(), 'p1', 'C')
+      expect(next.partner).toBe('p2')
+    })
+
+    it('throws if picker holds the called ace', () => {
+      const state = makeCallingState()
+      // Inject AC into p1's hand (remove KC to avoid hand size issues)
+      state.hands.p1 = [c('Q','C'), c('J','C'), c('A','D'), c('A','C'), c('9','C'), c('8','C')]
+      expect(() => callAce(state, 'p1', 'C')).toThrow()
+    })
+
+    it('throws if picker holds no fail cards of the called suit', () => {
+      const state = makeCallingState()
+      // p1 has no hearts fail cards → cannot call AH
+      // p1's hand has no fail hearts (KH, 9H, etc.) — only trump and clubs fail
+      expect(() => callAce(state, 'p1', 'H')).toThrow()
+    })
+  })
+
+  describe('goAlone', () => {
+    it('sets goingAlone=true, clears partner, and advances to playing', () => {
+      const next = goAlone(makeCallingState(), 'p1')
+      expect(next.phase).toBe('playing')
+      expect(next.goingAlone).toBe(true)
+      expect(next.partner).toBeNull()
+    })
+
+    it('throws if a non-picker calls goAlone', () => {
+      expect(() => goAlone(makeCallingState(), 'p2')).toThrow()
+    })
+  })
+
+  describe('callTen', () => {
+    // callMode='ten': picker holds all 3 fail aces (AC, AH, AS) but not 10C
+    it('sets calledTen, partner, and pickerForcedPlays', () => {
+      const state = {
+        phase: 'calling',
+        picker: 'p1',
+        callMode: 'ten',
+        pickOrder: ['p1','p2','p3','p4','p5'],
+        hands: {
+          p1: [c('A','C'), c('A','H'), c('A','S'), c('Q','C'), c('J','C'), c('K','D')],
+          p2: [c('10','C'), c('7','C'), c('8','H'), c('9','H'), c('Q','S'), c('J','S')],
+          p3: [c('K','H'), c('K','S'), c('9','S'), c('8','S'), c('7','S'), c('9','C')],
+          p4: [c('7','H'), c('8','C'), c('A','D'), c('9','D'), c('8','D'), c('7','D')],
+          p5: [c('Q','H'), c('Q','D'), c('J','H'), c('J','D'), c('10','D'), c('10','H')],
+        },
+        discard: [c('10','S'), c('K','C')],
+        log: [],
+      }
+      const next = callTen(state, 'p1', 'C')
+      expect(next.calledTen).toEqual({ suit: 'C', tenId: '10C' })
+      expect(next.partner).toBe('p2')
+      expect(next.pickerForcedPlays).toContain('AC')
+    })
+  })
+
+  describe('callKing', () => {
+    // callMode='king': picker holds all 3 fail aces AND all 3 fail tens
+    it('sets calledKing, partner, and pickerForcedPlays with both ace and ten', () => {
+      const state = {
+        phase: 'calling',
+        picker: 'p1',
+        callMode: 'king',
+        pickOrder: ['p1','p2','p3','p4','p5'],
+        hands: {
+          p1: [c('A','C'), c('A','H'), c('A','S'), c('10','C'), c('10','H'), c('10','S')],
+          p2: [c('K','C'), c('7','C'), c('8','H'), c('9','H'), c('Q','S'), c('J','S')],
+          p3: [c('K','H'), c('K','S'), c('9','S'), c('8','S'), c('7','S'), c('9','C')],
+          p4: [c('7','H'), c('8','C'), c('A','D'), c('9','D'), c('8','D'), c('7','D')],
+          p5: [c('Q','C'), c('Q','H'), c('J','C'), c('J','H'), c('10','D'), c('Q','D')],
+        },
+        discard: [c('J','D'), c('K','D')],
+        log: [],
+      }
+      const next = callKing(state, 'p1', 'C')
+      expect(next.calledKing).toEqual({ suit: 'C', kingId: 'KC' })
+      expect(next.partner).toBe('p2')
+      expect(next.pickerForcedPlays).toContain('AC')
+      expect(next.pickerForcedPlays).toContain('10C')
+    })
+  })
+})
