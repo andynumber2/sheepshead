@@ -902,6 +902,7 @@ export function resolveSchwanzer(state) {
 // ─── Player view (redact other hands) ────────────────────────────────────────
 export function getPlayerView(state, userId) {
   const view = deepClone(state)
+  view.rewindHistory = []   // strip snapshots — each contains all players' unredacted hands
 
   for (const uid of Object.keys(view.hands)) {
     if (uid !== userId) {

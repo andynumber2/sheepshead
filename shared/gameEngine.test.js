@@ -1498,4 +1498,23 @@ describe('getPlayerView', () => {
     const oppView = getPlayerView(makeViewState(), 'p3')
     expect(oppView.partner).toBeNull()      // opponent sees null until revealed
   })
+
+  it('strips rewindHistory from the player view', () => {
+    // Build a minimal state with a non-empty rewindHistory
+    const snapshot = { phase: 'playing', tricks: [], currentTrick: [], rewindHistory: [] }
+    const state = {
+      phase: 'playing',
+      picker: 'p1', partner: 'p3', goingAlone: false,
+      calledAce: null, calledSuit: null, calledTen: null, calledKing: null,
+      partnerRevealed: false, pickerForcedPlays: [], underCard: null,
+      pickOrder: ['p1','p2','p3','p4','p5'],
+      doublerMultiplier: 1, handCrackMultiplier: 1, crackState: null,
+      blitzes: [], discard: [], tricks: [], currentTrick: [], currentLeader: 'p1',
+      lastTrick: [], log: [], scores: {},
+      rewindHistory: [snapshot],
+      hands: { p1: [], p2: [], p3: [], p4: [], p5: [] },
+    }
+    const view = getPlayerView(state, 'p1')
+    expect(view.rewindHistory).toEqual([])
+  })
 })
