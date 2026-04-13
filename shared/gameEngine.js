@@ -134,6 +134,7 @@ export function dealHand(playerIds, dealerSeat, handNumber, doublerMultiplier) {
     blitzes: [],               // [{ userId, type: 'black'|'red' }] — players who declared a blitz
     log: [],                   // string messages
     scores: {},                // { userId: delta } — populated at scoring
+    rewindHistory: [],         // card play snapshots for rewinding
   }
 }
 

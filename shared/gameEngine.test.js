@@ -250,6 +250,11 @@ describe('dealHand', () => {
     expect(state.phase).toBe('picking')
     expect(state.pickIndex).toBe(0)
   })
+
+  it('initializes rewindHistory as an empty array', () => {
+    const state = dealHand(['p1','p2','p3','p4','p5'], 0, 1, 1)
+    expect(state.rewindHistory).toEqual([])
+  })
 })
 
 describe('pick / pass / blitz', () => {
