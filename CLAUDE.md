@@ -56,8 +56,10 @@ npx wrangler d1 execute sheepshead-db --local --command "PRAGMA table_info(games
 
 Direct pushes to `main` are blocked by a pre-push hook (`.githooks/pre-push`). Always work on a feature branch and open a PR. After merging, local branches tracking deleted remotes are auto-deleted by the post-merge hook.
 
-## README Sync
+## RULES Sync
 
-`README.md` contains a plain-English description of the game rules. **Whenever you change game rules in `shared/gameEngine.js`, also update the Rules section of `README.md` to match.**
+`RULES.md` contains a plain-English description of the game rules. **Whenever you change game rules in `shared/gameEngine.js`, also update `RULES.md` to match.**
+
+## General Rules
 
 When implementing any new game feature in `gameEngine.js`, write corresponding tests in `gameEngine.test.js` — unit tests for pure functions, state-construction tests for stateful functions.
