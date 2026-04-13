@@ -59,3 +59,5 @@ Direct pushes to `main` are blocked by a pre-push hook (`.githooks/pre-push`). A
 ## README Sync
 
 `README.md` contains a plain-English description of the game rules. **Whenever you change game rules in `shared/gameEngine.js`, also update the Rules section of `README.md` to match.**
+
+When implementing any new game feature in `gameEngine.js`, write corresponding tests in `gameEngine.test.js` — unit tests for pure functions, state-construction tests for stateful functions.
