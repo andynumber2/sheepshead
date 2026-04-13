@@ -27,6 +27,10 @@ Queen of Clubs, Queen of Spades, Queen of Hearts, Queen of Diamonds,
 Jack of Clubs, Jack of Spades, Jack of Hearts, Jack of Diamonds,
 Ace of Diamonds, 10 of Diamonds, King of Diamonds, 9 of Diamonds, 8 of Diamonds, 7 of Diamonds
 
+### Non-Trump Suit Rank (highest → lowest)
+
+Ace, 10, King, 9, 8, 7. Note that the 10 outranks the King.
+
 ### Card Point Values
 
 | Card | Points |
@@ -44,7 +48,11 @@ Total points in the deck: 120.
 
 #### 1. Picking
 
-Two blind cards are dealt face-down. Starting left of the dealer, each player may **pick** (take the blind and become the picker) or **pass**. If all five players pass, the hand is played as a **Leaster**.
+Two blind cards are dealt face-down. Starting left of the dealer, each player may **pick** (take the blind and become the picker) or **pass**. If all five players pass, what happens depends on the game's no-pick variant: the hand is played as a **Leaster**, the stakes double (**Doublers**), or the hand is scored immediately as a **Schwanzer**.
+
+**Blitzing**
+
+A player holding both black queens (Queen of Clubs + Queen of Spades) or both red queens (Queen of Hearts + Queen of Diamonds) may **blitz** when it is their turn to pick. Blitzing forces the player to pick (they take the blind and proceed to discarding), and doubles the hand's final payout (×2 on top of all other multipliers).
 
 #### 2. Discarding
 
@@ -103,7 +111,7 @@ The picker team needs **61 or more points** out of 120 to win.
 | Schneider (winner ≥91 pts, or loser ≤29 pts) | ×2 |
 | Schwarz (one side takes all 6 tricks) | ×3 |
 
-The final multiplier is: `base × doubler × crack`.
+The final multiplier is: `base × doubler × crack × blitz`.
 
 **Picker wins:**
 - With partner: picker earns 2 points, partner earns 1 point; each opponent loses 1 point (all × multiplier).
@@ -115,7 +123,11 @@ The final multiplier is: `base × doubler × crack`.
 
 ### Leaster
 
-When all five players pass, a Leaster is played. There is no picker or partner — everyone plays for themselves. The blind cards are awarded to the winner of the first trick. The player who takes at least one trick and ends with the **fewest points** wins. The winner gains 4 points; all others lose 1 point.
+When all five players pass and the no-pick variant is Leasters, a Leaster is played. There is no picker or partner — everyone plays for themselves. The blind cards are awarded to the winner of the first trick. The player who takes at least one trick and ends with the **fewest points** wins. **Tie-break:** if two or more eligible players are tied on points, the one who took the fewest tricks wins. The winner gains 4 points; all others lose 1 point.
+
+### Doubler
+
+When all five players pass and the no-pick variant is Doublers, no hand is played. Instead, the session-wide stakes multiplier doubles (×2, stacking on each successive no-pick), a new hand is dealt, and play continues until someone picks. The accumulated doubler multiplier applies to the final payout of the next played hand, then resets to ×1.
 
 ### Schwanzer
 
