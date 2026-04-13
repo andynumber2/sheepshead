@@ -539,6 +539,23 @@ export function playCard(state, userId, cardId) {
   return newState
 }
 
+// ─── Rewind ──────────────────────────────────────────────────────────────────
+export function rewindPlay(state) {
+  assertPhase(state, 'playing')
+  const history = state.rewindHistory ?? []
+  if (history.length === 0) throw new Error('Nothing to rewind.')
+
+  const remaining = history.slice(0, -1)
+  let restored = { ...history[history.length - 1], rewindHistory: remaining }
+
+  // Rewinding to the start of the hand resets crack/recrack state
+  if (restored.tricks.length === 0 && restored.currentTrick.length === 0) {
+    restored = { ...restored, crackState: null, handCrackMultiplier: 1 }
+  }
+
+  return restored
+}
+
 // Who plays next in the current trick?
 export function currentPlayer(state) {
   const played = state.currentTrick.map(p => p.userId)
