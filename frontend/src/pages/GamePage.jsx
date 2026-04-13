@@ -6,6 +6,7 @@ import TrickArea, { LastTrickArea } from '../components/TrickArea.jsx'
 import ActionPanel from '../components/ActionPanel.jsx'
 import GameLog from '../components/GameLog.jsx'
 import ScoreBoard from '../components/ScoreBoard.jsx'
+import GameOptionsPanel from '../components/GameOptionsPanel.jsx'
 
 const SUIT_SYMBOLS   = { C: '♣', D: '♦', H: '♥', S: '♠' }
 const VARIANT_LABELS = { leasters: 'Leasters', doublers: 'Doublers', schwanzers: 'Schwanzers' }
@@ -38,86 +39,6 @@ function resolveLogNames(entries, players) {
     }
     return s
   })
-}
-
-// ── Game admin settings panel (game creator only) ────────────────────────────
-function AdminSettingsPanel({ gameId, currentVariant, revealPartner, onUpdated }) {
-  const [variant, setVariant]             = useState(currentVariant)
-  const [reveal, setReveal]               = useState(revealPartner)
-  const [saving, setSaving]               = useState(false)
-  const [saved, setSaved]                 = useState(false)
-
-  useEffect(() => { setVariant(currentVariant) },  [currentVariant])
-  useEffect(() => { setReveal(revealPartner) },     [revealPartner])
-
-  async function save(patch) {
-    setSaving(true)
-    setSaved(false)
-    try {
-      const result = await api.games.updateSettings(gameId, patch)
-      setSaved(true)
-      onUpdated?.(result)
-      setTimeout(() => setSaved(false), 2000)
-    } catch { /* revert handled by parent re-poll */ }
-    finally { setSaving(false) }
-  }
-
-  async function handleVariantChange(v) {
-    setVariant(v)
-    await save({ no_pick_variant: v })
-  }
-
-  async function handleRevealChange(v) {
-    setReveal(v)
-    await save({ reveal_partner: v })
-  }
-
-  return (
-    <div style={{
-      background: 'rgba(0,0,0,0.5)',
-      border: '1px solid rgba(255,255,255,0.15)',
-      borderRadius: 8,
-      padding: '10px 14px',
-      color: '#fff',
-      fontSize: '0.82rem',
-    }}>
-      <strong>⚙ Game settings</strong>
-      <small style={{ color: '#aaa', display: 'block', marginBottom: 8 }}>
-        Changes take effect next hand
-      </small>
-
-      {/* No-pick variant */}
-      <div style={{ marginBottom: 8 }}>
-        <div style={{ color: '#ccc', marginBottom: 4 }}>No-pick variant:</div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {['leasters', 'doublers', 'schwanzers'].map(v => (
-            <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-              <input type="radio" name={`variant-${gameId}`} value={v}
-                checked={variant === v} onChange={() => handleVariantChange(v)} disabled={saving} />
-              {VARIANT_LABELS[v]}
-            </label>
-          ))}
-        </div>
-      </div>
-
-      {/* Reveal partner */}
-      <div>
-        <div style={{ color: '#ccc', marginBottom: 4 }}>Identify partner after ace is played?</div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {[true, false].map(v => (
-            <label key={String(v)} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-              <input type="radio" name={`reveal-${gameId}`} value={String(v)}
-                checked={reveal === v} onChange={() => handleRevealChange(v)} disabled={saving} />
-              {v ? 'Yes' : 'No'}
-            </label>
-          ))}
-        </div>
-      </div>
-
-      {saving && <span style={{ color: '#aaa', marginTop: 6, display: 'block' }}>Saving…</span>}
-      {saved  && <span style={{ color: '#4ade80', marginTop: 6, display: 'block' }}>✓ Saved</span>}
-    </div>
-  )
 }
 
 // ── Current turn helper ───────────────────────────────────────────────────────
@@ -208,6 +129,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
   const [leaving, setLeaving]               = useState(false)
   const [currentVariant, setCurrentVariant] = useState(null)
   const [revealPartner, setRevealPartner]   = useState(null)
+  const [showOptions, setShowOptions]       = useState(false)
   const pollingRef = useRef(null)
   // Tracks the auto-play timer for the last trick. We key by
   // `${turnUserId}:${trickLen}` so each "pending play" only schedules once,
@@ -470,21 +392,35 @@ export default function GamePage({ gameId, user, onNavigate }) {
         </div>
 
         {/* Game creator controls settings */}
-        {isGameAdmin
-          ? (
-            <AdminSettingsPanel
+        {isGameAdmin ? (
+          <>
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: '0.72rem', color: '#888', marginBottom: 3 }}>Game options</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <span style={{ color: '#ccc', fontSize: '0.85rem' }}>
+                  {VARIANT_LABELS[currentVariant ?? noPickVariant]} ·{' '}
+                  Partner: {(revealPartner ?? gameData.reveal_partner ?? true) ? 'shown' : 'hidden'}
+                </span>
+                <button className="outline" style={{ fontSize: '0.8rem', padding: '2px 10px' }}
+                  onClick={() => setShowOptions(true)}>
+                  ⚙ Edit
+                </button>
+              </div>
+            </div>
+            <GameOptionsPanel
+              mode="update"
               gameId={gameId}
-              currentVariant={currentVariant ?? noPickVariant}
-              revealPartner={revealPartner ?? gameData.reveal_partner ?? true}
+              open={showOptions}
+              values={{ no_pick_variant: currentVariant ?? noPickVariant, reveal_partner: revealPartner ?? gameData.reveal_partner ?? true }}
               onUpdated={handleSettingsUpdate}
+              onClose={() => setShowOptions(false)}
             />
-          )
-          : (
-            <p style={{ color: '#aaa', fontSize: '0.85rem', marginTop: 8 }}>
-              No-pick variant: <strong>{VARIANT_LABELS[noPickVariant]}</strong>
-            </p>
-          )
-        }
+          </>
+        ) : (
+          <p style={{ color: '#aaa', fontSize: '0.85rem', marginTop: 8 }}>
+            No-pick variant: <strong>{VARIANT_LABELS[noPickVariant]}</strong>
+          </p>
+        )}
 
         <p style={{ marginTop: 16 }}>Waiting for players… ({players.length}/5)</p>
         <ul>{players.map(p => <li key={p.user_id}>{p.username}</li>)}</ul>
@@ -528,11 +464,11 @@ export default function GamePage({ gameId, user, onNavigate }) {
 
   const dealerUserId  = state.pickOrder ? state.pickOrder[4] : null
   const pickerUserId  = state.picker
-  const partnerUserId = state.partnerRevealed ? state.partner : null
+  const partnerUserId  = (state.partnerRevealed && (state.reveal_partner ?? true)) ? state.partner : null
 
   // Called ace display
   const calledAce       = state.calledAce
-  const showPartnerName = state.partnerRevealed && (revealPartner ?? gameData.reveal_partner ?? true)
+  const showPartnerName = state.partnerRevealed && (state.reveal_partner ?? true)
   const partnerPlayer   = showPartnerName && state.partner
     ? players.find(p => String(p.user_id) === String(state.partner))
     : null
@@ -734,11 +670,24 @@ export default function GamePage({ gameId, user, onNavigate }) {
       {/* ── Game admin settings (game creator only) ── */}
       {isGameAdmin && (
         <div className="score-board">
-          <AdminSettingsPanel
+          <div style={{ fontSize: '0.68rem', color: '#666', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Game options</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <span style={{ color: '#aaa', fontSize: '0.78rem' }}>
+              {VARIANT_LABELS[currentVariant ?? noPickVariant]} ·{' '}
+              Partner: {(revealPartner ?? gameData.reveal_partner ?? true) ? 'shown' : 'hidden'}
+            </span>
+            <button className="outline" style={{ fontSize: '0.78rem', padding: '2px 8px' }}
+              onClick={() => setShowOptions(true)}>
+              ⚙ Edit
+            </button>
+          </div>
+          <GameOptionsPanel
+            mode="update"
             gameId={gameId}
-            currentVariant={currentVariant ?? noPickVariant}
-            revealPartner={revealPartner ?? gameData.reveal_partner ?? true}
+            open={showOptions}
+            values={{ no_pick_variant: currentVariant ?? noPickVariant, reveal_partner: revealPartner ?? gameData.reveal_partner ?? true }}
             onUpdated={handleSettingsUpdate}
+            onClose={() => setShowOptions(false)}
           />
         </div>
       )}

@@ -47,6 +47,7 @@ export async function onRequestPost({ request, env, params }) {
 
       const dealerSeat = 0
       const state = dealHand(allPlayers, dealerSeat, 1, 1)
+      state.reveal_partner = game.reveal_partner === 1
 
       await env.DB.prepare(
         'INSERT INTO game_state (game_id, state_json, updated_at) VALUES (?, ?, datetime(\'now\'))'

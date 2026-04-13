@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api.js'
+import GameOptionsPanel from '../components/GameOptionsPanel.jsx'
 
 const STATUS_LABELS  = { waiting: 'Open', active: 'In progress' }
-const VARIANT_LABELS = { leasters: 'Leasters', doublers: 'Doublers' }
+const VARIANT_LABELS = { leasters: 'Leasters', doublers: 'Doublers', schwanzers: 'Schwanzers' }
 
 export default function LobbyPage({ user, onNavigate, onLogout }) {
   const [games, setGames]       = useState([])
   const [loading, setLoading]   = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [gameName, setGameName] = useState(`${user.username}'s game`)
-  const [variant, setVariant]   = useState('leasters')
+  const [gameOptions, setGameOptions] = useState({ no_pick_variant: 'doublers', reveal_partner: false })
+  const [showOptions, setShowOptions] = useState(false)
   const [testMode, setTestMode] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError]       = useState(null)
@@ -41,8 +43,9 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
     try {
       const game = await api.games.create(
         gameName.trim() || `${user.username}'s game`,
-        variant,
+        gameOptions.no_pick_variant,
         user.is_admin ? testMode : false,
+        { reveal_partner: gameOptions.reveal_partner },
       )
       onNavigate(`/game/${game.id}`)
     } catch (e) {
@@ -133,19 +136,30 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
                 maxLength={60}
               />
             </label>
-            <fieldset>
-              <legend>No-pick variant</legend>
-              <label>
-                <input type="radio" name="variant" value="leasters"
-                  checked={variant === 'leasters'} onChange={() => setVariant('leasters')} />
-                Leasters — fewest points wins
-              </label>
-              <label>
-                <input type="radio" name="variant" value="doublers"
-                  checked={variant === 'doublers'} onChange={() => setVariant('doublers')} />
-                Doublers — stakes double each pass
-              </label>
-            </fieldset>
+            <div style={{ margin: '8px 0' }}>
+              <div style={{ fontSize: '0.72rem', color: '#888', marginBottom: 3 }}>Game options</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <span style={{ fontSize: '0.85rem', color: '#ccc' }}>
+                  {gameOptions.no_pick_variant.charAt(0).toUpperCase() + gameOptions.no_pick_variant.slice(1)} ·{' '}
+                  Partner: {gameOptions.reveal_partner ? 'shown' : 'hidden'}
+                </span>
+                <button
+                  type="button"
+                  className="outline"
+                  style={{ fontSize: '0.8rem', padding: '2px 10px' }}
+                  onClick={() => setShowOptions(true)}
+                >
+                  ⚙ Edit
+                </button>
+              </div>
+            </div>
+            <GameOptionsPanel
+              mode="create"
+              open={showOptions}
+              values={gameOptions}
+              onChange={setGameOptions}
+              onClose={() => setShowOptions(false)}
+            />
 
             {user.is_admin && (
               <label className="test-mode-label">

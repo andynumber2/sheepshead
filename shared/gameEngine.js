@@ -911,8 +911,11 @@ export function getPlayerView(state, userId) {
     }
   }
 
-  // Hide partner identity until revealed (don't expose to non-partners)
-  if (!view.partnerRevealed && view.partner && view.partner !== userId && view.picker !== userId) {
+  // Hide partner identity from bystanders when:
+  // 1. The ace hasn't been played yet (partnerRevealed is false), OR
+  // 2. The "identify partner" game option is disabled (reveal_partner is false)
+  const partnerVisible = view.partnerRevealed && (view.reveal_partner ?? true)
+  if (!partnerVisible && view.partner && view.partner !== userId && view.picker !== userId) {
     view.partner = null
   }
 
