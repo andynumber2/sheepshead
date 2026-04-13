@@ -589,4 +589,181 @@ describe('playCard', () => {
     // p5's turn comes after p4 — p5 cannot play before p4
     expect(() => playCard(state, 'p5', '10H')).toThrow()
   })
+
+  // State: empty trick, p1 leads first
+  function makeOpenTrickState() {
+    return {
+      phase: 'playing',
+      picker: 'p1',
+      partner: 'p3',
+      goingAlone: false,
+      calledAce: { suit: 'S', aceId: 'AS' },
+      calledSuit: 'S',
+      calledTen: null,
+      calledKing: null,
+      partnerRevealed: true,
+      pickerForcedPlays: [],
+      underCard: null,
+      pickOrder: ['p1','p2','p3','p4','p5'],
+      doublerMultiplier: 1,
+      handCrackMultiplier: 1,
+      blitzes: [],
+      discard: [],
+      tricks: [],
+      currentTrick: [],
+      currentLeader: 'p1',
+      log: [],
+      scores: {},
+      hands: {
+        p1: [c('K','H')],   // leads hearts
+        p2: [c('A','H')],   // higher heart — would win if no trump
+        p3: [c('Q','C')],   // trump — beats all fail
+        p4: [c('9','H')],
+        p5: [c('7','H')],
+      },
+    }
+  }
+
+  it('trump beats a led fail card', () => {
+    let state = makeOpenTrickState()
+    state = playCard(state, 'p1', 'KH')   // p1 leads KH
+    state = playCard(state, 'p2', 'AH')   // p2 plays AH (would win among hearts)
+    state = playCard(state, 'p3', 'QC')   // p3 plays QC (trump — should win)
+    state = playCard(state, 'p4', '9H')
+    state = playCard(state, 'p5', '7H')
+    expect(state.tricks[0].winner).toBe('p3')
+  })
+
+  it('higher trump beats lower trump', () => {
+    const state = {
+      phase: 'playing',
+      picker: 'p1',
+      partner: 'p2',
+      goingAlone: false,
+      calledAce: { suit: 'H', aceId: 'AH' },
+      calledSuit: 'H',
+      calledTen: null,
+      calledKing: null,
+      partnerRevealed: true,
+      pickerForcedPlays: [],
+      underCard: null,
+      pickOrder: ['p1','p2','p3','p4','p5'],
+      doublerMultiplier: 1,
+      handCrackMultiplier: 1,
+      blitzes: [],
+      discard: [],
+      tricks: [],
+      currentTrick: [],
+      currentLeader: 'p1',
+      log: [],
+      scores: {},
+      hands: {
+        p1: [c('Q','C')],   // QC — rank 0 (strongest trump)
+        p2: [c('Q','S')],   // QS — rank 1
+        p3: [c('J','C')],   // JC — rank 4
+        p4: [c('A','D')],   // AD — rank 8
+        p5: [c('7','D')],   // 7D — rank 13 (weakest trump)
+      },
+    }
+    let s = state
+    s = playCard(s, 'p1', 'QC')
+    s = playCard(s, 'p2', 'QS')
+    s = playCard(s, 'p3', 'JC')
+    s = playCard(s, 'p4', 'AD')
+    s = playCard(s, 'p5', '7D')
+    expect(s.tricks[0].winner).toBe('p1')  // QC (rank 0) wins
+  })
+
+  it('higher card of led suit wins among fail cards', () => {
+    const state = {
+      phase: 'playing',
+      picker: 'p1',
+      partner: 'p2',
+      goingAlone: false,
+      calledAce: { suit: 'H', aceId: 'AH' },
+      calledSuit: 'H',
+      calledTen: null,
+      calledKing: null,
+      partnerRevealed: true,
+      pickerForcedPlays: [],
+      underCard: null,
+      pickOrder: ['p1','p2','p3','p4','p5'],
+      doublerMultiplier: 1,
+      handCrackMultiplier: 1,
+      blitzes: [],
+      discard: [],
+      tricks: [],
+      currentTrick: [],
+      currentLeader: 'p1',
+      log: [],
+      scores: {},
+      hands: {
+        p1: [c('K','C')],   // leads clubs
+        p2: [c('A','C')],   // AC — highest club, should win
+        p3: [c('9','C')],
+        p4: [c('8','C')],
+        p5: [c('7','C')],
+      },
+    }
+    let s = state
+    s = playCard(s, 'p1', 'KC')
+    s = playCard(s, 'p2', 'AC')
+    s = playCard(s, 'p3', '9C')
+    s = playCard(s, 'p4', '8C')
+    s = playCard(s, 'p5', '7C')
+    expect(s.tricks[0].winner).toBe('p2')  // AC wins
+  })
+
+  it('transitions to scoring phase after 6 tricks', () => {
+    // Build a state with 5 complete tricks already done, then play the last card
+    const tricksComplete = Array(5).fill(null).map(() => ({
+      leader: 'p1',
+      plays: [
+        { userId: 'p1', card: c('7','C') },
+        { userId: 'p2', card: c('8','C') },
+        { userId: 'p3', card: c('9','C') },
+        { userId: 'p4', card: c('7','H') },
+        { userId: 'p5', card: c('8','H') },
+      ],
+      winner: 'p1',
+    }))
+    const endState = {
+      phase: 'playing',
+      picker: 'p1',
+      partner: null,
+      goingAlone: true,
+      calledAce: null,
+      calledSuit: null,
+      calledTen: null,
+      calledKing: null,
+      partnerRevealed: false,
+      pickerForcedPlays: [],
+      underCard: null,
+      pickOrder: ['p1','p2','p3','p4','p5'],
+      doublerMultiplier: 1,
+      handCrackMultiplier: 1,
+      blitzes: [],
+      discard: [],
+      tricks: tricksComplete,
+      currentTrick: [
+        { userId: 'p1', card: c('A','C') },
+        { userId: 'p2', card: c('K','S') },
+        { userId: 'p3', card: c('9','S') },
+        { userId: 'p4', card: c('8','S') },
+      ],
+      currentLeader: 'p1',
+      log: [],
+      scores: {},
+      hands: {
+        p1: [],
+        p2: [],
+        p3: [],
+        p4: [],
+        p5: [c('7','S')],
+      },
+    }
+    const final = playCard(endState, 'p5', '7S')
+    expect(final.phase).toBe('scoring')
+    expect(final.tricks).toHaveLength(6)
+  })
 })
