@@ -249,3 +249,90 @@ describe('dealHand', () => {
     expect(state.pickIndex).toBe(0)
   })
 })
+
+describe('pick / pass / blitz', () => {
+  function makePickingState() {
+    return dealHand(['p1','p2','p3','p4','p5'], 0, 1, 1)
+  }
+
+  describe('pick', () => {
+    it('transitions to discarding phase', () => {
+      const state = makePickingState()
+      const next = pick(state, state.pickOrder[0])
+      expect(next.phase).toBe('discarding')
+    })
+
+    it('gives the picker 8 cards (hand + blind)', () => {
+      const state = makePickingState()
+      const picker = state.pickOrder[0]
+      const next = pick(state, picker)
+      expect(next.hands[picker]).toHaveLength(8)
+    })
+
+    it('clears the blind after picking', () => {
+      const state = makePickingState()
+      const next = pick(state, state.pickOrder[0])
+      expect(next.blind).toHaveLength(0)
+    })
+
+    it('throws if it is not the player\'s turn', () => {
+      const state = makePickingState()
+      expect(() => pick(state, state.pickOrder[1])).toThrow()
+    })
+
+    it('throws if called outside picking phase', () => {
+      const state = { ...makePickingState(), phase: 'playing' }
+      expect(() => pick(state, state.pickOrder[0])).toThrow()
+    })
+  })
+
+  describe('pass', () => {
+    it('advances pickIndex', () => {
+      const state = makePickingState()
+      const next = pass(state, state.pickOrder[0])
+      expect(next.pickIndex).toBe(1)
+    })
+
+    it('transitions to no_pick phase when all 5 players pass', () => {
+      let state = makePickingState()
+      for (let i = 0; i < 5; i++) {
+        state = pass(state, state.pickOrder[state.pickIndex])
+      }
+      expect(state.phase).toBe('no_pick')
+    })
+
+    it('throws if it is not the player\'s turn', () => {
+      const state = makePickingState()
+      expect(() => pass(state, state.pickOrder[1])).toThrow()
+    })
+  })
+
+  describe('blitz', () => {
+    it('transitions to discarding phase', () => {
+      const state = makePickingState()
+      const firstPicker = state.pickOrder[0]
+      const stateWithBlitz = {
+        ...state,
+        potentialBlitzes: [{ userId: firstPicker, type: 'black' }],
+      }
+      const next = blitz(stateWithBlitz, firstPicker)
+      expect(next.phase).toBe('discarding')
+    })
+
+    it('records the blitz in state.blitzes', () => {
+      const state = makePickingState()
+      const firstPicker = state.pickOrder[0]
+      const stateWithBlitz = {
+        ...state,
+        potentialBlitzes: [{ userId: firstPicker, type: 'red' }],
+      }
+      const next = blitz(stateWithBlitz, firstPicker)
+      expect(next.blitzes).toEqual([{ userId: firstPicker, type: 'red' }])
+    })
+
+    it('throws if player is not in potentialBlitzes', () => {
+      const state = { ...makePickingState(), potentialBlitzes: [] }
+      expect(() => blitz(state, state.pickOrder[0])).toThrow('Cannot blitz')
+    })
+  })
+})
