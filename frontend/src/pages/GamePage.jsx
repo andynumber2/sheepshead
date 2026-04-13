@@ -348,10 +348,13 @@ export default function GamePage({ gameId, user, onNavigate }) {
 
     if (trick.length > 0) {
       // Cards are being played — update immediately and cancel any pending clear.
+      // Also sync the ref so a rewind-reduced trickCount is tracked; otherwise
+      // re-completing the same trick won't trigger the completion branch below.
       if (trickClearTimerRef.current) {
         clearTimeout(trickClearTimerRef.current)
         trickClearTimerRef.current = null
       }
+      lastProcessedTrickCountRef.current = trickCount
       setDisplayedTrick(trick)
     } else if (trickCount !== lastProcessedTrickCountRef.current) {
       // A new trick just completed — guard by trickCount so repeated polls of
@@ -542,6 +545,11 @@ export default function GamePage({ gameId, user, onNavigate }) {
     && (state.tricks ?? []).length === 0
     && (state.currentTrick ?? []).length === 0
 
+  const rewindHistory = state.rewindHistory ?? []
+  const canRewindPlay  = isTestMode && user.is_admin && state.phase === 'playing' && rewindHistory.length > 0
+  const canRewindTrick = isTestMode && user.is_admin && state.phase === 'playing'
+    && !(rewindHistory.length === 0 && (state.tricks ?? []).length === 0 && (state.currentTrick ?? []).length === 0)
+
   function seatProps(player) {
     if (!player) return {}
     const uid  = String(player.user_id)
@@ -689,6 +697,34 @@ export default function GamePage({ gameId, user, onNavigate }) {
             loading={actionLoading}
             actingForName={isActingForBot ? (actingForPlayer?.username ?? turnUserId) : null}
           />
+        </div>
+      )}
+
+      {/* ── Test controls (admin rewind) ── */}
+      {isTestMode && user.is_admin && state.phase === 'playing' && (
+        <div style={{
+          gridColumn: '1 / -1',
+          display: 'flex',
+          gap: 8,
+          justifyContent: 'center',
+          padding: '4px 0',
+        }}>
+          <button
+            className="secondary"
+            onClick={() => handleAction('rewind_play', {})}
+            disabled={!canRewindPlay || actionLoading}
+            style={{ fontSize: '0.8rem' }}
+          >
+            Rewind Play
+          </button>
+          <button
+            className="secondary"
+            onClick={() => handleAction('rewind_trick', {})}
+            disabled={!canRewindTrick || actionLoading}
+            style={{ fontSize: '0.8rem' }}
+          >
+            Rewind Trick
+          </button>
         </div>
       )}
 

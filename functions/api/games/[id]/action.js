@@ -5,6 +5,7 @@ import {
   setupLeaster, awardLeasterBlind, resolveLeaster,
   resolveSchwanzer,
   dealHand, currentPlayer,
+  rewindPlay, rewindTrick,
 } from '../../../../shared/gameEngine.js'
 import { finishHand, processBotTurns } from '../../_botHelpers.js'
 
@@ -154,6 +155,20 @@ export async function onRequestPost({ request, env, params }) {
         // No-op — hands now auto-advance; kept for backward compatibility
         break
 
+      case 'rewind_play': {
+        if (!game.is_test_mode) return err('rewind_play is only allowed in test mode games.', 403)
+        if (!user.is_admin)     return err('Only admins can use rewind_play.', 403)
+        state = rewindPlay(state)
+        break
+      }
+
+      case 'rewind_trick': {
+        if (!game.is_test_mode) return err('rewind_trick is only allowed in test mode games.', 403)
+        if (!user.is_admin)     return err('Only admins can use rewind_trick.', 403)
+        state = rewindTrick(state)
+        break
+      }
+
       default:
         return err(`Unknown action type: ${type}`)
     }
@@ -162,7 +177,7 @@ export async function onRequestPost({ request, env, params }) {
     // the frontend's bot_play trigger applies the same 700 ms delay for bots as for
     // the human who just played. If the hand ended (new picking phase), still run
     // processBotTurns so bot picks/passes resolve instantly as normal.
-    if (type !== 'play_card' || state.phase !== 'playing') {
+    if ((type !== 'play_card' && type !== 'rewind_play' && type !== 'rewind_trick') || state.phase !== 'playing') {
       state = await processBotTurns(state, gameId, env.DB, game, { allowTrick1Lead: type === 'bot_play' })
     }
 
