@@ -64,7 +64,7 @@ export async function onRequestPost({ request, env, params }) {
         state = pass(state, userId)
         if (state.phase === 'no_pick') {
           // Re-read no_pick_variant from DB in case admin changed it mid-session
-          const freshGame = await env.DB.prepare('SELECT no_pick_variant FROM games WHERE id = ?').bind(gameId).first()
+          const freshGame = await env.DB.prepare('SELECT no_pick_variant, reveal_partner FROM games WHERE id = ?').bind(gameId).first()
           if (freshGame.no_pick_variant === 'leasters') {
             state = setupLeaster(state)
           } else if (freshGame.no_pick_variant === 'schwanzers') {
@@ -81,6 +81,7 @@ export async function onRequestPost({ request, env, params }) {
             const nextDealer = (state.dealerSeat + 1) % 5
             state = dealHand(playerIds, nextDealer, state.handNumber + 1, newMultiplier)
             state.doublerMultiplier = newMultiplier
+            state.reveal_partner = freshGame.reveal_partner === 1
             state.log.push(`Doubler! Stakes are now ×${newMultiplier}.`)
 
             await env.DB.prepare(
