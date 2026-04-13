@@ -688,7 +688,7 @@ function beats(challenger, current, ledSuit) {
 }
 
 // ─── Scoring ─────────────────────────────────────────────────────────────────
-function computeScores(state) {
+export function computeScores(state) {
   const { tricks, picker, partner, goingAlone, discard, doublerMultiplier } = state
 
   // Gather all trick winners' point piles
