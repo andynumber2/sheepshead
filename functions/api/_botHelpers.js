@@ -120,7 +120,7 @@ async function createPlayBots(DB, count) {
 //   to trigger the next bot card — giving the appearance of sequential play.
 //
 // Saves state to the DB after each bot action and returns the final state.
-export async function processBotTurns(state, gameId, DB, game) {
+export async function processBotTurns(state, gameId, DB, game, { allowTrick1Lead = false } = {}) {
   // Fetch bot-type for every player in this game once upfront
   const { results: players } = await DB.prepare(
     'SELECT gp.user_id, u.bot_type FROM game_players gp JOIN users u ON u.id = gp.user_id WHERE gp.game_id = ?'
@@ -128,12 +128,16 @@ export async function processBotTurns(state, gameId, DB, game) {
   const botTypeMap = Object.fromEntries(players.map(p => [String(p.user_id), p.bot_type]))
 
   let current = state
+  // canLeadTrick1 starts true only for bot_play; resets to false on each hand
+  // boundary so that subsequent hands always get the full 5s crack window.
+  let canLeadTrick1 = allowTrick1Lead
   const MAX_ITERS = 60  // safety cap; one full hand is ~37 actions
 
   for (let i = 0; i < MAX_ITERS; i++) {
     // Handle scoring phase entered when a bot plays the final card of a hand
     if (current.phase === 'scoring') {
       current = await finishHand(DB, gameId, current)
+      canLeadTrick1 = false  // new hand — trick-1 delay applies again
       await persistState(DB, gameId, current)
       continue
     }
@@ -143,6 +147,14 @@ export async function processBotTurns(state, gameId, DB, game) {
     if (botTypeMap[nextActorId] !== 'play') break  // human's turn
 
     const wasPlayingPhase = current.phase === 'playing'
+
+    // Stop before leading trick 1 — frontend needs 5s for the crack window.
+    // canLeadTrick1 is only true for the current hand's initial bot_play lead.
+    if (wasPlayingPhase && !canLeadTrick1 &&
+        (current.tricks?.length ?? 0) === 0 &&
+        (current.currentTrick?.length ?? 0) === 0) {
+      break
+    }
 
     const view = getPlayerView(current, nextActorId)
     current = applyBotDecision(current, nextActorId, view)
@@ -160,6 +172,7 @@ export async function processBotTurns(state, gameId, DB, game) {
       // If the bot played the last card of the hand, score and deal the next hand.
       if (current.phase === 'scoring') {
         current = await finishHand(DB, gameId, current)
+        canLeadTrick1 = false  // new hand — trick-1 delay applies again
       }
       await persistState(DB, gameId, current)
       // If still in playing phase, stop — the frontend drives the next bot card.
