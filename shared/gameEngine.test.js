@@ -211,3 +211,41 @@ describe('resolveSchwanzer', () => {
     expect(state.log[0]).toContain('loses')
   })
 })
+
+describe('dealHand', () => {
+  const playerIds = ['p1','p2','p3','p4','p5']
+
+  it('deals 6 cards to each of 5 players', () => {
+    const state = dealHand(playerIds, 0, 1, 1)
+    for (const pid of playerIds) {
+      expect(state.hands[pid]).toHaveLength(6)
+    }
+  })
+
+  it('puts 2 cards in the blind', () => {
+    const state = dealHand(playerIds, 0, 1, 1)
+    expect(state.blind).toHaveLength(2)
+  })
+
+  it('deals all 32 cards with no duplicates', () => {
+    const state = dealHand(playerIds, 0, 1, 1)
+    const allCards = [
+      ...state.blind,
+      ...Object.values(state.hands).flat(),
+    ]
+    expect(allCards).toHaveLength(32)
+    expect(new Set(allCards.map(cd => cd.id)).size).toBe(32)
+  })
+
+  it('sets pick order starting left of dealer', () => {
+    // dealerSeat=2 → dealer is p3, first picker is p4
+    const state = dealHand(playerIds, 2, 1, 1)
+    expect(state.pickOrder).toEqual(['p4','p5','p1','p2','p3'])
+  })
+
+  it('starts in picking phase with pickIndex 0', () => {
+    const state = dealHand(playerIds, 0, 1, 1)
+    expect(state.phase).toBe('picking')
+    expect(state.pickIndex).toBe(0)
+  })
+})
