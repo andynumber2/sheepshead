@@ -461,7 +461,12 @@ export function playCard(state, userId, cardId) {
   assertPhase(state, 'playing')
   assertTurn(state, userId, currentPlayer(state))
 
+  // Capture pre-play snapshot. Strip rewindHistory to prevent exponential nesting.
+  const snapshot = deepClone(state)
+  snapshot.rewindHistory = []
+
   const newState = deepClone(state)
+  newState.rewindHistory = [...(state.rewindHistory ?? []), snapshot]
 
   const isUnderCardPlay =
     newState.underCard &&

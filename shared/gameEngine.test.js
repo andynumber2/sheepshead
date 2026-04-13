@@ -791,6 +791,64 @@ describe('playCard', () => {
   })
 })
 
+describe('rewind history (playCard)', () => {
+  function makeLeadingState() {
+    return {
+      phase: 'playing',
+      picker: 'p1',
+      partner: 'p3',
+      goingAlone: false,
+      calledAce: { suit: 'S', aceId: 'AS' },
+      calledSuit: 'S',
+      calledTen: null,
+      calledKing: null,
+      partnerRevealed: true,
+      pickerForcedPlays: [],
+      underCard: null,
+      pickOrder: ['p1','p2','p3','p4','p5'],
+      doublerMultiplier: 1,
+      handCrackMultiplier: 1,
+      crackState: null,
+      blitzes: [],
+      discard: [],
+      tricks: [],
+      currentTrick: [],
+      currentLeader: 'p1',
+      lastTrick: [],
+      log: [],
+      scores: {},
+      rewindHistory: [],
+      hands: {
+        p1: [c('K','H')],
+        p2: [c('7','H')],
+        p3: [c('8','H')],
+        p4: [c('9','H')],
+        p5: [c('10','H')],
+      },
+    }
+  }
+
+  it('adds one entry to rewindHistory per card play', () => {
+    const state = makeLeadingState()
+    const next = playCard(state, 'p1', 'KH')
+    expect(next.rewindHistory).toHaveLength(1)
+  })
+
+  it('snapshot does not contain nested rewindHistory entries (no exponential growth)', () => {
+    const state = makeLeadingState()
+    const next = playCard(state, 'p1', 'KH')
+    expect(next.rewindHistory[0].rewindHistory).toEqual([])
+  })
+
+  it('snapshot captures pre-play state (card still in hand, trick still empty)', () => {
+    const state = makeLeadingState()
+    const next = playCard(state, 'p1', 'KH')
+    const snapshot = next.rewindHistory[0]
+    expect(snapshot.currentTrick).toHaveLength(0)
+    expect(snapshot.hands.p1.some(cd => cd.id === 'KH')).toBe(true)
+  })
+})
+
 describe('computeScores', () => {
   // Create a fake card with a specific point rank (suit doesn't affect scoring)
   let fakeId = 0
