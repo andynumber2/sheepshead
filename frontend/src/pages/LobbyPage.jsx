@@ -3,7 +3,7 @@ import { api } from '../lib/api.js'
 import GameOptionsPanel from '../components/GameOptionsPanel.jsx'
 
 const STATUS_LABELS  = { waiting: 'Open', active: 'In progress' }
-const VARIANT_LABELS = { leasters: 'Leasters', doublers: 'Doublers' }
+const VARIANT_LABELS = { leasters: 'Leasters', doublers: 'Doublers', schwanzers: 'Schwanzers' }
 
 export default function LobbyPage({ user, onNavigate, onLogout }) {
   const [games, setGames]       = useState([])
