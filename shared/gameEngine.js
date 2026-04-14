@@ -808,7 +808,7 @@ export function computeScores(state) {
 
   state.log.push(
     `Hand over. Picker team (${pickerTeam.join(', ')}) had ${pickerTeamPoints} pts. ` +
-    `${pickerWon ? 'Picker wins' : 'Opponents win'}. Multiplier: ×${multiplier}.`
+    `${pickerWon ? 'Picker wins' : 'Opponents win'}. Multiplier: ×${multiplier}${dobMultiplier === 2 ? ' (DOB)' : ''}.`
   )
 
   const fmt = (n) => (n >= 0 ? '+' : '') + n

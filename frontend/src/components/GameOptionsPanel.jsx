@@ -140,13 +140,13 @@ export default function GameOptionsPanel({ mode, gameId, open, values, onChange,
       {/* Double on the Bump */}
       <div style={{ marginBottom: 16 }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem' }}>
+          Double on the Bump?
           <input
             type="checkbox"
             checked={dob}
             onChange={e => handleDobChange(e.target.checked)}
             disabled={saving}
           />
-          Double on the Bump?
         </label>
       </div>
 
