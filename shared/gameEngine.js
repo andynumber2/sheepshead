@@ -768,7 +768,7 @@ export function computeScores(state) {
   const opponents = Object.keys(state.hands).filter(uid => !pickerTeam.includes(uid))
 
   let baseMultiplier = 1
-  if (pickerTeamPoints >= 91 || (!pickerWon && pickerTeamPoints <= 29)) baseMultiplier = 2  // schneider
+  if (pickerTeamPoints >= 91 || (!pickerWon && pickerTeamPoints <= 30)) baseMultiplier = 2  // schneider
   if (pickerTeamTricks === 6 || pickerTeamTricks === 0) baseMultiplier = 3  // schwarz
 
   const blitzMultiplier = (state.blitzes?.length ?? 0) > 0 ? 2 : 1
