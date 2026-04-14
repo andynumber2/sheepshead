@@ -89,7 +89,7 @@ The picker team needs **61 or more points** out of 120 to win.
 | Condition | Base Multiplier |
 |-----------|----------------|
 | Normal win/loss | ×1 |
-| Schneider (winner ≥91 pts, or loser ≤29 pts) | ×2 |
+| Schneider (winner ≥91 pts, or loser ≤30 pts) | ×2 |
 | Schwarz (one side takes all 6 tricks) | ×3 |
 
 The final multiplier is: `base × doubler × crack × blitz`.
