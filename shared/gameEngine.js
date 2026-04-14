@@ -774,7 +774,8 @@ export function computeScores(state) {
   if (pickerTeamTricks === 6 || pickerTeamTricks === 0) baseMultiplier = 3  // schwarz
 
   const blitzMultiplier = (state.blitzes?.length ?? 0) > 0 ? 2 : 1
-  const multiplier = baseMultiplier * doublerMultiplier * (state.handCrackMultiplier ?? 1) * blitzMultiplier
+  const dobMultiplier = (!pickerWon && state.double_on_bump) ? 2 : 1
+  const multiplier = baseMultiplier * doublerMultiplier * (state.handCrackMultiplier ?? 1) * blitzMultiplier * dobMultiplier
 
   const scores = {}
   for (const uid of Object.keys(state.hands)) scores[uid] = 0
