@@ -806,9 +806,17 @@ export function computeScores(state) {
     }
   }
 
+  const crackMultiplier = state.handCrackMultiplier ?? 1
+  const multiplierParts = [
+    ['Base', baseMultiplier],
+    ['Doubler', doublerMultiplier],
+    ['Crack', crackMultiplier],
+    ['Blitz', blitzMultiplier],
+    ['DOB', dobMultiplier],
+  ].filter(([, v]) => v > 1).map(([k, v]) => `${k}: ${v}`).join(', ')
   state.log.push(
     `Hand over. Picker team (${pickerTeam.join(', ')}) had ${pickerTeamPoints} pts. ` +
-    `${pickerWon ? 'Picker wins' : 'Opponents win'}. Multiplier: ×${multiplier}${dobMultiplier === 2 ? ' (DOB)' : ''}.`
+    `${pickerWon ? 'Picker wins' : 'Opponents win'}. Multiplier: ×${multiplier}${multiplierParts ? ` (${multiplierParts})` : ''}.`
   )
 
   const fmt = (n) => (n >= 0 ? '+' : '') + n
