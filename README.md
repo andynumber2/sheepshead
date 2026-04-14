@@ -12,8 +12,15 @@ A web app for playing the card game Sheepshead, built on **Cloudflare Pages** wi
 
 ```bash
 npm install
-npm run dev          # Vite on :3000 + Wrangler on :8788
 npm run db:migrate:local   # apply DB migrations locally
+npm run dev          # Vite on :3000 + Wrangler on :8788
+```
+
+## Production
+
+```bash
+npm install
+npm run db:migrate   # apply DB migrations to remote
 npm run deploy       # build and deploy to Cloudflare Pages
 ```
 
