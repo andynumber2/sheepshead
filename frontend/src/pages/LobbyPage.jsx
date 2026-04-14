@@ -142,6 +142,7 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
                 <span style={{ fontSize: '0.85rem', color: '#ccc' }}>
                   {gameOptions.no_pick_variant.charAt(0).toUpperCase() + gameOptions.no_pick_variant.slice(1)} ·{' '}
                   Partner: {gameOptions.reveal_partner ? 'shown' : 'hidden'}
+                  {gameOptions.double_on_bump ? ' · DOB' : ''}
                 </span>
                 <button
                   type="button"

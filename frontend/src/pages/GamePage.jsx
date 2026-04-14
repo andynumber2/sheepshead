@@ -152,6 +152,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
       // Only set once — don't clobber in-flight admin changes
       setCurrentVariant(prev => prev ?? data.no_pick_variant)
       setRevealPartner(prev => prev ?? data.reveal_partner)
+      setDobEnabled(prev => prev ?? data.double_on_bump)
       setError(null)
     } catch (e) {
       setError(e.message)
