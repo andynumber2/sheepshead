@@ -129,6 +129,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
   const [leaving, setLeaving]               = useState(false)
   const [currentVariant, setCurrentVariant] = useState(null)
   const [revealPartner, setRevealPartner]   = useState(null)
+  const [dobEnabled, setDobEnabled]         = useState(null)
   const [showOptions, setShowOptions]       = useState(false)
   const pollingRef = useRef(null)
   // Tracks the auto-play timer for the last trick. We key by
@@ -321,6 +322,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
   function handleSettingsUpdate(result) {
     if (result.no_pick_variant !== undefined) setCurrentVariant(result.no_pick_variant)
     if (result.reveal_partner  !== undefined) setRevealPartner(result.reveal_partner)
+    if (result.double_on_bump  !== undefined) setDobEnabled(result.double_on_bump)
   }
 
   async function handleFillWithBots() {
@@ -400,6 +402,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
                 <span style={{ color: '#ccc', fontSize: '0.85rem' }}>
                   {VARIANT_LABELS[currentVariant ?? noPickVariant]} ·{' '}
                   Partner: {(revealPartner ?? gameData.reveal_partner ?? true) ? 'shown' : 'hidden'}
+                  {(dobEnabled ?? gameData.double_on_bump ?? true) ? ' · DOB' : ''}
                 </span>
                 <button className="outline" style={{ fontSize: '0.8rem', padding: '2px 10px' }}
                   onClick={() => setShowOptions(true)}>
@@ -411,7 +414,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
               mode="update"
               gameId={gameId}
               open={showOptions}
-              values={{ no_pick_variant: currentVariant ?? noPickVariant, reveal_partner: revealPartner ?? gameData.reveal_partner ?? true }}
+              values={{ no_pick_variant: currentVariant ?? noPickVariant, reveal_partner: revealPartner ?? gameData.reveal_partner ?? true, double_on_bump: dobEnabled ?? gameData.double_on_bump ?? true }}
               onUpdated={handleSettingsUpdate}
               onClose={() => setShowOptions(false)}
             />
@@ -675,6 +678,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
             <span style={{ color: '#aaa', fontSize: '0.78rem' }}>
               {VARIANT_LABELS[currentVariant ?? noPickVariant]} ·{' '}
               Partner: {(revealPartner ?? gameData.reveal_partner ?? true) ? 'shown' : 'hidden'}
+              {(dobEnabled ?? gameData.double_on_bump ?? true) ? ' · DOB' : ''}
             </span>
             <button className="outline" style={{ fontSize: '0.78rem', padding: '2px 8px' }}
               onClick={() => setShowOptions(true)}>
@@ -685,7 +689,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
             mode="update"
             gameId={gameId}
             open={showOptions}
-            values={{ no_pick_variant: currentVariant ?? noPickVariant, reveal_partner: revealPartner ?? gameData.reveal_partner ?? true }}
+            values={{ no_pick_variant: currentVariant ?? noPickVariant, reveal_partner: revealPartner ?? gameData.reveal_partner ?? true, double_on_bump: dobEnabled ?? gameData.double_on_bump ?? true }}
             onUpdated={handleSettingsUpdate}
             onClose={() => setShowOptions(false)}
           />
