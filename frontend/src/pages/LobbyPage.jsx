@@ -242,6 +242,9 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
           </article>
         )
       })}
+      <p style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: '0.65rem', color: 'rgba(255,255,255,0.25)', marginTop: 24 }}>
+        Build {__GIT_HASH__}
+      </p>
     </div>
   )
 }
