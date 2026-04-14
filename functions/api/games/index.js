@@ -73,6 +73,7 @@ async function createGame({ request, env }) {
   const VALID_VARIANTS = ['leasters', 'doublers', 'schwanzers']
   const noPickVariant  = VALID_VARIANTS.includes(body?.no_pick_variant) ? body.no_pick_variant : 'doublers'
   const revealPartner  = typeof body?.reveal_partner === 'boolean' ? body.reveal_partner : false
+  const doubleOnBump   = typeof body?.double_on_bump === 'boolean' ? body.double_on_bump : true
   const testMode       = !!(body?.test_mode && user.is_admin)
 
   if (testMode) {
@@ -84,8 +85,8 @@ async function createGame({ request, env }) {
   }
 
   const result = await env.DB.prepare(
-    'INSERT INTO games (name, no_pick_variant, reveal_partner, is_test_mode, created_by) VALUES (?, ?, ?, ?, ?)'
-  ).bind(name, noPickVariant, revealPartner ? 1 : 0, testMode ? 1 : 0, user.user_id).run()
+    'INSERT INTO games (name, no_pick_variant, reveal_partner, double_on_bump, is_test_mode, created_by) VALUES (?, ?, ?, ?, ?, ?)'
+  ).bind(name, noPickVariant, revealPartner ? 1 : 0, doubleOnBump ? 1 : 0, testMode ? 1 : 0, user.user_id).run()
 
   const gameId = result.meta.last_row_id
 
@@ -112,6 +113,7 @@ async function createGame({ request, env }) {
     const allPlayers = [user.user_id, ...bots.map(b => b.id)]
     const state = dealHand(allPlayers.map(String), 0, 1, 1)
     state.reveal_partner = revealPartner
+    state.double_on_bump = doubleOnBump
 
     await env.DB.prepare(
       "INSERT INTO game_state (game_id, state_json, updated_at) VALUES (?, ?, datetime('now'))"

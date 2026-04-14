@@ -16,7 +16,7 @@ export async function onRequestPatch({ request, env, params }) {
     let body
     try { body = await request.json() } catch { return err('Invalid JSON.') }
 
-    const { no_pick_variant, reveal_partner } = body ?? {}
+    const { no_pick_variant, reveal_partner, double_on_bump } = body ?? {}
 
     if (no_pick_variant !== undefined && !['leasters', 'doublers', 'schwanzers'].includes(no_pick_variant)) {
       return err('no_pick_variant must be "leasters", "doublers", or "schwanzers".')
@@ -24,11 +24,15 @@ export async function onRequestPatch({ request, env, params }) {
     if (reveal_partner !== undefined && typeof reveal_partner !== 'boolean') {
       return err('reveal_partner must be a boolean.')
     }
+    if (double_on_bump !== undefined && typeof double_on_bump !== 'boolean') {
+      return err('double_on_bump must be a boolean.')
+    }
 
     const fields = []
     const values = []
     if (no_pick_variant !== undefined) { fields.push('no_pick_variant = ?'); values.push(no_pick_variant) }
     if (reveal_partner  !== undefined) { fields.push('reveal_partner = ?');  values.push(reveal_partner ? 1 : 0) }
+    if (double_on_bump !== undefined) { fields.push('double_on_bump = ?'); values.push(double_on_bump ? 1 : 0) }
 
     if (fields.length === 0) return err('No settings to update.')
 
@@ -38,10 +42,10 @@ export async function onRequestPatch({ request, env, params }) {
     ).bind(...values).run()
 
     const updated = await env.DB.prepare(
-      'SELECT no_pick_variant, reveal_partner FROM games WHERE id = ?'
+      'SELECT no_pick_variant, reveal_partner, double_on_bump FROM games WHERE id = ?'
     ).bind(gameId).first()
 
-    return json({ ok: true, ...updated, reveal_partner: updated.reveal_partner === 1 })
+    return json({ ok: true, ...updated, reveal_partner: updated.reveal_partner === 1, double_on_bump: updated.double_on_bump === 1 })
   } catch (e) {
     if (e instanceof AuthError) return err(e.message, 401)
     return err(e.message, 500)
