@@ -513,7 +513,9 @@ export function playCard(state, userId, cardId) {
       newState.calledKing?.kingId
     if (calledCardId && card.id === calledCardId && userId === newState.partner) {
       newState.partnerRevealed = true
-      newState.log.push(`${userId} revealed as partner by playing the ${card.id}.`)
+      if (newState.reveal_partner) {
+        newState.log.push(`${userId} revealed as partner by playing the ${card.id}.`)
+      }
     }
   }
 
