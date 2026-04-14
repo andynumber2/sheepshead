@@ -63,3 +63,35 @@ Direct pushes to `main` are blocked by a pre-push hook (`.githooks/pre-push`). A
 ## General Rules
 
 When implementing any new game feature in `gameEngine.js`, write corresponding tests in `gameEngine.test.js` — unit tests for pure functions, state-construction tests for stateful functions.
+
+## Game Terminology
+
+When reading instructions or discussing this project, check for terminology inconsistencies using the definitions below. If something is referred to imprecisely, ask for clarification before proceeding.
+
+### Users & Players
+- **User** — An account in the system, identified by `user_id` in the database. A User can be human or a bot. When seated in a game, a User becomes a Player.
+- **Player** — A User occupying a seat in a game. Use **Bot Player** or **Human Player** for clarity. 
+  - User and Player are easily confused. If there is any doubt about which is being referred to in a discussion about this project, ask for clarification.
+
+### Table & Seats
+- **Table** — The playing field in which gameplay takes place. A table contains seats.
+- **Seat** — A position at the table that contains a player. Refer to specific seats by their code names. If a seat is referenced imprecisely, ask for clarification.
+  - `seat-bottom` is where the Human Player sits.
+
+### Game Flow
+- **Game** — A construct inside which hands are played by players.
+- **Blind** — The 2 cards set aside from the deal, available for the picker to take into their hand.
+- **Hand** — A single round of play within a game, from deal through scoring. Each hand begins with 6 cards dealt to each player plus a 2-card blind, proceeds through a picking phase, and ends with scores awarded. How a hand resolves depends on the picking phase outcome:
+  - **Normal hand** — a picker is found, calls a partner (or goes alone), and 6 tricks are played
+  - **Leaster** — no one picks; 6 tricks are played, but the player with the fewest card points wins
+  - **Schwanzer** — no one picks (Schwanzer variant active); no tricks are played — scores are based on cards in each player's dealt hand
+- **Trick** — 5 cards played, one by each player.
+
+### Roles
+- **Picker** — The player who picked up the blind.
+- **Partner** — The player who holds the card called by the picker. Depending on the call mode, this may be the Ace, Ten, or King of the called suit.
+
+### Points & Scores
+- **Score** — A signed integer delta awarded to each player at the end of a hand (e.g. +2, -1). Accumulates into game, day, and lifetime totals.
+- **Card Points** — 120 total per hand. Used to determine the hand outcome in all variants except Schwanzer.
+- **Schwanzer Points** — Used in the Schwanzer no-pick variant to determine the loser.
