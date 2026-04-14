@@ -61,11 +61,12 @@ export async function onRequestGet({ request, env, params }) {
 
     return json({
       ...game,
-      is_test_mode:   game.is_test_mode   === 1,
-      reveal_partner: game.reveal_partner === 1,
-      is_admin:       game.created_by     === user.user_id,
-      players:        playersWithScores,
-      state:          stateView,
+      is_test_mode:    game.is_test_mode    === 1,
+      reveal_partner:  game.reveal_partner  === 1,
+      double_on_bump:  game.double_on_bump  === 1,
+      is_admin:        game.created_by      === user.user_id,
+      players:         playersWithScores,
+      state:           stateView,
     })
   } catch (e) {
     if (e instanceof AuthError) return err(e.message, 401)

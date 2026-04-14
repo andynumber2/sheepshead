@@ -774,7 +774,8 @@ export function computeScores(state) {
   if (pickerTeamTricks === 6 || pickerTeamTricks === 0) baseMultiplier = 3  // schwarz
 
   const blitzMultiplier = (state.blitzes?.length ?? 0) > 0 ? 2 : 1
-  const multiplier = baseMultiplier * doublerMultiplier * (state.handCrackMultiplier ?? 1) * blitzMultiplier
+  const dobMultiplier = (!pickerWon && state.double_on_bump) ? 2 : 1
+  const multiplier = baseMultiplier * doublerMultiplier * (state.handCrackMultiplier ?? 1) * blitzMultiplier * dobMultiplier
 
   const scores = {}
   for (const uid of Object.keys(state.hands)) scores[uid] = 0
@@ -805,9 +806,17 @@ export function computeScores(state) {
     }
   }
 
+  const crackMultiplier = state.handCrackMultiplier ?? 1
+  const multiplierParts = [
+    ['Base', baseMultiplier],
+    ['Doubler', doublerMultiplier],
+    ['Crack', crackMultiplier],
+    ['Blitz', blitzMultiplier],
+    ['DOB', dobMultiplier],
+  ].filter(([, v]) => v > 1).map(([k, v]) => `${k}: ${v}`).join(', ')
   state.log.push(
     `Hand over. Picker team (${pickerTeam.join(', ')}) had ${pickerTeamPoints} pts. ` +
-    `${pickerWon ? 'Picker wins' : 'Opponents win'}. Multiplier: ×${multiplier}.`
+    `${pickerWon ? 'Picker wins' : 'Opponents win'}. Multiplier: ×${multiplier}${multiplierParts ? ` (${multiplierParts})` : ''}.`
   )
 
   const fmt = (n) => (n >= 0 ? '+' : '') + n

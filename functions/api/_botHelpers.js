@@ -41,8 +41,9 @@ export async function finishHand(DB, gameId, state) {
   const nextDealer = (state.dealerSeat + 1) % 5
   const nextState = dealHand(playerIds, nextDealer, state.handNumber + 1, 1)
 
-  const gameRow = await DB.prepare('SELECT reveal_partner FROM games WHERE id = ?').bind(gameId).first()
+  const gameRow = await DB.prepare('SELECT reveal_partner, double_on_bump FROM games WHERE id = ?').bind(gameId).first()
   nextState.reveal_partner = gameRow.reveal_partner === 1
+  nextState.double_on_bump = gameRow.double_on_bump === 1
 
   nextState.log = [...state.log, `--- Hand ${state.handNumber} complete ---`]
   nextState.lastTrick = state.lastTrick
@@ -265,8 +266,9 @@ async function resolveNoPick(state, game, DB, gameId) {
   const nextDealer = (state.dealerSeat + 1) % 5
   const newState = dealHand(playerIds, nextDealer, state.handNumber + 1, newMultiplier)
   newState.doublerMultiplier = newMultiplier
-  const gameRow = await DB.prepare('SELECT reveal_partner FROM games WHERE id = ?').bind(gameId).first()
+  const gameRow = await DB.prepare('SELECT reveal_partner, double_on_bump FROM games WHERE id = ?').bind(gameId).first()
   newState.reveal_partner = gameRow.reveal_partner === 1
+  newState.double_on_bump = gameRow.double_on_bump === 1
   newState.log = [...state.log, ...newState.log, `Doubler! Stakes are now ×${newMultiplier}.`]
 
   await DB.prepare(

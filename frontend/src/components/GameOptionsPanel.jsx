@@ -15,6 +15,7 @@ export default function GameOptionsPanel({ mode, gameId, open, values, onChange,
   const dialogRef  = useRef(null)
   const [variant, setVariant] = useState(values?.no_pick_variant ?? 'doublers')
   const [reveal,  setReveal]  = useState(values?.reveal_partner  ?? false)
+  const [dob,     setDob]     = useState(values?.double_on_bump  ?? true)
   const [saving,  setSaving]  = useState(false)
   const [saved,   setSaved]   = useState(false)
 
@@ -23,6 +24,7 @@ export default function GameOptionsPanel({ mode, gameId, open, values, onChange,
     if (open) {
       setVariant(values?.no_pick_variant ?? 'leasters')
       setReveal(values?.reveal_partner  ?? true)
+      setDob(values?.double_on_bump ?? true)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -41,7 +43,7 @@ export default function GameOptionsPanel({ mode, gameId, open, values, onChange,
   async function handleVariantChange(v) {
     setVariant(v)
     if (mode === 'create') {
-      onChange?.({ no_pick_variant: v, reveal_partner: reveal })
+      onChange?.({ no_pick_variant: v, reveal_partner: reveal, double_on_bump: dob })
     } else {
       await save({ no_pick_variant: v })
     }
@@ -50,9 +52,18 @@ export default function GameOptionsPanel({ mode, gameId, open, values, onChange,
   async function handleRevealChange(v) {
     setReveal(v)
     if (mode === 'create') {
-      onChange?.({ no_pick_variant: variant, reveal_partner: v })
+      onChange?.({ no_pick_variant: variant, reveal_partner: v, double_on_bump: dob })
     } else {
       await save({ reveal_partner: v })
+    }
+  }
+
+  async function handleDobChange(v) {
+    setDob(v)
+    if (mode === 'create') {
+      onChange?.({ no_pick_variant: variant, reveal_partner: reveal, double_on_bump: v })
+    } else {
+      await save({ double_on_bump: v })
     }
   }
 
@@ -124,6 +135,19 @@ export default function GameOptionsPanel({ mode, gameId, open, values, onChange,
             </label>
           ))}
         </div>
+      </div>
+
+      {/* Double on the Bump */}
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem' }}>
+          Double on the Bump?
+          <input
+            type="checkbox"
+            checked={dob}
+            onChange={e => handleDobChange(e.target.checked)}
+            disabled={saving}
+          />
+        </label>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

@@ -1233,6 +1233,65 @@ describe('computeScores', () => {
     expect(scores.p4).toBe(-2)
     expect(scores.p5).toBe(-2)
   })
+
+  describe('Double on the Bump (DOB)', () => {
+    // Picker loses with 32 pts (no schneider, no schwarz, no crack, no blitz)
+    // Expected base scores without DOB: p1=-2, p2=-1, p3=+1, p4=+1, p5=+1
+    const losingTricks = [
+      makeTrick('p1', [fk('A'), fk('10'), fk('9'), fk('8'), fk('7')]),  // 21 pts
+      makeTrick('p2', [fk('A'), fk('9'), fk('8'), fk('7'), fk('7')]),   // 11 pts → total = 32
+      makeTrick('p3', [fk('A'), fk('10'), fk('K'), fk('9'), fk('8')]),
+      makeTrick('p3', [fk('A'), fk('10'), fk('K'), fk('9'), fk('8')]),
+      makeTrick('p4', [fk('9'), fk('8'), fk('7'), fk('7'), fk('7')]),
+      makeTrick('p5', [fk('9'), fk('8'), fk('7'), fk('7'), fk('7')]),
+    ]
+
+    it('doubles stakes when picker loses and double_on_bump is true', () => {
+      const scores = computeScores(baseState(losingTricks, { double_on_bump: true }))
+      expect(scores.p1).toBe(-4)   // -2 × 2 (DOB)
+      expect(scores.p2).toBe(-2)   // -1 × 2
+      expect(scores.p3).toBe(2)    // +1 × 2
+      expect(scores.p4).toBe(2)
+      expect(scores.p5).toBe(2)
+    })
+
+    it('does not double when picker loses and double_on_bump is false', () => {
+      const scores = computeScores(baseState(losingTricks, { double_on_bump: false }))
+      expect(scores.p1).toBe(-2)
+      expect(scores.p2).toBe(-1)
+      expect(scores.p3).toBe(1)
+      expect(scores.p4).toBe(1)
+      expect(scores.p5).toBe(1)
+    })
+
+    it('does not double when picker wins even if double_on_bump is true', () => {
+      // Picker team wins with 75 pts (3 tricks of 25 pts each)
+      const winningTricks = [
+        makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),  // 25 pts
+        makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),  // 25 pts
+        makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('7'), fk('7')]),  // 25 pts
+        makeTrick('p3', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
+        makeTrick('p4', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
+        makeTrick('p5', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
+      ]
+      const scores = computeScores(baseState(winningTricks, { double_on_bump: true }))
+      expect(scores.p1).toBe(2)
+      expect(scores.p2).toBe(1)
+      expect(scores.p3).toBe(-1)
+      expect(scores.p4).toBe(-1)
+      expect(scores.p5).toBe(-1)
+    })
+
+    it('DOB stacks with crack multiplier when picker loses', () => {
+      // handCrackMultiplier=2 (cracked), DOB=true → total multiplier = 1×1×2×1×2 = 4
+      const scores = computeScores(baseState(losingTricks, { double_on_bump: true, handCrackMultiplier: 2 }))
+      expect(scores.p1).toBe(-8)   // -2 × (crack×2) × (DOB×2) = -2×4
+      expect(scores.p2).toBe(-4)
+      expect(scores.p3).toBe(4)
+      expect(scores.p4).toBe(4)
+      expect(scores.p5).toBe(4)
+    })
+  })
 })
 
 describe('resolveLeaster', () => {

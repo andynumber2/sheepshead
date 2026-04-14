@@ -10,7 +10,7 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
   const [loading, setLoading]   = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [gameName, setGameName] = useState(`${user.username}'s game`)
-  const [gameOptions, setGameOptions] = useState({ no_pick_variant: 'doublers', reveal_partner: false })
+  const [gameOptions, setGameOptions] = useState({ no_pick_variant: 'doublers', reveal_partner: false, double_on_bump: true })
   const [showOptions, setShowOptions] = useState(false)
   const [testMode, setTestMode] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -45,7 +45,7 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
         gameName.trim() || `${user.username}'s game`,
         gameOptions.no_pick_variant,
         user.is_admin ? testMode : false,
-        { reveal_partner: gameOptions.reveal_partner },
+        { reveal_partner: gameOptions.reveal_partner, double_on_bump: gameOptions.double_on_bump },
       )
       onNavigate(`/game/${game.id}`)
     } catch (e) {
@@ -142,6 +142,7 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
                 <span style={{ fontSize: '0.85rem', color: '#ccc' }}>
                   {gameOptions.no_pick_variant.charAt(0).toUpperCase() + gameOptions.no_pick_variant.slice(1)} ·{' '}
                   Partner: {gameOptions.reveal_partner ? 'shown' : 'hidden'}
+                  {gameOptions.double_on_bump ? ' · DOB' : ''}
                 </span>
                 <button
                   type="button"
