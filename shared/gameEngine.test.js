@@ -2114,8 +2114,8 @@ describe('decidePlay trump counting', () => {
   })
 
   it('opponent leads fail Ace when picker team exhausted', () => {
-    // Own trump: 0. Played trump: 13. Remaining elsewhere = 14 - 0 - 13 = 1 ≤ 2.
-    const playedTrump = ['QC','QS','QH','QD','JC','JS','JH','JD','AD','10D','KD','9D','8D'].map(trump)
+    // Own trump: 0. Played trump: 14 (all). Remaining elsewhere = 14 - 0 - 14 = 0.
+    const playedTrump = ['QC','QS','QH','QD','JC','JS','JH','JD','AD','10D','KD','9D','8D','7D'].map(trump)
     const view = makeTrumpExhaustedView({
       userId: 'p3',
       picker: 'p1',
@@ -2124,6 +2124,33 @@ describe('decidePlay trump counting', () => {
       trumpPlayed: playedTrump,
     })
     expect(decidePlay(view, 'p3')).toBe('AH')
+  })
+
+  it('opponent does NOT lead fail Ace when picker team has 1 trump remaining', () => {
+    // 13 trump played, own trump = 0 → remaining = 14 - 0 - 13 = 1
+    const playedTrump = ['QC','QS','QH','QD','JC','JS','JH','JD','AD','10D','KD','9D','8D'].map(trump)
+    const view = makeTrumpExhaustedView({
+      userId: 'p3',
+      picker: 'p1',
+      partner: 'p2',
+      handCards: [c('A','H'), c('9','S'), c('8','C')],
+      trumpPlayed: playedTrump,
+    })
+    // Must NOT cash the ace — should fall through to lowest non-trump (9S or 8C)
+    expect(decidePlay(view, 'p3')).not.toBe('AH')
+  })
+
+  it('opponent does NOT lead fail Ace when picker team has 2 trump remaining', () => {
+    // 12 trump played, own trump = 0 → remaining = 14 - 0 - 12 = 2
+    const playedTrump = ['QC','QS','QH','QD','JC','JS','JH','JD','AD','10D','KD','9D'].map(trump)
+    const view = makeTrumpExhaustedView({
+      userId: 'p3',
+      picker: 'p1',
+      partner: 'p2',
+      handCards: [c('A','H'), c('9','S'), c('8','C')],
+      trumpPlayed: playedTrump,
+    })
+    expect(decidePlay(view, 'p3')).not.toBe('AH')
   })
 
   it('opponent leads lowest non-trump normally when trump not exhausted', () => {
@@ -2152,6 +2179,58 @@ describe('decidePlay trump counting', () => {
     })
     // Should lead one of the fail Aces (both are 11 pts)
     expect(['AC', 'AH']).toContain(decidePlay(view, 'p1'))
+  })
+})
+
+describe('decidePlay opponent leading called suit', () => {
+  function makeOpponentLeadView({ handCards, partnerRevealed, calledSuit = 'H' }) {
+    return {
+      hands: { p3: handCards },
+      currentTrick: [],
+      tricks: [],          // no trump played → fail-ace branch won't fire
+      picker: 'p1',
+      partner: partnerRevealed ? 'p2' : null,
+      isLeaster: false,
+      phase: 'playing',
+      calledSuit,
+      calledAce: { aceId: `A${calledSuit}` },
+      calledTen: null,
+      calledKing: null,
+      partnerRevealed,
+      pickerForcedPlays: [],
+      underCard: null,
+      discard: [],
+    }
+  }
+
+  it('leads lowest called-suit card when partner is not yet revealed', () => {
+    // Hand: 10H (called suit, 10 pts), 8C (0 pts), 7S (0 pts)
+    // partnerRevealed=false → should lead called suit even though it is the highest-value card
+    const view = makeOpponentLeadView({
+      handCards: [c('10','H'), c('8','C'), c('7','S')],
+      partnerRevealed: false,
+    })
+    expect(decidePlay(view, 'p3')).toBe('10H')
+  })
+
+  it('does not lead called suit when partner is already revealed', () => {
+    // Same hand, partnerRevealed=true → falls through to lowest non-trump
+    const view = makeOpponentLeadView({
+      handCards: [c('10','H'), c('8','C'), c('7','S')],
+      partnerRevealed: true,
+    })
+    // 10H is 10pts; 8C and 7S are 0pts → lowest non-trump is 8C or 7S, not 10H
+    expect(['8C', '7S']).toContain(decidePlay(view, 'p3'))
+  })
+
+  it('falls through to lowest non-trump when bot holds no called-suit cards', () => {
+    // No hearts in hand; calledSuit='H' → no called-suit lead possible
+    const view = makeOpponentLeadView({
+      handCards: [c('9','C'), c('8','C'), c('7','S')],
+      partnerRevealed: false,
+    })
+    // All 0pt non-trump; lowestCard picks 9C (first encountered)
+    expect(decidePlay(view, 'p3')).toBe('9C')
   })
 })
 

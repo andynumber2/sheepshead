@@ -277,14 +277,23 @@ export function decidePlay(view, userId) {
       // No trump; lead highest-value fail card
       return highestValueCard(realCards).id
     } else {
-      // Cash a fail Ace when picker team is likely trump-exhausted
-      if (trumpRemainingElsewhere(view, userId) <= 2) {
-        const failAces = realCards.filter(c => !isTrump(c) && c.rank === 'A')
-                                   .sort((a, b) => cardPoints(b) - cardPoints(a))
+      // Cash a fail Ace only when picker team is completely out of trump
+      if (trumpRemainingElsewhere(view, userId) === 0) {
+        const { calledAce, calledTen, calledKing } = view
+        const calledCardId = calledAce?.aceId ?? calledTen?.tenId ?? calledKing?.kingId
+        const failAces = realCards
+          .filter(c => !isTrump(c) && c.rank === 'A' && c.id !== calledCardId)
+          .sort((a, b) => cardPoints(b) - cardPoints(a))
         if (failAces.length > 0) return failAces[0].id
       }
-      // Opponent: lead a non-trump to avoid burning trump while looking for called suit
+      // Lead called suit to flush out the unrevealed partner
+      const { calledSuit, partnerRevealed } = view
       const nonTrump = realCards.filter(c => !isTrump(c))
+      if (!partnerRevealed && calledSuit) {
+        const calledSuitCards = nonTrump.filter(c => effectiveSuit(c) === calledSuit)
+        if (calledSuitCards.length > 0) return lowestCard(calledSuitCards).id
+      }
+      // Otherwise: lead lowest non-trump to avoid burning trump
       if (nonTrump.length > 0) return lowestCard(nonTrump).id
       return lowestCard(realCards).id
     }
