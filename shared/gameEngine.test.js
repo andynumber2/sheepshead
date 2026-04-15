@@ -1902,4 +1902,15 @@ describe('bestVoidDiscard', () => {
     const hand = [c('A','C'), c('A','H'), c('A','S'), c('Q','C'), c('J','C'), c('K','S'), c('9','D'), c('8','D')]
     expect(bestVoidDiscard(hand)).toBeNull()
   })
+
+  it('excludes both fail aces AND fail tens when holding all 6', () => {
+    // Picker holds all 3 fail aces + all 3 fail tens → mustHold = [AC,AH,AS,10C,10H,10S]
+    // Only remaining non-trump eligible: KS (4 pts). No second eligible card → null
+    const hand = [
+      c('A','C'), c('A','H'), c('A','S'),
+      c('10','C'), c('10','H'), c('10','S'),
+      c('K','S'), c('Q','C'),
+    ]
+    expect(bestVoidDiscard(hand)).toBeNull()
+  })
 })
