@@ -9,6 +9,9 @@ import {
   setupLeaster, awardLeasterBlind, getPlayerView,
   rewindPlay, rewindTrick,
 } from './gameEngine.js'
+import {
+  countTrumpPlayed, trumpRemainingElsewhere,
+} from './botInference.js'
 
 const c = (rank, suit) => ({ id: `${rank}${suit}`, rank, suit })
 
@@ -1594,5 +1597,84 @@ describe('getPlayerView', () => {
     }
     const view = getPlayerView(state, 'p1')
     expect(view.rewindHistory).toEqual([])
+  })
+})
+
+// ─── botInference helpers ─────────────────────────────────────────────────────
+const trick = (plays) => ({ plays: plays.map(([uid, card]) => ({ userId: uid, card })), winner: plays[0][0] })
+
+describe('countTrumpPlayed', () => {
+  it('counts trump in completed tricks', () => {
+    const view = {
+      tricks: [trick([['p1', c('Q','C')], ['p2', c('A','H')], ['p3', c('7','C')], ['p4', c('8','S')], ['p5', c('9','C')]])],
+      currentTrick: [],
+      hands: { p1: [] },
+    }
+    // QC is trump, rest are not
+    expect(countTrumpPlayed(view, 'p1')).toBe(1)
+  })
+
+  it('counts trump in currentTrick', () => {
+    const view = {
+      tricks: [],
+      currentTrick: [{ userId: 'p2', card: c('J','C') }, { userId: 'p3', card: c('K','H') }],
+      hands: { p1: [] },
+    }
+    // JC is trump, KH is not
+    expect(countTrumpPlayed(view, 'p1')).toBe(1)
+  })
+
+  it('skips hidden plays', () => {
+    const view = {
+      tricks: [{ plays: [{ userId: 'p2', card: { id: 'UNDER_CARD', hidden: true } }], winner: 'p2' }],
+      currentTrick: [],
+      hands: { p1: [] },
+    }
+    expect(countTrumpPlayed(view, 'p1')).toBe(0)
+  })
+
+  it('returns 0 when no tricks played', () => {
+    const view = { tricks: [], currentTrick: [], hands: { p1: [] } }
+    expect(countTrumpPlayed(view, 'p1')).toBe(0)
+  })
+})
+
+describe('trumpRemainingElsewhere', () => {
+  it('subtracts own trump and played trump from 14', () => {
+    // Own hand: QC, JC = 2 trump. Played: AD = 1 trump. Remaining = 14 - 2 - 1 = 11
+    const view = {
+      tricks: [trick([['p2', c('A','D')], ['p1', c('7','C')]])],
+      currentTrick: [],
+      hands: { p1: [c('Q','C'), c('J','C'), c('A','H'), c('K','S'), c('9','C'), c('8','S')] },
+    }
+    expect(trumpRemainingElsewhere(view, 'p1')).toBe(11)
+  })
+
+  it('returns 0 when all trump accounted for', () => {
+    // Own hand has 7 trump. Played tricks show 7 trump. 14 - 7 - 7 = 0.
+    const myTrump = [
+      { id: 'QC', rank: 'Q', suit: 'C' },
+      { id: 'QS', rank: 'Q', suit: 'S' },
+      { id: 'QH', rank: 'Q', suit: 'H' },
+      { id: 'QD', rank: 'Q', suit: 'D' },
+      { id: 'JC', rank: 'J', suit: 'C' },
+      { id: 'JS', rank: 'J', suit: 'S' },
+      { id: 'JH', rank: 'J', suit: 'H' },
+    ]
+    const playedTrump = [
+      { id: 'JD', rank: 'J', suit: 'D' },
+      { id: 'AD', rank: 'A', suit: 'D' },
+      { id: '10D', rank: '10', suit: 'D' },
+      { id: 'KD', rank: 'K', suit: 'D' },
+      { id: '9D', rank: '9', suit: 'D' },
+      { id: '8D', rank: '8', suit: 'D' },
+      { id: '7D', rank: '7', suit: 'D' },
+    ]
+    const view = {
+      tricks: [{ plays: playedTrump.map(card => ({ userId: 'p2', card })), winner: 'p2' }],
+      currentTrick: [],
+      hands: { p1: myTrump },
+    }
+    expect(trumpRemainingElsewhere(view, 'p1')).toBe(0)
   })
 })
