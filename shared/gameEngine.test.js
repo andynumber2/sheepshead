@@ -1677,4 +1677,16 @@ describe('trumpRemainingElsewhere', () => {
     }
     expect(trumpRemainingElsewhere(view, 'p1')).toBe(0)
   })
+
+  it('subtracts trump visible in picker discard', () => {
+    // Picker (p1) buried QS (trump) in discard. Own hand: QC. No tricks played.
+    // Remaining = 14 - 1 (QC in hand) - 0 (played) - 1 (QS in discard) = 12
+    const view = {
+      tricks: [],
+      currentTrick: [],
+      hands: { p1: [c('Q','C'), c('A','H'), c('K','S'), c('9','C'), c('8','S'), c('7','H')] },
+      discard: [c('Q','S'), c('K','H')],  // picker sees their own real discard
+    }
+    expect(trumpRemainingElsewhere(view, 'p1')).toBe(12)
+  })
 })

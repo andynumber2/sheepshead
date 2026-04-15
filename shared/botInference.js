@@ -2,13 +2,14 @@
 // Pure functions that derive facts from a player's view (own hand + played cards).
 // No decisions, no side effects. All functions receive a getPlayerView-redacted view.
 
-import { isTrump, cardPoints, schwanzerCardPoints, effectiveSuit, trumpRank, suitRank } from './gameEngine.js'
+import { isTrump } from './gameEngine.js'
 
 // ─── Trump tracking ───────────────────────────────────────────────────────────
 
 // Count trump cards visible in completed tricks and the current trick.
 // Skips hidden/face-down plays the bot cannot see.
-export function countTrumpPlayed(view, userId) {
+// userId is unused here but kept for API symmetry with trumpRemainingElsewhere
+export function countTrumpPlayed(view, _userId) {
   let count = 0
   for (const trick of (view.tricks ?? [])) {
     for (const play of trick.plays) {
@@ -26,5 +27,6 @@ export function countTrumpPlayed(view, userId) {
 // A result ≤ 2 means opponents are likely trump-exhausted.
 export function trumpRemainingElsewhere(view, userId) {
   const myTrump = (view.hands[userId] ?? []).filter(c => !c.hidden && isTrump(c)).length
-  return 14 - myTrump - countTrumpPlayed(view, userId)
+  const discardTrump = (view.discard ?? []).filter(c => !c.hidden && isTrump(c)).length
+  return 14 - myTrump - countTrumpPlayed(view, userId) - discardTrump
 }
