@@ -76,9 +76,10 @@ Play the **lowest-value card** always, to avoid winning tricks.
 4. If no trump and not the partner: lead the **highest-value fail card**.
 
 #### Opponent bot leading
-1. **Cash a fail ace** if the picker team is likely trump-exhausted (≤2 trump estimated remaining elsewhere).
-2. Otherwise, lead the **lowest non-trump card** to avoid burning trump.
-3. If no non-trump cards remain, lead the lowest card overall.
+1. **Cash a fail ace** if the picker team has **zero** trump remaining (all 14 trump accounted for in own hand, discard, and played tricks). The fail ace must not be the called card (in practice an opponent never holds the called card, but the code is explicit).
+2. **Lead called suit** (lowest card of that suit) if the partner has not yet been revealed and the bot holds at least one fail card of the called suit. This forces the partner to play their called card, revealing their identity.
+3. Otherwise, lead the **lowest non-trump card** to avoid burning trump.
+4. If no non-trump cards remain, lead the lowest card overall.
 
 ### Following a Trick
 
