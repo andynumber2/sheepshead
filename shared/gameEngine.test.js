@@ -1718,21 +1718,22 @@ describe('buriablePoints', () => {
 })
 
 describe('handScore', () => {
-  it('scores at >= 24 for 6 schwanzer pts, 0 burial (6*4+0=24)', () => {
-    // QC=3, QS=3 = 6 schwanzer pts; all trump, no burial → score = 24
-    const hand = [c('Q','C'), c('Q','S'), c('A','D'), c('10','D'), c('9','D'), c('8','D')]
-    expect(handScore(hand)).toBeGreaterThanOrEqual(24)
+  it('returns schwanzerPts * 4 + buriablePoints (exact formula check)', () => {
+    // QC=3, QS=3 = 6 schwanzer pts; 7C=0, 8C=0 non-trump → buriable=0; score = 6*4+0 = 24
+    const hand = [c('Q','C'), c('Q','S'), c('7','C'), c('8','C'), c('9','H'), c('8','H')]
+    expect(handScore(hand)).toBe(24)
   })
 
-  it('scores < 24 for 5 schwanzer pts, 0 burial (5*4+0=20)', () => {
-    // QC=3, JC=2 = 5 schwanzer pts; zero-point non-trump cards → buriable=0; score = 20
-    const hand = [c('Q','C'), c('J','C'), c('7','C'), c('8','C'), c('9','H'), c('8','H')]
+  it('scores < 24 for 5 schwanzer pts, 0 burial', () => {
+    // QC=3, JC=2 = 5 schwanzer pts; 7C=0, 8C=0 non-trump → buriable=0; score = 5*4+0 = 20
+    const hand = [c('Q','C'), c('J','C'), c('7','C'), c('8','C'), c('9','C'), c('9','H')]
     expect(handScore(hand)).toBeLessThan(24)
+    expect(handScore(hand)).toBe(20)
   })
 
-  it('scores at >= 24 for 5 schwanzer pts + two aces buried (5*4+22=42)', () => {
-    // QC=3, JC=2 = 5 schwanzer pts; AC=11, AH=11 → buriable=22; score = 42
-    const hand = [c('Q','C'), c('J','C'), c('A','D'), c('A','C'), c('A','H'), c('8','S')]
-    expect(handScore(hand)).toBeGreaterThanOrEqual(24)
+  it('scores >= 24 for 5 schwanzer pts + two aces to bury', () => {
+    // QC=3, JC=2 = 5 schwanzer pts; AC=11, AH=11 → buriable=22; score = 5*4+22 = 42
+    const hand = [c('Q','C'), c('J','C'), c('7','C'), c('A','C'), c('A','H'), c('8','S')]
+    expect(handScore(hand)).toBe(42)
   })
 })

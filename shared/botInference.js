@@ -45,6 +45,6 @@ export function buriablePoints(hand) {
 // Combined hand quality score for the pick decision.
 // schwanzerPts * 4 + buriablePoints. Threshold: >= 24 → pick.
 export function handScore(hand) {
-  const schwanzerPts = hand.reduce((sum, c) => sum + schwanzerCardPoints(c), 0)
+  const schwanzerPts = hand.filter(c => !c.hidden).reduce((sum, c) => sum + schwanzerCardPoints(c), 0)
   return schwanzerPts * 4 + buriablePoints(hand)
 }
