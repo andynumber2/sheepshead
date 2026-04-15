@@ -2,21 +2,24 @@ import { useState, useEffect } from 'react'
 import { api } from '../lib/api.js'
 
 function UserRow({ user, currentUserId, onSaved, onDeleted }) {
-  const [editing, setEditing]     = useState(false)
-  const [username, setUsername]   = useState(user.username)
-  const [isAdmin, setIsAdmin]     = useState(!!user.is_admin)
-  const [isBot, setIsBot]         = useState(!!user.is_bot)
-  const [password, setPassword]   = useState('')
-  const [saving, setSaving]       = useState(false)
-  const [deleting, setDeleting]   = useState(false)
-  const [error, setError]         = useState(null)
+  const [editing, setEditing]         = useState(false)
+  const [username, setUsername]       = useState(user.username)
+  const [isAdmin, setIsAdmin]         = useState(!!user.is_admin)
+  const [isBot, setIsBot]             = useState(!!user.is_bot)
+  const [password, setPassword]       = useState('')
+  const [draftDay, setDraftDay]       = useState(String(user.day_score ?? 0))
+  const [draftLifetime, setDraftLifetime] = useState(String(user.lifetime_score ?? 0))
+  const [saving, setSaving]           = useState(false)
+  const [deleting, setDeleting]       = useState(false)
+  const [error, setError]             = useState(null)
 
-  // Keep local state in sync when parent data refreshes
   useEffect(() => {
     if (!editing) {
       setUsername(user.username)
       setIsAdmin(!!user.is_admin)
       setIsBot(!!user.is_bot)
+      setDraftDay(String(user.day_score ?? 0))
+      setDraftLifetime(String(user.lifetime_score ?? 0))
     }
   }, [user, editing])
 
@@ -29,12 +32,30 @@ function UserRow({ user, currentUserId, onSaved, onDeleted }) {
         'You are about to remove your own admin access.\nYou will be locked out of admin features immediately.\nAre you sure?'
       )) return
     }
+
+    const newDay = parseInt(draftDay, 10)
+    const newLifetime = parseInt(draftLifetime, 10)
+    if (!Number.isInteger(newDay))      return setError('Day score must be an integer.')
+    if (!Number.isInteger(newLifetime)) return setError('Lifetime score must be an integer.')
+
     setSaving(true)
     setError(null)
     try {
+      let updated = { ...user }
+
+      // Account fields update
       const patch = { username, is_admin: isAdmin, is_bot: isBot }
       if (password) patch.password = password
-      const updated = await api.admin.updateUser(user.id, patch)
+      const accountResult = await api.admin.updateUser(user.id, patch)
+      updated = { ...updated, ...accountResult }
+
+      // Score adjustment (only if values changed)
+      const scoreChanged = newDay !== (user.day_score ?? 0) || newLifetime !== (user.lifetime_score ?? 0)
+      if (scoreChanged) {
+        const scoreResult = await api.admin.adjustScore(user.id, newDay, newLifetime)
+        updated = { ...updated, day_score: scoreResult.day_score, lifetime_score: scoreResult.lifetime_score }
+      }
+
       setPassword('')
       setEditing(false)
       onSaved(updated)
@@ -50,6 +71,8 @@ function UserRow({ user, currentUserId, onSaved, onDeleted }) {
     setIsAdmin(!!user.is_admin)
     setIsBot(!!user.is_bot)
     setPassword('')
+    setDraftDay(String(user.day_score ?? 0))
+    setDraftLifetime(String(user.lifetime_score ?? 0))
     setError(null)
     setEditing(false)
   }
@@ -82,6 +105,8 @@ function UserRow({ user, currentUserId, onSaved, onDeleted }) {
         <td style={{ color: '#888' }}>
           {new Date(user.created_at).toLocaleDateString()}
         </td>
+        <td style={{ textAlign: 'right' }}>{user.day_score ?? 0}</td>
+        <td style={{ textAlign: 'right' }}>{user.lifetime_score ?? 0}</td>
         <td>
           <div style={{ display: 'flex', gap: 4 }}>
             <button className="outline" style={{ padding: '2px 8px' }} onClick={() => setEditing(true)}>
@@ -144,6 +169,22 @@ function UserRow({ user, currentUserId, onSaved, onDeleted }) {
         />
       </td>
       <td>
+        <input
+          type="number"
+          value={draftDay}
+          onChange={e => setDraftDay(e.target.value)}
+          style={{ margin: 0, padding: '2px 6px', width: '100%', boxSizing: 'border-box', textAlign: 'right' }}
+        />
+      </td>
+      <td>
+        <input
+          type="number"
+          value={draftLifetime}
+          onChange={e => setDraftLifetime(e.target.value)}
+          style={{ margin: 0, padding: '2px 6px', width: '100%', boxSizing: 'border-box', textAlign: 'right' }}
+        />
+      </td>
+      <td>
         <div style={{ display: 'flex', gap: 4 }}>
           <button
             style={{ padding: '2px 8px' }}
@@ -203,7 +244,6 @@ export default function AccountManagementPage({ currentUser, onNavigate }) {
 
   function handleSaved(updated) {
     setUsers(prev => prev.map(u => u.id === updated.id ? { ...u, ...updated } : u))
-    // If admin removed their own access, boot them back to lobby
     if (updated.removedOwnAdmin) {
       alert('Your admin access has been removed. Returning to lobby.')
       onNavigate('/lobby')
@@ -241,7 +281,7 @@ export default function AccountManagementPage({ currentUser, onNavigate }) {
   }
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: 24 }}>
+    <div style={{ maxWidth: 1000, margin: '0 auto', padding: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <h2 style={{ margin: 0 }}>Account Management</h2>
         <button className="outline" onClick={() => onNavigate('/admin')}>← Back to admin panel</button>
@@ -256,12 +296,14 @@ export default function AccountManagementPage({ currentUser, onNavigate }) {
           <style>{`.acct-mgmt td, .acct-mgmt th { padding: 4px 6px; }`}</style>
           <table className="acct-mgmt" style={{ width: '100%', tableLayout: 'fixed', fontSize: '0.74rem' }}>
               <colgroup>
+                <col style={{ width: '4%' }} />
+                <col style={{ width: '20%' }} />
                 <col style={{ width: '5%' }} />
-                <col style={{ width: '27%' }} />
                 <col style={{ width: '6%' }} />
-                <col style={{ width: '7%' }} />
-                <col style={{ width: '25%' }} />
-                <col style={{ width: '30%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '9%' }} />
+                <col style={{ width: '34%' }} />
               </colgroup>
               <thead>
                 <tr>
@@ -270,6 +312,8 @@ export default function AccountManagementPage({ currentUser, onNavigate }) {
                   <SortTh col="is_admin">Admin</SortTh>
                   <SortTh col="is_bot">Test Bot</SortTh>
                   <SortTh col="created_at">Created / New password</SortTh>
+                  <SortTh col="day_score">Day</SortTh>
+                  <SortTh col="lifetime_score">Lifetime</SortTh>
                   <th>Actions</th>
                 </tr>
               </thead>
