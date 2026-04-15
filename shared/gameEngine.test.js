@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { decidePick, decideDiscard, decideCall } from './botStrategy.js'
+import { decidePick, decideDiscard, decideCall, decidePlay } from './botStrategy.js'
 import {
   isTrump, trumpRank, suitRank, effectiveSuit, cardPoints,
   schwanzerCardPoints, resolveSchwanzer,
@@ -1976,5 +1976,83 @@ describe('decideCall go-alone', () => {
     const hand = [c('Q','C'), c('Q','S'), c('J','C'), c('A','D'), c('10','D'), c('A','H')]
     const view = { callMode: 'ace', hands: { p1: hand }, discard: [] }
     expect(decideCall(view, 'p1').type).not.toBe('alone')
+  })
+})
+
+describe('decidePlay schmearing', () => {
+  function makeFollowView({ userId, picker, partner, trickWinner, trickCard, handCards }) {
+    return {
+      hands: { [userId]: handCards },
+      currentTrick: [{ userId: trickWinner, card: trickCard }],
+      tricks: [],
+      picker,
+      partner,
+      isLeaster: false,
+      phase: 'playing',
+      calledSuit: null,
+      calledAce: null,
+      calledTen: null,
+      calledKing: null,
+      partnerRevealed: false,
+      pickerForcedPlays: [],
+      underCard: null,
+    }
+  }
+
+  it('picker-team bot schmears highest non-trump when partner is winning', () => {
+    // Bot is picker (p1). Partner (p2) leads QC (trump). Bot has AC(11), KH(4), 9S(0) — all off-suit.
+    // QC leads trump; bot has no trump. All cards legal (off-suit). Schmear: AC (11 pts).
+    const view = makeFollowView({
+      userId: 'p1',
+      picker: 'p1',
+      partner: 'p2',
+      trickWinner: 'p2',
+      trickCard: c('Q','C'),
+      handCards: [c('A','C'), c('K','H'), c('9','S')],
+    })
+    expect(decidePlay(view, 'p1')).toBe('AC')
+  })
+
+  it('opponent bot schmears highest non-trump when fellow opponent is winning (partner known)', () => {
+    // Bot is p3. Partner is p2 (revealed). p4 (fellow opponent) leads QC.
+    // Bot has AH(11), 9S(0), 8C(0) — all off-suit legal.
+    const view = makeFollowView({
+      userId: 'p3',
+      picker: 'p1',
+      partner: 'p2',
+      trickWinner: 'p4',
+      trickCard: c('Q','C'),
+      handCards: [c('A','H'), c('9','S'), c('8','C')],
+    })
+    expect(decidePlay(view, 'p3')).toBe('AH')
+  })
+
+  it('does not burn trump to schmear — plays lowest when only trump is legal', () => {
+    // Bot is picker (p1), partner (p2) winning with QC. Bot has only trump.
+    // Must follow trump. Should play lowest (7D), not burn JD.
+    const view = makeFollowView({
+      userId: 'p1',
+      picker: 'p1',
+      partner: 'p2',
+      trickWinner: 'p2',
+      trickCard: c('Q','C'),
+      handCards: [c('J','D'), c('7','D')],
+    })
+    expect(decidePlay(view, 'p1')).toBe('7D')
+  })
+
+  it('opponent does not schmear when partner is unknown (null)', () => {
+    // Bot is p3. Partner is null (unrevealed). p4 leading QC.
+    // teammateWinning returns false when partner is null → play low (9S)
+    const view = makeFollowView({
+      userId: 'p3',
+      picker: 'p1',
+      partner: null,
+      trickWinner: 'p4',
+      trickCard: c('Q','C'),
+      handCards: [c('A','H'), c('9','S'), c('8','C')],
+    })
+    // Should NOT schmear — play lowest
+    expect(decidePlay(view, 'p3')).not.toBe('AH')
   })
 })

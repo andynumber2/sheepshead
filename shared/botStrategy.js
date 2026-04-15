@@ -6,7 +6,7 @@
 import {
   isTrump, cardPoints, effectiveSuit, trumpRank, suitRank, schwanzerCardPoints,
 } from './gameEngine.js'
-import { currentWinner, beats, handScore, bestVoidDiscard } from './botInference.js'
+import { currentWinner, beats, handScore, bestVoidDiscard, teammateWinning } from './botInference.js'
 
 // ─── Legal card helper ────────────────────────────────────────────────────────
 // Mirrors getLegalCardIds from the frontend; computes which cards can be played.
@@ -257,12 +257,14 @@ export function decidePlay(view, userId) {
   // Following a trick
   const first = currentTrick[0]
   const ledSuit = first.declaredSuit ?? effectiveSuit(first.card)
-  const winner = currentWinner(currentTrick)
 
   if (isPickerTeam) {
-    // If a teammate is already winning, dump the lowest card (save resources)
-    const teammateWinning = winner && (winner.userId === picker || winner.userId === partner)
-    if (teammateWinning) return lowestCard(realCards).id
+    // Schmear: dump highest-point non-trump on teammate's winning trick
+    if (teammateWinning(view, userId)) {
+      const nonTrump = realCards.filter(c => !isTrump(c))
+      if (nonTrump.length > 0) return highestValueCard(nonTrump).id
+      return lowestCard(realCards).id  // only trump available — don't burn trump to schmear
+    }
 
     // Try to win with the lowest winning card
     const winning = realCards.filter(c => {
@@ -276,7 +278,12 @@ export function decidePlay(view, userId) {
     // Can't win; play lowest
     return lowestCard(realCards).id
   } else {
-    // Opponent: play low by default
+    // Opponent: schmear on confirmed teammate wins; otherwise play low
+    if (teammateWinning(view, userId)) {
+      const nonTrump = realCards.filter(c => !isTrump(c))
+      if (nonTrump.length > 0) return highestValueCard(nonTrump).id
+      return lowestCard(realCards).id
+    }
     return lowestCard(realCards).id
   }
 }
