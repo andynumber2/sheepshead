@@ -98,6 +98,16 @@ function highestValueCard(cards) {
   return cards.reduce((best, c) => cardPoints(c) > cardPoints(best) ? c : best)
 }
 
+function cheapestWinningTrump(cards) {
+  const POINT_DIAMONDS = new Set(['AD', '10D', 'KD'])
+  const PIP_DIAMONDS = new Set(['9D', '8D', '7D'])
+  const pointD = cards.filter(c => POINT_DIAMONDS.has(c.id))
+  const pipD = cards.filter(c => PIP_DIAMONDS.has(c.id))
+  const highTrump = cards.filter(c => c.rank === 'Q' || c.rank === 'J')
+  const group = pointD.length > 0 ? pointD : pipD.length > 0 ? pipD : highTrump
+  return group.reduce((best, c) => trumpRank(c) > trumpRank(best) ? c : best)
+}
+
 // ─── decidePick ───────────────────────────────────────────────────────────────
 export function decidePick(view, userId) {
   const hand = view.hands[userId]
@@ -292,14 +302,33 @@ export function decidePlay(view, userId) {
       return lowestCard(realCards).id  // only trump available — don't burn trump to schmear
     }
 
-    // Try to win with the lowest winning card
+    // Try to win with the most efficient card
     const winning = realCards.filter(c => {
       for (const play of currentTrick) {
         if (!beats(c, play.card, ledSuit)) return false
       }
       return true
     })
-    if (winning.length > 0) return lowestCard(winning).id
+    if (winning.length > 0) {
+      const nonTrumpWins = winning.filter(c => !isTrump(c))
+      if (nonTrumpWins.length > 0) return lowestCard(nonTrumpWins).id
+
+      // Trump wins only — compute how many opposing players have yet to play
+      const playedIds = new Set(currentTrick.map(p => p.userId))
+      const allPlayerIds = Object.keys(view.hands)
+      const opponentsRemaining = allPlayerIds.filter(id =>
+        !playedIds.has(id) && id !== userId && id !== picker && id !== partner
+      ).length
+
+      if (ledSuit === 'T') {
+        // Scenario 1: Trump trick
+        if (opponentsRemaining === 0) return cheapestWinningTrump(winning).id
+        return highestTrump(winning).id
+      }
+
+      // Scenario 2: Fail trick, bot is void — implemented in Task 2
+      return lowestCard(winning).id
+    }
 
     // Can't win; play lowest
     return lowestCard(realCards).id
