@@ -12,7 +12,7 @@ import {
 import {
   countTrumpPlayed, trumpRemainingElsewhere,
   buriablePoints, handScore,
-  currentWinner, teammateWinning,
+  beats, currentWinner, teammateWinning,
 } from './botInference.js'
 
 const c = (rank, suit) => ({ id: `${rank}${suit}`, rank, suit })
@@ -1736,6 +1736,43 @@ describe('handScore', () => {
     // QC=3, JC=2 = 5 schwanzer pts; AC=11, AH=11 → buriable=22; score = 5*4+22 = 42
     const hand = [c('Q','C'), c('J','C'), c('7','C'), c('A','C'), c('A','H'), c('8','S')]
     expect(handScore(hand)).toBe(42)
+  })
+})
+
+describe('beats', () => {
+  it('trump beats non-trump', () => {
+    expect(beats(c('7','D'), c('A','H'), 'H')).toBe(true)   // 7D is trump, AH is not
+    expect(beats(c('A','H'), c('7','D'), 'H')).toBe(false)  // AH is not trump, 7D is
+  })
+
+  it('higher trump rank beats lower trump rank', () => {
+    expect(beats(c('Q','C'), c('Q','S'), 'T')).toBe(true)   // QC rank 0 beats QS rank 1
+    expect(beats(c('Q','S'), c('Q','C'), 'T')).toBe(false)  // QS rank 1 loses to QC rank 0
+    expect(beats(c('J','C'), c('7','D'), 'T')).toBe(true)   // JC rank 4 beats 7D rank 13
+  })
+
+  it('led-suit beats off-suit fail', () => {
+    expect(beats(c('7','H'), c('A','S'), 'H')).toBe(true)   // 7H is led suit, AS is off-suit
+    expect(beats(c('A','S'), c('7','H'), 'H')).toBe(false)  // AS is off-suit, 7H is led suit
+  })
+
+  it('higher card wins same suit', () => {
+    expect(beats(c('A','H'), c('K','H'), 'H')).toBe(true)   // A ranks higher than K
+    expect(beats(c('K','H'), c('A','H'), 'H')).toBe(false)
+  })
+
+  it('off-suit vs off-suit different suits — neither wins', () => {
+    // Challenger is off-suit (S), current is off-suit (C) — neither matches led (H)
+    expect(beats(c('A','S'), c('A','C'), 'H')).toBe(false)
+    expect(beats(c('A','C'), c('A','S'), 'H')).toBe(false)
+  })
+
+  it('returns true when current is hidden (challenger wins by default)', () => {
+    expect(beats(c('7','C'), { id: 'UNDER_CARD', hidden: true }, 'H')).toBe(true)
+  })
+
+  it('returns true when current is faceDown', () => {
+    expect(beats(c('7','C'), { id: 'UNDER_CARD', faceDown: true }, 'H')).toBe(true)
   })
 })
 
