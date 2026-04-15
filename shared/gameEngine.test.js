@@ -2154,3 +2154,99 @@ describe('decidePlay trump counting', () => {
     expect(['AC', 'AH']).toContain(decidePlay(view, 'p1'))
   })
 })
+
+describe('decidePlay (botStrategy)', () => {
+  function makeView({ userId, hand, trick = [], picker, partner, calledSuit, lastTrick = [] }) {
+    return {
+      hands: { [userId]: hand },
+      currentTrick: trick,
+      picker,
+      partner,
+      isLeaster: false,
+      calledSuit,
+      calledAce: calledSuit ? { aceId: `A${calledSuit}` } : null,
+      calledTen: null,
+      calledKing: null,
+      partnerRevealed: true,
+      underCard: null,
+      pickerForcedPlays: [],
+      lastTrick,
+    }
+  }
+
+  it('opponent plays trump when called suit is led and picker team is winning', () => {
+    // p1 (picker) leads 9♥ (called suit), p2 (partner) plays K♥ and is winning
+    // p3 has trump (J♦) and two fails — should trump in
+    const view = makeView({
+      userId: 'p3',
+      hand: [c('J','D'), c('8','S'), c('7','C')],
+      trick: [
+        { userId: 'p1', card: c('9','H') },
+        { userId: 'p2', card: c('K','H') },
+      ],
+      picker: 'p1',
+      partner: 'p2',
+      calledSuit: 'H',
+    })
+    expect(decidePlay(view, 'p3')).toBe('JD')
+  })
+
+  it('opponent does not trump in when another opponent is already winning the called suit trick', () => {
+    // p1 (picker) leads 9♥, p4 (opponent) trumps in with Q♥ and is winning
+    // p3 should play low rather than wasting trump
+    // lowestCard([J♦, 8♠, 7♣]) = 8♠ (first 0-pt non-trump in reduce order)
+    const view = makeView({
+      userId: 'p3',
+      hand: [c('J','D'), c('8','S'), c('7','C')],
+      trick: [
+        { userId: 'p1', card: c('9','H') },
+        { userId: 'p4', card: c('Q','H') },
+      ],
+      picker: 'p1',
+      partner: 'p2',
+      calledSuit: 'H',
+    })
+    expect(decidePlay(view, 'p3')).toBe('8S')
+  })
+
+  it('partner with no trump leads called suit when previous trick had few trump', () => {
+    // p2 (partner, revealed) leads with no trump; last trick had 1 trump (≤3)
+    // hand: 9♥ (called suit, 0pts), 10♣ (10pts), 7♠ (0pts)
+    // current code would lead 10♣ (highestValueCard); fix should lead 9♥ (called suit)
+    const view = makeView({
+      userId: 'p2',
+      hand: [c('9','H'), c('10','C'), c('7','S')],
+      picker: 'p1',
+      partner: 'p2',
+      calledSuit: 'H',
+      lastTrick: [
+        { userId: 'p1', card: c('Q','D') },   // 1 trump
+        { userId: 'p3', card: c('A','C') },
+        { userId: 'p4', card: c('K','C') },
+        { userId: 'p5', card: c('9','C') },
+      ],
+    })
+    expect(decidePlay(view, 'p2')).toBe('9H')
+  })
+
+  it('partner with no trump leads lowest fail when previous trick had many trump', () => {
+    // p2 (partner, revealed) leads with no trump; last trick had 4 trump (>3)
+    // hand: 10♥ (called suit, 10pts), 10♣ (10pts), 7♠ (0pts)
+    // fix should lead 7♠ (lowest fail), not 10♥ or 10♣
+    const view = makeView({
+      userId: 'p2',
+      hand: [c('10','H'), c('10','C'), c('7','S')],
+      picker: 'p1',
+      partner: 'p2',
+      calledSuit: 'H',
+      lastTrick: [
+        { userId: 'p1', card: c('Q','D') },   // trump
+        { userId: 'p3', card: c('J','D') },   // trump
+        { userId: 'p4', card: c('Q','H') },   // trump
+        { userId: 'p5', card: c('Q','S') },   // trump (4 total)
+        { userId: 'p2', card: c('A','C') },   // fail
+      ],
+    })
+    expect(decidePlay(view, 'p2')).toBe('7S')
+  })
+})
