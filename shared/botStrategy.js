@@ -244,6 +244,7 @@ export function decidePlay(view, userId) {
       // Cash a fail Ace when opponents are likely trump-exhausted
       if (trumpRemainingElsewhere(view, userId) <= 2) {
         const failAces = realCards.filter(c => !isTrump(c) && c.rank === 'A')
+                                   .sort((a, b) => cardPoints(b) - cardPoints(a))
         if (failAces.length > 0) return failAces[0].id
       }
       // Lead strongest trump to win tricks and accumulate points
@@ -255,6 +256,7 @@ export function decidePlay(view, userId) {
       // Cash a fail Ace when picker team is likely trump-exhausted
       if (trumpRemainingElsewhere(view, userId) <= 2) {
         const failAces = realCards.filter(c => !isTrump(c) && c.rank === 'A')
+                                   .sort((a, b) => cardPoints(b) - cardPoints(a))
         if (failAces.length > 0) return failAces[0].id
       }
       // Opponent: lead a non-trump to avoid burning trump while looking for called suit

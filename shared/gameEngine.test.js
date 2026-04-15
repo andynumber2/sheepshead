@@ -2139,4 +2139,18 @@ describe('decidePlay trump counting', () => {
     const result = decidePlay(view, 'p3')
     expect(['8C', '9S']).toContain(result)
   })
+
+  it('picks one of the fail Aces when multiple are held', () => {
+    // Own hand: QC (trump), AC, AH (two fail aces). 13 trump played. Remaining = 14 - 1 - 13 = 0.
+    const playedTrump = ['QS','QH','QD','JC','JS','JH','JD','AD','10D','KD','9D','8D','7D'].map(trump)
+    const view = makeTrumpExhaustedView({
+      userId: 'p1',
+      picker: 'p1',
+      partner: 'p2',
+      handCards: [c('Q','C'), c('A','C'), c('A','H')],
+      trumpPlayed: playedTrump,
+    })
+    // Should lead one of the fail Aces (both are 11 pts)
+    expect(['AC', 'AH']).toContain(decidePlay(view, 'p1'))
+  })
 })
