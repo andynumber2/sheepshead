@@ -250,6 +250,20 @@ export function decidePlay(view, userId) {
       // Lead strongest trump to win tricks and accumulate points
       const best = highestTrump(realCards)
       if (best) return best.id
+
+      // Partner with no trump: lead called suit if previous trick was low on trump,
+      // otherwise lead the lowest-point fail card
+      if (userId === partner) {
+        const { calledSuit, lastTrick = [] } = view
+        const lastTrumpCount = lastTrick.filter(p => !p.card?.hidden && isTrump(p.card)).length
+        if (lastTrumpCount <= 3) {
+          const calledSuitCards = realCards.filter(c => effectiveSuit(c) === calledSuit)
+          if (calledSuitCards.length > 0) return lowestCard(calledSuitCards).id
+        }
+        const fails = realCards.filter(c => !isTrump(c))
+        return fails.length > 0 ? lowestCard(fails).id : lowestCard(realCards).id
+      }
+
       // No trump; lead highest-value fail card
       return highestValueCard(realCards).id
     } else {
@@ -296,8 +310,16 @@ export function decidePlay(view, userId) {
       if (nonTrump.length > 0) return highestValueCard(nonTrump).id
       return lowestCard(realCards).id
     }
-    // Opponents play low when not schmearing — proactive trick-winning for opponents
-    // is out of scope for this iteration (see issue #82 for future improvements).
+    // Trump in on called suit if picker team is currently winning the trick
+    const { calledSuit } = view
+    if (ledSuit === calledSuit) {
+      const winner = currentWinner(currentTrick)
+      const opponentWinning = winner && winner.userId !== picker && winner.userId !== partner
+      if (!opponentWinning) {
+        const trumpCards = realCards.filter(c => isTrump(c))
+        if (trumpCards.length > 0) return lowestCard(trumpCards).id
+      }
+    }
     return lowestCard(realCards).id
   }
 }
