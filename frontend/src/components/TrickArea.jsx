@@ -68,9 +68,9 @@ export default function TrickArea({ trick = [], seats = {}, blind = [] }) {
 export function LastTrickArea({ lastTrick = [], seats = {} }) {
   if (!lastTrick || lastTrick.length === 0) return null
   return (
-    <div className="last-trick-area">
+    <>
       <div className="last-trick-label">Last trick</div>
       <TrickGrid entries={lastTrick} seats={seats} mini />
-    </div>
+    </>
   )
 }
