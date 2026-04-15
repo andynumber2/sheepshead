@@ -2056,3 +2056,87 @@ describe('decidePlay schmearing', () => {
     expect(decidePlay(view, 'p3')).toBe('9S')
   })
 })
+
+describe('decidePlay trump counting', () => {
+  function makeTrumpExhaustedView({ userId, picker, partner, handCards, trumpPlayed }) {
+    return {
+      hands: { [userId]: handCards },
+      currentTrick: [],
+      tricks: trumpPlayed.length > 0
+        ? [{ plays: trumpPlayed.map(card => ({ userId: 'other', card })), winner: 'other' }]
+        : [],
+      picker,
+      partner,
+      isLeaster: false,
+      phase: 'playing',
+      calledSuit: null,
+      calledAce: null,
+      calledTen: null,
+      calledKing: null,
+      partnerRevealed: false,
+      pickerForcedPlays: [],
+      underCard: null,
+      discard: [],
+    }
+  }
+
+  // Helper: build trump card object from ID string like 'QS', 'JC', '10D'
+  function trump(id) {
+    const rank = id.startsWith('10') ? '10' : id[0]
+    const suit = id[id.length - 1]
+    return { id, rank, suit }
+  }
+
+  it('picker team leads fail Ace instead of trump when opponents exhausted', () => {
+    // Own hand: QC (trump), AC (fail ace), KH (fail).
+    // Own trump: 1 (QC). Played trump: 13. Remaining elsewhere = 14 - 1 - 13 = 0 ≤ 2.
+    const playedTrump = ['QS','QH','QD','JC','JS','JH','JD','AD','10D','KD','9D','8D','7D'].map(trump)
+    const view = makeTrumpExhaustedView({
+      userId: 'p1',
+      picker: 'p1',
+      partner: 'p2',
+      handCards: [c('Q','C'), c('A','C'), c('K','H')],
+      trumpPlayed: playedTrump,
+    })
+    expect(decidePlay(view, 'p1')).toBe('AC')
+  })
+
+  it('picker team leads highest trump normally when opponents not exhausted', () => {
+    // No played trump → remaining = 14 - 1 - 0 = 13 > 2
+    const view = makeTrumpExhaustedView({
+      userId: 'p1',
+      picker: 'p1',
+      partner: 'p2',
+      handCards: [c('Q','C'), c('A','C'), c('K','H')],
+      trumpPlayed: [],
+    })
+    expect(decidePlay(view, 'p1')).toBe('QC')
+  })
+
+  it('opponent leads fail Ace when picker team exhausted', () => {
+    // Own trump: 0. Played trump: 13. Remaining elsewhere = 14 - 0 - 13 = 1 ≤ 2.
+    const playedTrump = ['QC','QS','QH','QD','JC','JS','JH','JD','AD','10D','KD','9D','8D'].map(trump)
+    const view = makeTrumpExhaustedView({
+      userId: 'p3',
+      picker: 'p1',
+      partner: 'p2',
+      handCards: [c('A','H'), c('9','S'), c('8','C')],
+      trumpPlayed: playedTrump,
+    })
+    expect(decidePlay(view, 'p3')).toBe('AH')
+  })
+
+  it('opponent leads lowest non-trump normally when trump not exhausted', () => {
+    const view = makeTrumpExhaustedView({
+      userId: 'p3',
+      picker: 'p1',
+      partner: 'p2',
+      handCards: [c('A','H'), c('9','S'), c('8','C')],
+      trumpPlayed: [],
+    })
+    // Normal opponent lead: lowestCard of non-trump
+    // AH=11, 9S=0, 8C=0 — lowest is 9S or 8C (both 0 pts, non-trump)
+    const result = decidePlay(view, 'p3')
+    expect(['8C', '9S']).toContain(result)
+  })
+})

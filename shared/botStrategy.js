@@ -6,7 +6,7 @@
 import {
   isTrump, cardPoints, effectiveSuit, trumpRank, suitRank, schwanzerCardPoints,
 } from './gameEngine.js'
-import { currentWinner, beats, handScore, bestVoidDiscard, teammateWinning } from './botInference.js'
+import { currentWinner, beats, handScore, bestVoidDiscard, teammateWinning, trumpRemainingElsewhere } from './botInference.js'
 
 // ─── Legal card helper ────────────────────────────────────────────────────────
 // Mirrors getLegalCardIds from the frontend; computes which cards can be played.
@@ -241,12 +241,22 @@ export function decidePlay(view, userId) {
 
   if (isLeading) {
     if (isPickerTeam) {
+      // Cash a fail Ace when opponents are likely trump-exhausted
+      if (trumpRemainingElsewhere(view, userId) <= 2) {
+        const failAces = realCards.filter(c => !isTrump(c) && c.rank === 'A')
+        if (failAces.length > 0) return failAces[0].id
+      }
       // Lead strongest trump to win tricks and accumulate points
       const best = highestTrump(realCards)
       if (best) return best.id
       // No trump; lead highest-value fail card
       return highestValueCard(realCards).id
     } else {
+      // Cash a fail Ace when picker team is likely trump-exhausted
+      if (trumpRemainingElsewhere(view, userId) <= 2) {
+        const failAces = realCards.filter(c => !isTrump(c) && c.rank === 'A')
+        if (failAces.length > 0) return failAces[0].id
+      }
       // Opponent: lead a non-trump to avoid burning trump while looking for called suit
       const nonTrump = realCards.filter(c => !isTrump(c))
       if (nonTrump.length > 0) return lowestCard(nonTrump).id
