@@ -6,6 +6,7 @@
 import {
   isTrump, cardPoints, effectiveSuit, trumpRank, suitRank, schwanzerCardPoints,
 } from './gameEngine.js'
+import { currentWinner, beats } from './botInference.js'
 
 // ─── Legal card helper ────────────────────────────────────────────────────────
 // Mirrors getLegalCardIds from the frontend; computes which cards can be played.
@@ -71,32 +72,6 @@ function getLegalCards(state, userId) {
 }
 
 // ─── Card comparison helpers ──────────────────────────────────────────────────
-
-function beats(challenger, current, ledSuit) {
-  if (!current || current.hidden || current.faceDown) return true
-  const cTrump = isTrump(challenger)
-  const wTrump = isTrump(current)
-  if (cTrump && !wTrump) return true
-  if (!cTrump && wTrump) return false
-  if (cTrump && wTrump) return trumpRank(challenger) < trumpRank(current)
-  const cIsLed = challenger.suit === ledSuit
-  const wIsLed = current.suit === ledSuit
-  if (cIsLed && !wIsLed) return true
-  if (!cIsLed && wIsLed) return false
-  if (challenger.suit !== current.suit) return false
-  return suitRank(challenger) < suitRank(current)
-}
-
-function currentWinner(trick) {
-  if (!trick || trick.length === 0) return null
-  const first = trick[0]
-  const ledSuit = first.declaredSuit ?? effectiveSuit(first.card)
-  let winner = trick[0]
-  for (let i = 1; i < trick.length; i++) {
-    if (beats(trick[i].card, winner.card, ledSuit)) winner = trick[i]
-  }
-  return winner
-}
 
 function lowestCard(cards) {
   // Prefer non-trump, then by point value ascending, then by trump rank descending (weaker trump)

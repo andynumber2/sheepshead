@@ -12,6 +12,7 @@ import {
 import {
   countTrumpPlayed, trumpRemainingElsewhere,
   buriablePoints, handScore,
+  currentWinner, teammateWinning,
 } from './botInference.js'
 
 const c = (rank, suit) => ({ id: `${rank}${suit}`, rank, suit })
@@ -1735,5 +1736,89 @@ describe('handScore', () => {
     // QC=3, JC=2 = 5 schwanzer pts; AC=11, AH=11 → buriable=22; score = 5*4+22 = 42
     const hand = [c('Q','C'), c('J','C'), c('7','C'), c('A','C'), c('A','H'), c('8','S')]
     expect(handScore(hand)).toBe(42)
+  })
+})
+
+describe('currentWinner', () => {
+  it('returns the play with the highest trump when trump is led', () => {
+    const plays = [
+      { userId: 'p1', card: c('Q','C') },
+      { userId: 'p2', card: c('J','C') },
+      { userId: 'p3', card: c('A','D') },
+    ]
+    expect(currentWinner(plays).userId).toBe('p1')
+  })
+
+  it('returns the play with the highest led-suit card when no trump played', () => {
+    const plays = [
+      { userId: 'p1', card: c('K','H') },
+      { userId: 'p2', card: c('A','H') },
+      { userId: 'p3', card: c('9','H') },
+    ]
+    expect(currentWinner(plays).userId).toBe('p2')
+  })
+
+  it('trump beats led suit', () => {
+    const plays = [
+      { userId: 'p1', card: c('A','H') },
+      { userId: 'p2', card: c('7','D') },
+    ]
+    expect(currentWinner(plays).userId).toBe('p2')
+  })
+})
+
+describe('teammateWinning', () => {
+  it('returns true when picker is winning and bot is the partner', () => {
+    const view = {
+      currentTrick: [{ userId: 'p1', card: c('Q','C') }],
+      picker: 'p1',
+      partner: 'p2',
+    }
+    expect(teammateWinning(view, 'p2')).toBe(true)
+  })
+
+  it('returns true when partner is winning and bot is the picker', () => {
+    const view = {
+      currentTrick: [{ userId: 'p2', card: c('Q','C') }],
+      picker: 'p1',
+      partner: 'p2',
+    }
+    expect(teammateWinning(view, 'p1')).toBe(true)
+  })
+
+  it('returns false when an opponent is winning and bot is on picker team', () => {
+    const view = {
+      currentTrick: [{ userId: 'p3', card: c('Q','C') }],
+      picker: 'p1',
+      partner: 'p2',
+    }
+    expect(teammateWinning(view, 'p1')).toBe(false)
+  })
+
+  it('returns true when fellow opponent is winning and partner is known', () => {
+    const view = {
+      currentTrick: [{ userId: 'p4', card: c('Q','C') }],
+      picker: 'p1',
+      partner: 'p2',
+    }
+    expect(teammateWinning(view, 'p3')).toBe(true)
+  })
+
+  it('returns false when opponent bot cannot identify partner (partner null)', () => {
+    const view = {
+      currentTrick: [{ userId: 'p4', card: c('Q','C') }],
+      picker: 'p1',
+      partner: null,
+    }
+    expect(teammateWinning(view, 'p3')).toBe(false)
+  })
+
+  it('returns false when trick is empty (leading)', () => {
+    const view = {
+      currentTrick: [],
+      picker: 'p1',
+      partner: 'p2',
+    }
+    expect(teammateWinning(view, 'p1')).toBe(false)
   })
 })

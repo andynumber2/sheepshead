@@ -2,7 +2,7 @@
 // Pure functions that derive facts from a player's view (own hand + played cards).
 // No decisions, no side effects. All functions receive a getPlayerView-redacted view.
 
-import { isTrump, cardPoints, schwanzerCardPoints } from './gameEngine.js'
+import { isTrump, cardPoints, schwanzerCardPoints, effectiveSuit, trumpRank, suitRank } from './gameEngine.js'
 
 // ─── Trump tracking ───────────────────────────────────────────────────────────
 
@@ -47,4 +47,58 @@ export function buriablePoints(hand) {
 export function handScore(hand) {
   const schwanzerPts = hand.filter(c => !c.hidden).reduce((sum, c) => sum + schwanzerCardPoints(c), 0)
   return schwanzerPts * 4 + buriablePoints(hand)
+}
+
+// ─── Trick evaluation ─────────────────────────────────────────────────────────
+
+// Returns true if challenger beats current card given the led suit.
+export function beats(challenger, current, ledSuit) {
+  if (!current || current.hidden || current.faceDown) return true
+  const cTrump = isTrump(challenger)
+  const wTrump = isTrump(current)
+  if (cTrump && !wTrump) return true
+  if (!cTrump && wTrump) return false
+  if (cTrump && wTrump) return trumpRank(challenger) < trumpRank(current)
+  const cIsLed = challenger.suit === ledSuit
+  const wIsLed = current.suit === ledSuit
+  if (cIsLed && !wIsLed) return true
+  if (!cIsLed && wIsLed) return false
+  if (challenger.suit !== current.suit) return false
+  return suitRank(challenger) < suitRank(current)
+}
+
+// Returns the play object currently winning the trick (array of {userId, card}).
+export function currentWinner(trick) {
+  if (!trick || trick.length === 0) return null
+  const first = trick[0]
+  const ledSuit = first.declaredSuit ?? effectiveSuit(first.card)
+  let winner = trick[0]
+  for (let i = 1; i < trick.length; i++) {
+    if (beats(trick[i].card, winner.card, ledSuit)) winner = trick[i]
+  }
+  return winner
+}
+
+// ─── Schmear detection ────────────────────────────────────────────────────────
+
+// Returns true if the player currently winning the trick is on the same team as userId.
+// Picker-team bots: teammate = picker or partner.
+// Opponent bots: only returns true when partner is known AND winner is confirmed opponent.
+//   If partner is null (unrevealed), returns false — unsafe to schmear.
+export function teammateWinning(view, userId) {
+  const { currentTrick, picker, partner } = view
+  if (!currentTrick || currentTrick.length === 0) return false
+
+  const winner = currentWinner(currentTrick)
+  if (!winner) return false
+  const winnerId = winner.userId
+
+  const onPickerTeam = userId === picker || userId === partner
+
+  if (onPickerTeam) {
+    return winnerId === picker || winnerId === partner
+  } else {
+    if (partner === null) return false
+    return winnerId !== picker && winnerId !== partner
+  }
 }
