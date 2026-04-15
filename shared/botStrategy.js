@@ -326,8 +326,17 @@ export function decidePlay(view, userId) {
         return highestTrump(winning).id
       }
 
-      // Scenario 2: Fail trick, bot is void — implemented in Task 2
-      return lowestCard(winning).id
+      // Scenario 2: Fail trick, bot is void, playing trump to contest the lead
+      if (userId === picker) return highestTrump(winning).id
+
+      // Partner: play highest trump only when there is another trump to lead back
+      const myTrumpCount = realCards.filter(c => isTrump(c)).length
+      if (myTrumpCount > 1) return highestTrump(winning).id
+
+      // Partner with exactly 1 trump: play it unless the picker has the trick locked
+      const pickerCurrentlyWinning = currentWinner(currentTrick)?.userId === picker
+      if (pickerCurrentlyWinning && opponentsRemaining === 0) return lowestCard(realCards).id
+      return highestTrump(winning).id
     }
 
     // Can't win; play lowest

@@ -2352,3 +2352,100 @@ describe('decidePlay trump efficiency — trump trick (Scenario 1)', () => {
     expect(decidePlay(view, 'p1')).toBe('QS')
   })
 })
+
+describe('decidePlay trump efficiency — fail trick, bot void (Scenario 2)', () => {
+  function makeView({ userId, picker, partner, hand, trick }) {
+    const ALL = ['p1', 'p2', 'p3', 'p4', 'p5']
+    const hands = Object.fromEntries(ALL.map(id => [id, id === userId ? hand : []]))
+    return {
+      hands,
+      currentTrick: trick,
+      tricks: [],
+      picker,
+      partner,
+      isLeaster: false,
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      calledTen: null,
+      calledKing: null,
+      partnerRevealed: true,
+      underCard: null,
+      pickerForcedPlays: [],
+      lastTrick: [],
+    }
+  }
+
+  it('picker plays highest trump to get the lead on a void fail trick', () => {
+    // Clubs led. Picker (p1) void in clubs. p3(AC), p4(KC), p5(9C), p2(7S — void in clubs).
+    // Current winner: p3 (AC). Picker hand: KD(rank10), JD(rank7), QS(rank1).
+    // All trump beat AC: KD(trump vs non-trump) ✓, JD ✓, QS ✓.
+    // Old lowestCard([KD,JD,QS]): JD=2pts → JD. Bug: picker wants the lead, play strongest.
+    // New: userId===picker → highestTrump(winning) = QS (rank1, lowest index).
+    const view = makeView({
+      userId: 'p1', picker: 'p1', partner: 'p2',
+      hand: [c('K','D'), c('J','D'), c('Q','S')],
+      trick: [
+        { userId: 'p3', card: c('A','C') },
+        { userId: 'p4', card: c('K','C') },
+        { userId: 'p5', card: c('9','C') },
+        { userId: 'p2', card: c('7','S') },
+      ],
+    })
+    expect(decidePlay(view, 'p1')).toBe('QS')
+  })
+
+  it('partner with >1 trump plays highest trump (point diamond) to win and lead back', () => {
+    // Spades led. Partner (p2) void in spades. p3(AS), p4(KS), p5(9S). p1(picker) not yet played.
+    // Current winner: p3 (AS). Partner hand: AD(rank8), KD(rank10), 8H.
+    // Trump in hand: AD and KD (count=2 > 1) → play highest trump.
+    // Old lowestCard([AD,KD]): KD=4pts < AD=11pts → picks KD. Bug: should lead back AD (strongest).
+    // New: myTrumpCount=2 > 1 → highestTrump([AD,KD]) = AD (rank8 < rank10).
+    const view = makeView({
+      userId: 'p2', picker: 'p1', partner: 'p2',
+      hand: [c('A','D'), c('K','D'), c('8','H')],
+      trick: [
+        { userId: 'p3', card: c('A','S') },
+        { userId: 'p4', card: c('K','S') },
+        { userId: 'p5', card: c('9','S') },
+      ],
+    })
+    expect(decidePlay(view, 'p2')).toBe('AD')
+  })
+
+  it('partner with 1 trump plays that trump when picker is not winning the trick', () => {
+    // Clubs led. Partner (p2) void in clubs. p3(AC), p4(KC). Current winner: p3(AC, opponent).
+    // Partner hand: JD (only trump), 8H, KS. myTrumpCount=1.
+    // Picker (p1) not in trick. pickerCurrentlyWinning=false → play the trump.
+    // Both old and new code return JD here; this test guards against regression.
+    const view = makeView({
+      userId: 'p2', picker: 'p1', partner: 'p2',
+      hand: [c('J','D'), c('8','H'), c('K','S')],
+      trick: [
+        { userId: 'p3', card: c('A','C') },
+        { userId: 'p4', card: c('K','C') },
+      ],
+    })
+    expect(decidePlay(view, 'p2')).toBe('JD')
+  })
+
+  it('partner with 1 trump plays low when picker has the trick locked', () => {
+    // Clubs led. Partner (p2) void in clubs.
+    // p3(AC), p4(KC), p5(9C), p1(AD — picker trumped in, currently winning).
+    // All 3 opponents (p3,p4,p5) already played. 0 opponents remaining.
+    // pickerCurrentlyWinning=true AND opponentsRemaining=0 → play low.
+    // Partner hand: 9D(only trump), AH(11pts), KS(4pts).
+    // lowestCard([9D,AH,KS]): prefer non-trump; KS=4pts < AH=11pts → KS.
+    // Old code: lowestCard([9D]) = 9D. Bug: wastes trump when picker has it locked.
+    const view = makeView({
+      userId: 'p2', picker: 'p1', partner: 'p2',
+      hand: [c('9','D'), c('A','H'), c('K','S')],
+      trick: [
+        { userId: 'p3', card: c('A','C') },
+        { userId: 'p4', card: c('K','C') },
+        { userId: 'p5', card: c('9','C') },
+        { userId: 'p1', card: c('A','D') },
+      ],
+    })
+    expect(decidePlay(view, 'p2')).toBe('KS')
+  })
+})
