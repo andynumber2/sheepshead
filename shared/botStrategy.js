@@ -6,6 +6,7 @@
 import {
   isTrump, cardPoints, effectiveSuit, trumpRank, suitRank, schwanzerCardPoints,
 } from './gameEngine.js'
+import { currentWinner, beats, handScore, bestVoidDiscard, teammateWinning, trumpRemainingElsewhere } from './botInference.js'
 
 // ─── Legal card helper ────────────────────────────────────────────────────────
 // Mirrors getLegalCardIds from the frontend; computes which cards can be played.
@@ -72,32 +73,6 @@ function getLegalCards(state, userId) {
 
 // ─── Card comparison helpers ──────────────────────────────────────────────────
 
-function beats(challenger, current, ledSuit) {
-  if (!current || current.hidden || current.faceDown) return true
-  const cTrump = isTrump(challenger)
-  const wTrump = isTrump(current)
-  if (cTrump && !wTrump) return true
-  if (!cTrump && wTrump) return false
-  if (cTrump && wTrump) return trumpRank(challenger) < trumpRank(current)
-  const cIsLed = challenger.suit === ledSuit
-  const wIsLed = current.suit === ledSuit
-  if (cIsLed && !wIsLed) return true
-  if (!cIsLed && wIsLed) return false
-  if (challenger.suit !== current.suit) return false
-  return suitRank(challenger) < suitRank(current)
-}
-
-function currentWinner(trick) {
-  if (!trick || trick.length === 0) return null
-  const first = trick[0]
-  const ledSuit = first.declaredSuit ?? effectiveSuit(first.card)
-  let winner = trick[0]
-  for (let i = 1; i < trick.length; i++) {
-    if (beats(trick[i].card, winner.card, ledSuit)) winner = trick[i]
-  }
-  return winner
-}
-
 function lowestCard(cards) {
   // Prefer non-trump, then by point value ascending, then by trump rank descending (weaker trump)
   return cards.reduce((best, c) => {
@@ -126,23 +101,7 @@ function highestValueCard(cards) {
 // ─── decidePick ───────────────────────────────────────────────────────────────
 export function decidePick(view, userId) {
   const hand = view.hands[userId]
-  const schwanzerPts = hand.reduce((sum, c) => sum + schwanzerCardPoints(c), 0)
-
-  if (schwanzerPts >= 7) return true
-
-  if (schwanzerPts >= 6) return true
-
-  if (schwanzerPts >= 5) {
-    // Must also have at least 20 points worth burying (fail aces/tens are ideal)
-    const nonTrump = hand.filter(c => !isTrump(c))
-    const burialPts = nonTrump
-      .sort((a, b) => cardPoints(b) - cardPoints(a))
-      .slice(0, 2)
-      .reduce((sum, c) => sum + cardPoints(c), 0)
-    return burialPts >= 20
-  }
-
-  return false
+  return handScore(hand) >= 24
 }
 
 // ─── decideBlitz ──────────────────────────────────────────────────────────────
@@ -158,6 +117,9 @@ export function decideBlitz(view, userId) {
 // ─── decideDiscard ────────────────────────────────────────────────────────────
 export function decideDiscard(view, userId) {
   const hand = view.hands[userId]  // 8 cards after picking up blind
+
+  const voidCards = bestVoidDiscard(hand)
+  if (voidCards) return voidCards
 
   // Replicate mustHold logic from gameEngine.discard to avoid illegal discards
   const failAces = ['AC', 'AH', 'AS']
@@ -186,6 +148,12 @@ export function decideDiscard(view, userId) {
 export function decideCall(view, userId) {
   const { callMode, hands, discard: discardCards } = view
   const hand = hands[userId]
+
+  // Go alone with a dominant trump hand
+  const trumpCount = hand.filter(c => isTrump(c)).length
+  const queenCount = hand.filter(c => c.rank === 'Q').length
+  if (trumpCount >= 6 && queenCount >= 2) return { type: 'alone' }
+
   const buried = (discardCards ?? []).filter(c => !c.hidden)
   const suits = ['C', 'H', 'S']
 
@@ -219,7 +187,7 @@ export function decideCall(view, userId) {
       // Pick lowest-value non-trump card as under card; fall back to lowest trump
       const underCard =
         hand.filter(c => !isTrump(c)).sort((a, b) => cardPoints(a) - cardPoints(b))[0]
-        ?? hand.sort((a, b) => cardPoints(a) - cardPoints(b))[0]
+        ?? [...hand].sort((a, b) => cardPoints(a) - cardPoints(b))[0]
       return { type: 'ace_unknown', suit, underCardId: underCard.id }
     }
 
@@ -273,12 +241,24 @@ export function decidePlay(view, userId) {
 
   if (isLeading) {
     if (isPickerTeam) {
+      // Cash a fail Ace when opponents are likely trump-exhausted
+      if (trumpRemainingElsewhere(view, userId) <= 2) {
+        const failAces = realCards.filter(c => !isTrump(c) && c.rank === 'A')
+                                   .sort((a, b) => cardPoints(b) - cardPoints(a))
+        if (failAces.length > 0) return failAces[0].id
+      }
       // Lead strongest trump to win tricks and accumulate points
       const best = highestTrump(realCards)
       if (best) return best.id
       // No trump; lead highest-value fail card
       return highestValueCard(realCards).id
     } else {
+      // Cash a fail Ace when picker team is likely trump-exhausted
+      if (trumpRemainingElsewhere(view, userId) <= 2) {
+        const failAces = realCards.filter(c => !isTrump(c) && c.rank === 'A')
+                                   .sort((a, b) => cardPoints(b) - cardPoints(a))
+        if (failAces.length > 0) return failAces[0].id
+      }
       // Opponent: lead a non-trump to avoid burning trump while looking for called suit
       const nonTrump = realCards.filter(c => !isTrump(c))
       if (nonTrump.length > 0) return lowestCard(nonTrump).id
@@ -289,12 +269,14 @@ export function decidePlay(view, userId) {
   // Following a trick
   const first = currentTrick[0]
   const ledSuit = first.declaredSuit ?? effectiveSuit(first.card)
-  const winner = currentWinner(currentTrick)
 
   if (isPickerTeam) {
-    // If a teammate is already winning, dump the lowest card (save resources)
-    const teammateWinning = winner && (winner.userId === picker || winner.userId === partner)
-    if (teammateWinning) return lowestCard(realCards).id
+    // Schmear: dump highest-point non-trump on teammate's winning trick
+    if (teammateWinning(view, userId)) {
+      const nonTrump = realCards.filter(c => !isTrump(c))
+      if (nonTrump.length > 0) return highestValueCard(nonTrump).id
+      return lowestCard(realCards).id  // only trump available — don't burn trump to schmear
+    }
 
     // Try to win with the lowest winning card
     const winning = realCards.filter(c => {
@@ -308,7 +290,14 @@ export function decidePlay(view, userId) {
     // Can't win; play lowest
     return lowestCard(realCards).id
   } else {
-    // Opponent: play low by default
+    // Opponent: schmear on confirmed teammate wins; otherwise play low
+    if (teammateWinning(view, userId)) {
+      const nonTrump = realCards.filter(c => !isTrump(c))
+      if (nonTrump.length > 0) return highestValueCard(nonTrump).id
+      return lowestCard(realCards).id
+    }
+    // Opponents play low when not schmearing — proactive trick-winning for opponents
+    // is out of scope for this iteration (see issue #82 for future improvements).
     return lowestCard(realCards).id
   }
 }

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import { decidePick, decideDiscard, decideCall, decidePlay } from './botStrategy.js'
 import {
   isTrump, trumpRank, suitRank, effectiveSuit, cardPoints,
   schwanzerCardPoints, resolveSchwanzer,
@@ -9,6 +10,12 @@ import {
   setupLeaster, awardLeasterBlind, getPlayerView,
   rewindPlay, rewindTrick,
 } from './gameEngine.js'
+import {
+  countTrumpPlayed, trumpRemainingElsewhere,
+  buriablePoints, handScore,
+  beats, currentWinner, teammateWinning,
+  bestVoidDiscard,
+} from './botInference.js'
 
 const c = (rank, suit) => ({ id: `${rank}${suit}`, rank, suit })
 
@@ -1594,5 +1601,556 @@ describe('getPlayerView', () => {
     }
     const view = getPlayerView(state, 'p1')
     expect(view.rewindHistory).toEqual([])
+  })
+})
+
+// ─── botInference helpers ─────────────────────────────────────────────────────
+const trick = (plays) => ({ plays: plays.map(([uid, card]) => ({ userId: uid, card })), winner: plays[0][0] })
+
+describe('countTrumpPlayed', () => {
+  it('counts trump in completed tricks', () => {
+    const view = {
+      tricks: [trick([['p1', c('Q','C')], ['p2', c('A','H')], ['p3', c('7','C')], ['p4', c('8','S')], ['p5', c('9','C')]])],
+      currentTrick: [],
+      hands: { p1: [] },
+    }
+    // QC is trump, rest are not
+    expect(countTrumpPlayed(view, 'p1')).toBe(1)
+  })
+
+  it('counts trump in currentTrick', () => {
+    const view = {
+      tricks: [],
+      currentTrick: [{ userId: 'p2', card: c('J','C') }, { userId: 'p3', card: c('K','H') }],
+      hands: { p1: [] },
+    }
+    // JC is trump, KH is not
+    expect(countTrumpPlayed(view, 'p1')).toBe(1)
+  })
+
+  it('skips hidden plays', () => {
+    const view = {
+      tricks: [{ plays: [{ userId: 'p2', card: { id: 'UNDER_CARD', hidden: true } }], winner: 'p2' }],
+      currentTrick: [],
+      hands: { p1: [] },
+    }
+    expect(countTrumpPlayed(view, 'p1')).toBe(0)
+  })
+
+  it('returns 0 when no tricks played', () => {
+    const view = { tricks: [], currentTrick: [], hands: { p1: [] } }
+    expect(countTrumpPlayed(view, 'p1')).toBe(0)
+  })
+})
+
+describe('trumpRemainingElsewhere', () => {
+  it('subtracts own trump and played trump from 14', () => {
+    // Own hand: QC, JC = 2 trump. Played: AD = 1 trump. Remaining = 14 - 2 - 1 = 11
+    const view = {
+      tricks: [trick([['p2', c('A','D')], ['p1', c('7','C')]])],
+      currentTrick: [],
+      hands: { p1: [c('Q','C'), c('J','C'), c('A','H'), c('K','S'), c('9','C'), c('8','S')] },
+    }
+    expect(trumpRemainingElsewhere(view, 'p1')).toBe(11)
+  })
+
+  it('returns 0 when all trump accounted for', () => {
+    // Own hand has 7 trump. Played tricks show 7 trump. 14 - 7 - 7 = 0.
+    const myTrump = [
+      { id: 'QC', rank: 'Q', suit: 'C' },
+      { id: 'QS', rank: 'Q', suit: 'S' },
+      { id: 'QH', rank: 'Q', suit: 'H' },
+      { id: 'QD', rank: 'Q', suit: 'D' },
+      { id: 'JC', rank: 'J', suit: 'C' },
+      { id: 'JS', rank: 'J', suit: 'S' },
+      { id: 'JH', rank: 'J', suit: 'H' },
+    ]
+    const playedTrump = [
+      { id: 'JD', rank: 'J', suit: 'D' },
+      { id: 'AD', rank: 'A', suit: 'D' },
+      { id: '10D', rank: '10', suit: 'D' },
+      { id: 'KD', rank: 'K', suit: 'D' },
+      { id: '9D', rank: '9', suit: 'D' },
+      { id: '8D', rank: '8', suit: 'D' },
+      { id: '7D', rank: '7', suit: 'D' },
+    ]
+    const view = {
+      tricks: [{ plays: playedTrump.map(card => ({ userId: 'p2', card })), winner: 'p2' }],
+      currentTrick: [],
+      hands: { p1: myTrump },
+    }
+    expect(trumpRemainingElsewhere(view, 'p1')).toBe(0)
+  })
+
+  it('subtracts trump visible in picker discard', () => {
+    // Picker (p1) buried QS (trump) in discard. Own hand: QC. No tricks played.
+    // Remaining = 14 - 1 (QC in hand) - 0 (played) - 1 (QS in discard) = 12
+    const view = {
+      tricks: [],
+      currentTrick: [],
+      hands: { p1: [c('Q','C'), c('A','H'), c('K','S'), c('9','C'), c('8','S'), c('7','H')] },
+      discard: [c('Q','S'), c('K','H')],  // picker sees their own real discard
+    }
+    expect(trumpRemainingElsewhere(view, 'p1')).toBe(12)
+  })
+})
+
+describe('buriablePoints', () => {
+  it('returns sum of top 2 non-trump cards by point value', () => {
+    // AC=11, 10H=10, KS=4 → top 2 are AC + 10H = 21
+    const hand = [c('Q','C'), c('J','S'), c('A','C'), c('10','H'), c('K','S'), c('9','C')]
+    expect(buriablePoints(hand)).toBe(21)
+  })
+
+  it('returns 0 when fewer than 2 non-trump cards exist', () => {
+    const hand = [c('Q','C'), c('Q','S'), c('J','C'), c('J','S'), c('A','D'), c('10','D')]
+    expect(buriablePoints(hand)).toBe(0)
+  })
+
+  it('returns 0 when exactly 1 non-trump card exists', () => {
+    // Only KS is non-trump; fewer than 2 → 0
+    const hand = [c('Q','C'), c('Q','S'), c('J','C'), c('J','S'), c('A','D'), c('K','S')]
+    expect(buriablePoints(hand)).toBe(0)
+  })
+
+  it('returns sum when exactly 2 non-trump cards exist', () => {
+    // KS=4, 9C=0 → 4
+    const hand = [c('Q','C'), c('Q','S'), c('J','C'), c('J','S'), c('K','S'), c('9','C')]
+    expect(buriablePoints(hand)).toBe(4)
+  })
+})
+
+describe('handScore', () => {
+  it('returns schwanzerPts * 4 + buriablePoints (exact formula check)', () => {
+    // QC=3, QS=3 = 6 schwanzer pts; 7C=0, 8C=0 non-trump → buriable=0; score = 6*4+0 = 24
+    const hand = [c('Q','C'), c('Q','S'), c('7','C'), c('8','C'), c('9','H'), c('8','H')]
+    expect(handScore(hand)).toBe(24)
+  })
+
+  it('scores < 24 for 5 schwanzer pts, 0 burial', () => {
+    // QC=3, JC=2 = 5 schwanzer pts; 7C=0, 8C=0 non-trump → buriable=0; score = 5*4+0 = 20
+    const hand = [c('Q','C'), c('J','C'), c('7','C'), c('8','C'), c('9','C'), c('9','H')]
+    expect(handScore(hand)).toBeLessThan(24)
+    expect(handScore(hand)).toBe(20)
+  })
+
+  it('scores >= 24 for 5 schwanzer pts + two aces to bury', () => {
+    // QC=3, JC=2 = 5 schwanzer pts; AC=11, AH=11 → buriable=22; score = 5*4+22 = 42
+    const hand = [c('Q','C'), c('J','C'), c('7','C'), c('A','C'), c('A','H'), c('8','S')]
+    expect(handScore(hand)).toBe(42)
+  })
+})
+
+describe('beats', () => {
+  it('trump beats non-trump', () => {
+    expect(beats(c('7','D'), c('A','H'), 'H')).toBe(true)   // 7D is trump, AH is not
+    expect(beats(c('A','H'), c('7','D'), 'H')).toBe(false)  // AH is not trump, 7D is
+  })
+
+  it('higher trump rank beats lower trump rank', () => {
+    expect(beats(c('Q','C'), c('Q','S'), 'T')).toBe(true)   // QC rank 0 beats QS rank 1
+    expect(beats(c('Q','S'), c('Q','C'), 'T')).toBe(false)  // QS rank 1 loses to QC rank 0
+    expect(beats(c('J','C'), c('7','D'), 'T')).toBe(true)   // JC rank 4 beats 7D rank 13
+  })
+
+  it('led-suit beats off-suit fail', () => {
+    expect(beats(c('7','H'), c('A','S'), 'H')).toBe(true)   // 7H is led suit, AS is off-suit
+    expect(beats(c('A','S'), c('7','H'), 'H')).toBe(false)  // AS is off-suit, 7H is led suit
+  })
+
+  it('higher card wins same suit', () => {
+    expect(beats(c('A','H'), c('K','H'), 'H')).toBe(true)   // A ranks higher than K
+    expect(beats(c('K','H'), c('A','H'), 'H')).toBe(false)
+  })
+
+  it('off-suit vs off-suit different suits — neither wins', () => {
+    // Challenger is off-suit (S), current is off-suit (C) — neither matches led (H)
+    expect(beats(c('A','S'), c('A','C'), 'H')).toBe(false)
+    expect(beats(c('A','C'), c('A','S'), 'H')).toBe(false)
+  })
+
+  it('returns true when current is hidden (challenger wins by default)', () => {
+    expect(beats(c('7','C'), { id: 'UNDER_CARD', hidden: true }, 'H')).toBe(true)
+  })
+
+  it('returns true when current is faceDown', () => {
+    expect(beats(c('7','C'), { id: 'UNDER_CARD', faceDown: true }, 'H')).toBe(true)
+  })
+})
+
+describe('currentWinner', () => {
+  it('returns the play with the highest trump when trump is led', () => {
+    const plays = [
+      { userId: 'p1', card: c('Q','C') },
+      { userId: 'p2', card: c('J','C') },
+      { userId: 'p3', card: c('A','D') },
+    ]
+    expect(currentWinner(plays).userId).toBe('p1')
+  })
+
+  it('returns the play with the highest led-suit card when no trump played', () => {
+    const plays = [
+      { userId: 'p1', card: c('K','H') },
+      { userId: 'p2', card: c('A','H') },
+      { userId: 'p3', card: c('9','H') },
+    ]
+    expect(currentWinner(plays).userId).toBe('p2')
+  })
+
+  it('trump beats led suit', () => {
+    const plays = [
+      { userId: 'p1', card: c('A','H') },
+      { userId: 'p2', card: c('7','D') },
+    ]
+    expect(currentWinner(plays).userId).toBe('p2')
+  })
+})
+
+describe('teammateWinning', () => {
+  it('returns true when picker is winning and bot is the partner', () => {
+    const view = {
+      currentTrick: [{ userId: 'p1', card: c('Q','C') }],
+      picker: 'p1',
+      partner: 'p2',
+    }
+    expect(teammateWinning(view, 'p2')).toBe(true)
+  })
+
+  it('returns true when partner is winning and bot is the picker', () => {
+    const view = {
+      currentTrick: [{ userId: 'p2', card: c('Q','C') }],
+      picker: 'p1',
+      partner: 'p2',
+    }
+    expect(teammateWinning(view, 'p1')).toBe(true)
+  })
+
+  it('returns false when an opponent is winning and bot is on picker team', () => {
+    const view = {
+      currentTrick: [{ userId: 'p3', card: c('Q','C') }],
+      picker: 'p1',
+      partner: 'p2',
+    }
+    expect(teammateWinning(view, 'p1')).toBe(false)
+  })
+
+  it('returns true when fellow opponent is winning and partner is known', () => {
+    const view = {
+      currentTrick: [{ userId: 'p4', card: c('Q','C') }],
+      picker: 'p1',
+      partner: 'p2',
+    }
+    expect(teammateWinning(view, 'p3')).toBe(true)
+  })
+
+  it('returns false when opponent bot cannot identify partner (partner null)', () => {
+    const view = {
+      currentTrick: [{ userId: 'p4', card: c('Q','C') }],
+      picker: 'p1',
+      partner: null,
+    }
+    expect(teammateWinning(view, 'p3')).toBe(false)
+  })
+
+  it('returns false when trick is empty (leading)', () => {
+    const view = {
+      currentTrick: [],
+      picker: 'p1',
+      partner: 'p2',
+    }
+    expect(teammateWinning(view, 'p1')).toBe(false)
+  })
+})
+
+describe('bestVoidDiscard', () => {
+  it('returns 2-card IDs that void a suit when burial total >= 11', () => {
+    // AC(11) + KC(4) in clubs = 15 pts >= 11 → void clubs
+    const hand = [c('Q','C'), c('J','S'), c('A','D'), c('A','C'), c('K','C'), c('9','H'), c('8','S'), c('7','S')]
+    const result = bestVoidDiscard(hand)
+    expect(result).not.toBeNull()
+    expect(result).toHaveLength(2)
+    expect(result).toContain('AC')
+    expect(result).toContain('KC')
+  })
+
+  it('returns null when no suit can be voided with >= 11 pts', () => {
+    // Clubs: 7C + 8C = 0+0 = 0 pts, Hearts: 9H only (1 card), Spades: 7S + 8S = 0 pts
+    const hand = [c('Q','C'), c('J','S'), c('A','D'), c('10','D'), c('7','C'), c('8','C'), c('9','H'), c('7','S')]
+    expect(bestVoidDiscard(hand)).toBeNull()
+  })
+
+  it('handles 1-card suit: pairs with highest-point filler from another suit', () => {
+    // Spades: only KS (4 pts). Filler: AH (11 pts). Total = 15 → qualifies
+    const hand = [c('Q','C'), c('J','C'), c('A','D'), c('10','D'), c('K','S'), c('A','H'), c('8','C'), c('7','C')]
+    const result = bestVoidDiscard(hand)
+    expect(result).not.toBeNull()
+    expect(result).toContain('KS')
+    expect(result).toContain('AH')
+  })
+
+  it('returns null for suit with 3+ cards (burying 2 does not void it)', () => {
+    // Clubs: AC+KC+9C (3 cards), Hearts: AH+KH+9H (3 cards), Spades: AS+KS+9S (3 cards)
+    const hand = [c('Q','C'), c('A','C'), c('K','C'), c('A','H'), c('K','H'), c('A','S'), c('K','S'), c('9','C')]
+    expect(bestVoidDiscard(hand)).toBeNull()
+  })
+
+  it('excludes mustHold cards — cannot bury fail ace when holding all 3', () => {
+    // Picker holds AC, AH, AS — mustHold = [AC, AH, AS]
+    // After mustHold exclusion: no eligible cards in clubs except... check what's left
+    // Hand: AC(mustHold), AH(mustHold), AS(mustHold), QC, JC, KS, 9D, 8D
+    // Eligible non-trump non-mustHold: KS only (1 card, 4 pts). Need filler from other suit.
+    // No other eligible non-trump → null
+    const hand = [c('A','C'), c('A','H'), c('A','S'), c('Q','C'), c('J','C'), c('K','S'), c('9','D'), c('8','D')]
+    expect(bestVoidDiscard(hand)).toBeNull()
+  })
+
+  it('excludes both fail aces AND fail tens when holding all 6', () => {
+    // Picker holds all 3 fail aces + all 3 fail tens → mustHold = [AC,AH,AS,10C,10H,10S]
+    // Only remaining non-trump eligible: KS (4 pts). No second eligible card → null
+    const hand = [
+      c('A','C'), c('A','H'), c('A','S'),
+      c('10','C'), c('10','H'), c('10','S'),
+      c('K','S'), c('Q','C'),
+    ]
+    expect(bestVoidDiscard(hand)).toBeNull()
+  })
+})
+
+describe('decidePick', () => {
+  it('picks when handScore >= 24 (6 schwanzer pts, 0 burial = 24)', () => {
+    // QC=3, QS=3 = 6 schwanzer pts; 7C+8C non-trump = 0 burial; score = 24
+    const hand = [c('Q','C'), c('Q','S'), c('J','C'), c('J','S'), c('7','C'), c('8','C')]
+    expect(decidePick({ hands: { p1: hand } }, 'p1')).toBe(true)
+  })
+
+  it('passes when handScore < 24 (5 schwanzer pts, 0 burial = 20)', () => {
+    // QC=3, JC=2 = 5 schwanzer pts; 7C+8C non-trump = 0 burial; score = 20
+    const hand = [c('Q','C'), c('J','C'), c('7','C'), c('8','C'), c('9','C'), c('9','H')]
+    expect(decidePick({ hands: { p1: hand } }, 'p1')).toBe(false)
+  })
+
+  it('picks when 5 schwanzer pts + two aces (score = 42)', () => {
+    // QC=3, JC=2 = 5 schwanzer pts; AC+AH non-trump = 22 burial; score = 42
+    const hand = [c('Q','C'), c('J','C'), c('7','C'), c('A','C'), c('A','H'), c('8','S')]
+    expect(decidePick({ hands: { p1: hand } }, 'p1')).toBe(true)
+  })
+})
+
+describe('decideDiscard', () => {
+  it('buries void pair when suit can be voided with >= 11 pts', () => {
+    // AC(11) + KC(4) in clubs = 15 pts → void clubs
+    const hand = [c('Q','C'), c('J','S'), c('A','D'), c('A','C'), c('K','C'), c('9','H'), c('8','S'), c('7','S')]
+    const result = decideDiscard({ hands: { p1: hand }, discard: [] }, 'p1')
+    expect(result).toHaveLength(2)
+    expect(result).toContain('AC')
+    expect(result).toContain('KC')
+  })
+
+  it('falls back to greedy when no qualifying void', () => {
+    // Hearts: 10H + 9H = 10 pts (< 11). Spades: 8S + 7S = 0 pts. No qualifying void.
+    // Greedy buries highest-point non-trump: AC(11) + 10H(10)
+    const hand = [c('Q','C'), c('J','S'), c('A','D'), c('A','C'), c('10','H'), c('9','H'), c('8','S'), c('7','S')]
+    const result = decideDiscard({ hands: { p1: hand }, discard: [] }, 'p1')
+    expect(result).toContain('AC')
+    expect(result).toContain('10H')
+  })
+})
+
+describe('decideCall go-alone', () => {
+  it('goes alone with 6 trump and 2 queens', () => {
+    // QC, QS (2 queens), JC, JH, AD, 10D = 6 trump
+    const hand = [c('Q','C'), c('Q','S'), c('J','C'), c('J','H'), c('A','D'), c('10','D')]
+    const view = { callMode: 'ace', hands: { p1: hand }, discard: [] }
+    expect(decideCall(view, 'p1').type).toBe('alone')
+  })
+
+  it('does not go alone with only 1 queen even with 6 trump', () => {
+    // QC (1 queen), JC, JS, JH, JD, AD = 6 trump
+    const hand = [c('Q','C'), c('J','C'), c('J','S'), c('J','H'), c('J','D'), c('A','D')]
+    const view = { callMode: 'ace', hands: { p1: hand }, discard: [] }
+    expect(decideCall(view, 'p1').type).not.toBe('alone')
+  })
+
+  it('does not go alone with 2 queens but only 5 trump', () => {
+    // QC, QS (2 queens), JC, AD, 10D = 5 trump; AH is fail
+    const hand = [c('Q','C'), c('Q','S'), c('J','C'), c('A','D'), c('10','D'), c('A','H')]
+    const view = { callMode: 'ace', hands: { p1: hand }, discard: [] }
+    expect(decideCall(view, 'p1').type).not.toBe('alone')
+  })
+})
+
+describe('decidePlay schmearing', () => {
+  function makeFollowView({ userId, picker, partner, trickWinner, trickCard, handCards }) {
+    return {
+      hands: { [userId]: handCards },
+      currentTrick: [{ userId: trickWinner, card: trickCard }],
+      tricks: [],
+      picker,
+      partner,
+      isLeaster: false,
+      phase: 'playing',
+      calledSuit: null,
+      calledAce: null,
+      calledTen: null,
+      calledKing: null,
+      partnerRevealed: false,
+      pickerForcedPlays: [],
+      underCard: null,
+    }
+  }
+
+  it('picker-team bot schmears highest non-trump when partner is winning', () => {
+    // Bot is picker (p1). Partner (p2) leads QC (trump). Bot has AC(11), KH(4), 9S(0) — all off-suit.
+    // QC leads trump; bot has no trump. All cards legal (off-suit). Schmear: AC (11 pts).
+    const view = makeFollowView({
+      userId: 'p1',
+      picker: 'p1',
+      partner: 'p2',
+      trickWinner: 'p2',
+      trickCard: c('Q','C'),
+      handCards: [c('A','C'), c('K','H'), c('9','S')],
+    })
+    expect(decidePlay(view, 'p1')).toBe('AC')
+  })
+
+  it('opponent bot schmears highest non-trump when fellow opponent is winning (partner known)', () => {
+    // Bot is p3. Partner is p2 (revealed). p4 (fellow opponent) leads QC.
+    // Bot has AH(11), 9S(0), 8C(0) — all off-suit legal.
+    const view = makeFollowView({
+      userId: 'p3',
+      picker: 'p1',
+      partner: 'p2',
+      trickWinner: 'p4',
+      trickCard: c('Q','C'),
+      handCards: [c('A','H'), c('9','S'), c('8','C')],
+    })
+    expect(decidePlay(view, 'p3')).toBe('AH')
+  })
+
+  it('does not burn trump to schmear — plays lowest when only trump is legal', () => {
+    // Bot is picker (p1), partner (p2) winning with QC. Bot has only trump.
+    // Must follow trump. Should play lowest (7D), not burn JD.
+    const view = makeFollowView({
+      userId: 'p1',
+      picker: 'p1',
+      partner: 'p2',
+      trickWinner: 'p2',
+      trickCard: c('Q','C'),
+      handCards: [c('J','D'), c('7','D')],
+    })
+    expect(decidePlay(view, 'p1')).toBe('7D')
+  })
+
+  it('opponent does not schmear when partner is unknown (null)', () => {
+    // Bot is p3. Partner is null (unrevealed). p4 leading QC.
+    // teammateWinning returns false when partner is null → play low (9S)
+    const view = makeFollowView({
+      userId: 'p3',
+      picker: 'p1',
+      partner: null,
+      trickWinner: 'p4',
+      trickCard: c('Q','C'),
+      handCards: [c('A','H'), c('9','S'), c('8','C')],
+    })
+    // Should NOT schmear — play lowest (9S: 0 pts, first 0-pt non-trump encountered)
+    expect(decidePlay(view, 'p3')).toBe('9S')
+  })
+})
+
+describe('decidePlay trump counting', () => {
+  function makeTrumpExhaustedView({ userId, picker, partner, handCards, trumpPlayed }) {
+    return {
+      hands: { [userId]: handCards },
+      currentTrick: [],
+      tricks: trumpPlayed.length > 0
+        ? [{ plays: trumpPlayed.map(card => ({ userId: 'other', card })), winner: 'other' }]
+        : [],
+      picker,
+      partner,
+      isLeaster: false,
+      phase: 'playing',
+      calledSuit: null,
+      calledAce: null,
+      calledTen: null,
+      calledKing: null,
+      partnerRevealed: false,
+      pickerForcedPlays: [],
+      underCard: null,
+      discard: [],
+    }
+  }
+
+  // Helper: build trump card object from ID string like 'QS', 'JC', '10D'
+  function trump(id) {
+    const rank = id.startsWith('10') ? '10' : id[0]
+    const suit = id[id.length - 1]
+    return { id, rank, suit }
+  }
+
+  it('picker team leads fail Ace instead of trump when opponents exhausted', () => {
+    // Own hand: QC (trump), AC (fail ace), KH (fail).
+    // Own trump: 1 (QC). Played trump: 13. Remaining elsewhere = 14 - 1 - 13 = 0 ≤ 2.
+    const playedTrump = ['QS','QH','QD','JC','JS','JH','JD','AD','10D','KD','9D','8D','7D'].map(trump)
+    const view = makeTrumpExhaustedView({
+      userId: 'p1',
+      picker: 'p1',
+      partner: 'p2',
+      handCards: [c('Q','C'), c('A','C'), c('K','H')],
+      trumpPlayed: playedTrump,
+    })
+    expect(decidePlay(view, 'p1')).toBe('AC')
+  })
+
+  it('picker team leads highest trump normally when opponents not exhausted', () => {
+    // No played trump → remaining = 14 - 1 - 0 = 13 > 2
+    const view = makeTrumpExhaustedView({
+      userId: 'p1',
+      picker: 'p1',
+      partner: 'p2',
+      handCards: [c('Q','C'), c('A','C'), c('K','H')],
+      trumpPlayed: [],
+    })
+    expect(decidePlay(view, 'p1')).toBe('QC')
+  })
+
+  it('opponent leads fail Ace when picker team exhausted', () => {
+    // Own trump: 0. Played trump: 13. Remaining elsewhere = 14 - 0 - 13 = 1 ≤ 2.
+    const playedTrump = ['QC','QS','QH','QD','JC','JS','JH','JD','AD','10D','KD','9D','8D'].map(trump)
+    const view = makeTrumpExhaustedView({
+      userId: 'p3',
+      picker: 'p1',
+      partner: 'p2',
+      handCards: [c('A','H'), c('9','S'), c('8','C')],
+      trumpPlayed: playedTrump,
+    })
+    expect(decidePlay(view, 'p3')).toBe('AH')
+  })
+
+  it('opponent leads lowest non-trump normally when trump not exhausted', () => {
+    const view = makeTrumpExhaustedView({
+      userId: 'p3',
+      picker: 'p1',
+      partner: 'p2',
+      handCards: [c('A','H'), c('9','S'), c('8','C')],
+      trumpPlayed: [],
+    })
+    // Normal opponent lead: lowestCard of non-trump
+    // AH=11, 9S=0, 8C=0 — lowest is 9S or 8C (both 0 pts, non-trump)
+    const result = decidePlay(view, 'p3')
+    expect(['8C', '9S']).toContain(result)
+  })
+
+  it('picks one of the fail Aces when multiple are held', () => {
+    // Own hand: QC (trump), AC, AH (two fail aces). 13 trump played. Remaining = 14 - 1 - 13 = 0.
+    const playedTrump = ['QS','QH','QD','JC','JS','JH','JD','AD','10D','KD','9D','8D','7D'].map(trump)
+    const view = makeTrumpExhaustedView({
+      userId: 'p1',
+      picker: 'p1',
+      partner: 'p2',
+      handCards: [c('Q','C'), c('A','C'), c('A','H')],
+      trumpPlayed: playedTrump,
+    })
+    // Should lead one of the fail Aces (both are 11 pts)
+    expect(['AC', 'AH']).toContain(decidePlay(view, 'p1'))
   })
 })
