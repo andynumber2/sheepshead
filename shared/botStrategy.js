@@ -187,7 +187,7 @@ export function decideCall(view, userId) {
       // Pick lowest-value non-trump card as under card; fall back to lowest trump
       const underCard =
         hand.filter(c => !isTrump(c)).sort((a, b) => cardPoints(a) - cardPoints(b))[0]
-        ?? hand.sort((a, b) => cardPoints(a) - cardPoints(b))[0]
+        ?? [...hand].sort((a, b) => cardPoints(a) - cardPoints(b))[0]
       return { type: 'ace_unknown', suit, underCardId: underCard.id }
     }
 
@@ -296,6 +296,8 @@ export function decidePlay(view, userId) {
       if (nonTrump.length > 0) return highestValueCard(nonTrump).id
       return lowestCard(realCards).id
     }
+    // Opponents play low when not schmearing — proactive trick-winning for opponents
+    // is out of scope for this iteration (see issue #82 for future improvements).
     return lowestCard(realCards).id
   }
 }
