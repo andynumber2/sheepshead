@@ -2251,30 +2251,30 @@ describe('decidePlay (botStrategy)', () => {
   })
 })
 
-describe('decidePlay trump efficiency — trump trick (Scenario 1)', () => {
-  // All 5 player IDs must appear in hands so Object.keys(view.hands) returns
-  // the full player list — required for opponents-remaining computation.
-  function makeView({ userId, picker, partner, hand, trick }) {
-    const ALL = ['p1', 'p2', 'p3', 'p4', 'p5']
-    const hands = Object.fromEntries(ALL.map(id => [id, id === userId ? hand : []]))
-    return {
-      hands,
-      currentTrick: trick,
-      tricks: [],
-      picker,
-      partner,
-      isLeaster: false,
-      calledSuit: 'H',
-      calledAce: { aceId: 'AH' },
-      calledTen: null,
-      calledKing: null,
-      partnerRevealed: true,
-      underCard: null,
-      pickerForcedPlays: [],
-      lastTrick: [],
-    }
+// All 5 player IDs must appear in hands so Object.keys(view.hands) returns
+// the full player list — required for opponents-remaining computation.
+function makeTrumpEfficiencyView({ userId, picker, partner, hand, trick }) {
+  const ALL = ['p1', 'p2', 'p3', 'p4', 'p5']
+  const hands = Object.fromEntries(ALL.map(id => [id, id === userId ? hand : []]))
+  return {
+    hands,
+    currentTrick: trick,
+    tricks: [],
+    picker,
+    partner,
+    isLeaster: false,
+    calledSuit: 'H',
+    calledAce: { aceId: 'AH' },
+    calledTen: null,
+    calledKing: null,
+    partnerRevealed: true,
+    underCard: null,
+    pickerForcedPlays: [],
+    lastTrick: [],
   }
+}
 
+describe('decidePlay trump efficiency — trump trick (Scenario 1)', () => {
   it('uses point diamond over Queen when 0 opponents remain', () => {
     // Trump trick (7D led by p3). Played: p3(7D), p4(8D), p5(9D), p2(AC — void in trump).
     // Current winner: p5 (9D, rank 11). All opponents (p3,p4,p5) and partner (p2) played.
@@ -2283,7 +2283,7 @@ describe('decidePlay trump efficiency — trump trick (Scenario 1)', () => {
     //   QS beats 9D: trumpRank(QS)=1  < trumpRank(9D)=11 ✓
     // Old lowestCard([KD, QS]): QS=3pts < KD=4pts → picks QS. Bug: wastes strong Queen.
     // New cheapestWinningTrump: tier1=[KD] → return KD.
-    const view = makeView({
+    const view = makeTrumpEfficiencyView({
       userId: 'p1', picker: 'p1', partner: 'p2',
       hand: [c('K','D'), c('Q','S')],
       trick: [
@@ -2304,7 +2304,7 @@ describe('decidePlay trump efficiency — trump trick (Scenario 1)', () => {
     //   10D: trumpRank(10D)=9 < 12 ✓   9D: trumpRank(9D)=11 < 12 ✓
     // Old lowestCard: 9D=0pts < 10D=10pts → picks 9D. Bug: discards 10pts from pile.
     // New: tier1=[10D] → return 10D.
-    const view = makeView({
+    const view = makeTrumpEfficiencyView({
       userId: 'p1', picker: 'p1', partner: 'p2',
       hand: [c('10','D'), c('9','D')],
       trick: [
@@ -2323,7 +2323,7 @@ describe('decidePlay trump efficiency — trump trick (Scenario 1)', () => {
     // All four beat 9D(rank11): AD(8<11), 10D(9<11), KD(10<11), JD(7<11).
     // Old lowestCard: JD=2pts (lowest) → picks JD. Bug: wastes the Jack.
     // New cheapestWinningTrump: tier1=[AD,10D,KD], weakest in tier1 = KD (rank10, highest index).
-    const view = makeView({
+    const view = makeTrumpEfficiencyView({
       userId: 'p1', picker: 'p1', partner: 'p2',
       hand: [c('A','D'), c('10','D'), c('K','D'), c('J','D')],
       trick: [
@@ -2342,7 +2342,7 @@ describe('decidePlay trump efficiency — trump trick (Scenario 1)', () => {
     // All three beat 8D(rank12): KD(10<12), JD(7<12), QS(1<12).
     // Old lowestCard: JD=2pts → picks JD. Bug: should commit strongest against future opponents.
     // New: opponentsRemaining=2 → highestTrump(winning) = QS (rank 1).
-    const view = makeView({
+    const view = makeTrumpEfficiencyView({
       userId: 'p1', picker: 'p1', partner: 'p2',
       hand: [c('K','D'), c('J','D'), c('Q','S')],
       trick: [
@@ -2351,37 +2351,38 @@ describe('decidePlay trump efficiency — trump trick (Scenario 1)', () => {
     })
     expect(decidePlay(view, 'p1')).toBe('QS')
   })
+
+  it('uses weakest pip diamond when no point diamonds are in winning set', () => {
+    // Trump trick (7D led by p3). All opponents + partner played. Current winner p5(9D, rank11).
+    // Picker (p1) hand: 9D already played by p5. Bot has 8D(rank12) and QH(rank2).
+    // Wait — p5 played 9D so bot can't have 9D. Use 8D and QH in bot hand.
+    // Both beat current winner... but current winner is p5(9D, rank11).
+    // 8D(rank12): 12 < 11? No — 12 > 11, so 8D does NOT beat 9D. Only QH(rank2<11) wins.
+    // Better: current winner p4(8D, rank12). Bot has 9D(rank11) and QH(rank2). Both beat 8D.
+    // cheapestWinningTrump: tier1 empty (no AD/10D/KD), tier2=[9D] → return 9D.
+    // Old lowestCard([9D, QH]): 9D=0pts < QH=3pts → picks 9D. Same result, but test documents the path.
+    const view = makeTrumpEfficiencyView({
+      userId: 'p1', picker: 'p1', partner: 'p2',
+      hand: [c('9','D'), c('Q','H')],
+      trick: [
+        { userId: 'p3', card: c('7','D') },
+        { userId: 'p2', card: c('A','C') },
+        { userId: 'p5', card: c('K','C') },
+        { userId: 'p4', card: c('8','D') },
+      ],
+    })
+    expect(decidePlay(view, 'p1')).toBe('9D')
+  })
 })
 
 describe('decidePlay trump efficiency — fail trick, bot void (Scenario 2)', () => {
-  function makeView({ userId, picker, partner, hand, trick }) {
-    const ALL = ['p1', 'p2', 'p3', 'p4', 'p5']
-    const hands = Object.fromEntries(ALL.map(id => [id, id === userId ? hand : []]))
-    return {
-      hands,
-      currentTrick: trick,
-      tricks: [],
-      picker,
-      partner,
-      isLeaster: false,
-      calledSuit: 'H',
-      calledAce: { aceId: 'AH' },
-      calledTen: null,
-      calledKing: null,
-      partnerRevealed: true,
-      underCard: null,
-      pickerForcedPlays: [],
-      lastTrick: [],
-    }
-  }
-
   it('picker plays highest trump to get the lead on a void fail trick', () => {
     // Clubs led. Picker (p1) void in clubs. p3(AC), p4(KC), p5(9C), p2(7S — void in clubs).
     // Current winner: p3 (AC). Picker hand: KD(rank10), JD(rank7), QS(rank1).
     // All trump beat AC: KD(trump vs non-trump) ✓, JD ✓, QS ✓.
     // Old lowestCard([KD,JD,QS]): JD=2pts → JD. Bug: picker wants the lead, play strongest.
     // New: userId===picker → highestTrump(winning) = QS (rank1, lowest index).
-    const view = makeView({
+    const view = makeTrumpEfficiencyView({
       userId: 'p1', picker: 'p1', partner: 'p2',
       hand: [c('K','D'), c('J','D'), c('Q','S')],
       trick: [
@@ -2400,7 +2401,7 @@ describe('decidePlay trump efficiency — fail trick, bot void (Scenario 2)', ()
     // Trump in hand: AD and KD (count=2 > 1) → play highest trump.
     // Old lowestCard([AD,KD]): KD=4pts < AD=11pts → picks KD. Bug: should lead back AD (strongest).
     // New: myTrumpCount=2 > 1 → highestTrump([AD,KD]) = AD (rank8 < rank10).
-    const view = makeView({
+    const view = makeTrumpEfficiencyView({
       userId: 'p2', picker: 'p1', partner: 'p2',
       hand: [c('A','D'), c('K','D'), c('8','H')],
       trick: [
@@ -2417,7 +2418,7 @@ describe('decidePlay trump efficiency — fail trick, bot void (Scenario 2)', ()
     // Partner hand: JD (only trump), 8H, KS. myTrumpCount=1.
     // Picker (p1) not in trick. pickerCurrentlyWinning=false → play the trump.
     // Both old and new code return JD here; this test guards against regression.
-    const view = makeView({
+    const view = makeTrumpEfficiencyView({
       userId: 'p2', picker: 'p1', partner: 'p2',
       hand: [c('J','D'), c('8','H'), c('K','S')],
       trick: [
@@ -2436,7 +2437,7 @@ describe('decidePlay trump efficiency — fail trick, bot void (Scenario 2)', ()
     // Partner hand: 9D(only trump), AH(11pts), KS(4pts).
     // lowestCard([9D,AH,KS]): prefer non-trump; KS=4pts < AH=11pts → KS.
     // Old code: lowestCard([9D]) = 9D. Bug: wastes trump when picker has it locked.
-    const view = makeView({
+    const view = makeTrumpEfficiencyView({
       userId: 'p2', picker: 'p1', partner: 'p2',
       hand: [c('9','D'), c('A','H'), c('K','S')],
       trick: [
