@@ -38,7 +38,7 @@ export async function onRequestPost({ request, env, params }) {
     if (day_delta !== 0) {
       stmts.push(
         env.DB.prepare(
-          'INSERT INTO score_events (user_id, game_id, hand_number, delta, game_date, is_adjustment) VALUES (?, 0, 0, ?, ?, 1)'
+          'INSERT INTO score_events (user_id, game_id, hand_number, delta, game_date, is_adjustment) VALUES (?, NULL, 0, ?, ?, 1)'
         ).bind(userId, day_delta, today)
       )
     }
@@ -46,7 +46,7 @@ export async function onRequestPost({ request, env, params }) {
     if (lifetime_only_delta !== 0) {
       stmts.push(
         env.DB.prepare(
-          'INSERT INTO score_events (user_id, game_id, hand_number, delta, game_date, is_adjustment) VALUES (?, 0, 0, ?, NULL, 1)'
+          'INSERT INTO score_events (user_id, game_id, hand_number, delta, game_date, is_adjustment) VALUES (?, NULL, 0, ?, NULL, 1)'
         ).bind(userId, lifetime_only_delta)
       )
     }
