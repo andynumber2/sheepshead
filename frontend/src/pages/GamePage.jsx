@@ -559,6 +559,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
 
   const isMyPlayingTurn = state.phase === 'playing' && turnUserId === effectiveUserId
   const legalIds = isMyPlayingTurn ? getLegalCardIds(state, effectiveUserId, activeHand) : []
+  const isPickerOverlay = (state.phase === 'discarding' || state.phase === 'calling') && state.picker === effectiveUserId
 
   return (
     <div className="game-table">
@@ -584,8 +585,40 @@ export default function GamePage({ gameId, user, onNavigate }) {
         blind={state.phase === 'picking' ? (state.blind ?? []) : []}
       />
 
-      {/* ── Last trick (mini, mirrors seat positions) ── */}
-      <LastTrickArea lastTrick={lastTrick} seats={seats} />
+      {/* ── Right panel: last trick + game options + leave game ── */}
+      <div className="last-trick-area">
+        <LastTrickArea lastTrick={lastTrick} seats={seats} />
+        {isGameAdmin && (
+          <div style={{ width: '100%', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>
+            <div style={{ fontSize: '0.68rem', color: '#666', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Game options</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <span style={{ color: '#aaa', fontSize: '0.78rem' }}>
+                {VARIANT_LABELS[currentVariant ?? noPickVariant]} ·{' '}
+                Partner: {(revealPartner ?? gameData.reveal_partner ?? true) ? 'shown' : 'hidden'}
+                {(dobEnabled ?? gameData.double_on_bump ?? true) ? ' · DOB' : ''}
+              </span>
+              <button className="outline" style={{ fontSize: '0.78rem', padding: '2px 8px' }}
+                onClick={() => setShowOptions(true)}>
+                ⚙ Edit
+              </button>
+            </div>
+            <GameOptionsPanel
+              mode="update"
+              gameId={gameId}
+              open={showOptions}
+              values={{ no_pick_variant: currentVariant ?? noPickVariant, reveal_partner: revealPartner ?? gameData.reveal_partner ?? true, double_on_bump: dobEnabled ?? gameData.double_on_bump ?? true }}
+              onUpdated={handleSettingsUpdate}
+              onClose={() => setShowOptions(false)}
+            />
+          </div>
+        )}
+        <div style={{ marginTop: 'auto', width: '100%', display: 'flex', justifyContent: 'flex-end', paddingTop: 8 }}>
+          <button className="outline contrast" style={{ fontSize: '0.8rem' }}
+            onClick={handleLeave} aria-busy={leaving} disabled={leaving}>
+            Leave game
+          </button>
+        </div>
+      </div>
 
       {/* ── Info bar: called ace + partner reveal ── */}
       <div className="info-bar">
@@ -628,7 +661,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
 
       {/* ── Action panel (hidden on your real playing turn — cards in seat instead) ── */}
       {!(isMyPlayingTurn && !isActingForBot) && (
-        <div className="action-panel">
+        <div className={`action-panel${isPickerOverlay ? ' action-panel-discard-overlay' : ''}`}>
           <ActionPanel
             state={state}
             myUserId={effectiveUserId}
@@ -671,39 +704,6 @@ export default function GamePage({ gameId, user, onNavigate }) {
       {/* ── Game log ── */}
       <GameLog entries={resolvedLog} />
 
-      {/* ── Game admin settings (game creator only) ── */}
-      {isGameAdmin && (
-        <div className="score-board">
-          <div style={{ fontSize: '0.68rem', color: '#666', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Game options</div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            <span style={{ color: '#aaa', fontSize: '0.78rem' }}>
-              {VARIANT_LABELS[currentVariant ?? noPickVariant]} ·{' '}
-              Partner: {(revealPartner ?? gameData.reveal_partner ?? true) ? 'shown' : 'hidden'}
-              {(dobEnabled ?? gameData.double_on_bump ?? true) ? ' · DOB' : ''}
-            </span>
-            <button className="outline" style={{ fontSize: '0.78rem', padding: '2px 8px' }}
-              onClick={() => setShowOptions(true)}>
-              ⚙ Edit
-            </button>
-          </div>
-          <GameOptionsPanel
-            mode="update"
-            gameId={gameId}
-            open={showOptions}
-            values={{ no_pick_variant: currentVariant ?? noPickVariant, reveal_partner: revealPartner ?? gameData.reveal_partner ?? true, double_on_bump: dobEnabled ?? gameData.double_on_bump ?? true }}
-            onUpdated={handleSettingsUpdate}
-            onClose={() => setShowOptions(false)}
-          />
-        </div>
-      )}
-
-      {/* ── Leave button ── */}
-      <div style={{ gridColumn: '1 / -1', textAlign: 'right', padding: '0 4px' }}>
-        <button className="outline contrast" style={{ fontSize: '0.8rem' }}
-          onClick={handleLeave} aria-busy={leaving} disabled={leaving}>
-          Leave game
-        </button>
-      </div>
 
     </div>
   )
