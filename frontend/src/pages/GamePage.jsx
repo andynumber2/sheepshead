@@ -530,6 +530,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
     return {
       isDealer:      uid === dealerUserId,
       isPicker:      uid === pickerUserId,
+      isGoingAlone:  uid === pickerUserId && !!state.goingAlone,
       isPartner:     uid === partnerUserId,
       isYou:         uid === myUserId,
       isActiveTurn:  uid === turnUserId,
