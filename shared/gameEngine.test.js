@@ -11,6 +11,7 @@ import {
 } from './gameEngine.js'
 import {
   countTrumpPlayed, trumpRemainingElsewhere,
+  buriablePoints, handScore,
 } from './botInference.js'
 
 const c = (rank, suit) => ({ id: `${rank}${suit}`, rank, suit })
@@ -1688,5 +1689,44 @@ describe('trumpRemainingElsewhere', () => {
       discard: [c('Q','S'), c('K','H')],  // picker sees their own real discard
     }
     expect(trumpRemainingElsewhere(view, 'p1')).toBe(12)
+  })
+})
+
+describe('buriablePoints', () => {
+  it('returns sum of top 2 non-trump cards by point value', () => {
+    // AC=11, 10H=10, KS=4 → top 2 are AC + 10H = 21
+    const hand = [c('Q','C'), c('J','S'), c('A','C'), c('10','H'), c('K','S'), c('9','C')]
+    expect(buriablePoints(hand)).toBe(21)
+  })
+
+  it('returns 0 when fewer than 2 non-trump cards exist', () => {
+    const hand = [c('Q','C'), c('Q','S'), c('J','C'), c('J','S'), c('A','D'), c('10','D')]
+    expect(buriablePoints(hand)).toBe(0)
+  })
+
+  it('returns sum when exactly 2 non-trump cards exist', () => {
+    // KS=4, 9C=0 → 4
+    const hand = [c('Q','C'), c('Q','S'), c('J','C'), c('J','S'), c('K','S'), c('9','C')]
+    expect(buriablePoints(hand)).toBe(4)
+  })
+})
+
+describe('handScore', () => {
+  it('scores at >= 24 for 6 schwanzer pts, 0 burial (6*4+0=24)', () => {
+    // QC=3, QS=3 = 6 schwanzer pts; all trump, no burial → score = 24
+    const hand = [c('Q','C'), c('Q','S'), c('A','D'), c('10','D'), c('9','D'), c('8','D')]
+    expect(handScore(hand)).toBeGreaterThanOrEqual(24)
+  })
+
+  it('scores < 24 for 5 schwanzer pts, 0 burial (5*4+0=20)', () => {
+    // QC=3, JC=2 = 5 schwanzer pts; zero-point non-trump cards → buriable=0; score = 20
+    const hand = [c('Q','C'), c('J','C'), c('7','C'), c('8','C'), c('9','H'), c('8','H')]
+    expect(handScore(hand)).toBeLessThan(24)
+  })
+
+  it('scores at >= 24 for 5 schwanzer pts + two aces buried (5*4+22=42)', () => {
+    // QC=3, JC=2 = 5 schwanzer pts; AC=11, AH=11 → buriable=22; score = 42
+    const hand = [c('Q','C'), c('J','C'), c('A','D'), c('A','C'), c('A','H'), c('8','S')]
+    expect(handScore(hand)).toBeGreaterThanOrEqual(24)
   })
 })

@@ -2,7 +2,7 @@
 // Pure functions that derive facts from a player's view (own hand + played cards).
 // No decisions, no side effects. All functions receive a getPlayerView-redacted view.
 
-import { isTrump } from './gameEngine.js'
+import { isTrump, cardPoints, schwanzerCardPoints } from './gameEngine.js'
 
 // ─── Trump tracking ───────────────────────────────────────────────────────────
 
@@ -29,4 +29,21 @@ export function trumpRemainingElsewhere(view, userId) {
   const myTrump = (view.hands[userId] ?? []).filter(c => !c.hidden && isTrump(c)).length
   const discardTrump = (view.discard ?? []).filter(c => !c.hidden && isTrump(c)).length
   return 14 - myTrump - countTrumpPlayed(view, userId) - discardTrump
+}
+
+// ─── Hand evaluation ──────────────────────────────────────────────────────────
+
+// Sum of card points for the top 2 non-trump cards in hand.
+// Returns 0 if fewer than 2 non-trump cards exist.
+export function buriablePoints(hand) {
+  const nonTrump = hand.filter(c => !c.hidden && !isTrump(c))
+  const sorted = [...nonTrump].sort((a, b) => cardPoints(b) - cardPoints(a))
+  return sorted.slice(0, 2).reduce((sum, c) => sum + cardPoints(c), 0)
+}
+
+// Combined hand quality score for the pick decision.
+// schwanzerPts * 4 + buriablePoints. Threshold: >= 24 → pick.
+export function handScore(hand) {
+  const schwanzerPts = hand.reduce((sum, c) => sum + schwanzerCardPoints(c), 0)
+  return schwanzerPts * 4 + buriablePoints(hand)
 }
