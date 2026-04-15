@@ -37,6 +37,7 @@ export function trumpRemainingElsewhere(view, userId) {
 // Returns 0 if fewer than 2 non-trump cards exist.
 export function buriablePoints(hand) {
   const nonTrump = hand.filter(c => !c.hidden && !isTrump(c))
+  if (nonTrump.length < 2) return 0
   const sorted = [...nonTrump].sort((a, b) => cardPoints(b) - cardPoints(a))
   return sorted.slice(0, 2).reduce((sum, c) => sum + cardPoints(c), 0)
 }

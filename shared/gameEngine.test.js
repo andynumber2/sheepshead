@@ -1704,6 +1704,12 @@ describe('buriablePoints', () => {
     expect(buriablePoints(hand)).toBe(0)
   })
 
+  it('returns 0 when exactly 1 non-trump card exists', () => {
+    // Only KS is non-trump; fewer than 2 → 0
+    const hand = [c('Q','C'), c('Q','S'), c('J','C'), c('J','S'), c('A','D'), c('K','S')]
+    expect(buriablePoints(hand)).toBe(0)
+  })
+
   it('returns sum when exactly 2 non-trump cards exist', () => {
     // KS=4, 9C=0 → 4
     const hand = [c('Q','C'), c('Q','S'), c('J','C'), c('J','S'), c('K','S'), c('9','C')]
