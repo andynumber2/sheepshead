@@ -79,6 +79,61 @@ export function currentWinner(trick) {
   return winner
 }
 
+// ─── Void analysis ────────────────────────────────────────────────────────────
+
+// Returns 2 card IDs whose burial voids a non-trump suit with combined points >= 11,
+// or null if no qualifying void exists.
+//
+// For a 1-card suit: pairs the suit card with the highest-point eligible card from any
+// other suit (chosen for point value, not secondary voiding).
+// Among qualifying pairs, returns the highest-total pair.
+// Respects mustHold restrictions (same logic as decideDiscard).
+export function bestVoidDiscard(hand) {
+  const failAces = ['AC', 'AH', 'AS']
+  const failTens = ['10C', '10H', '10S']
+  const holdsAllAces = failAces.every(id => hand.some(c => c.id === id))
+  const holdsAllTens = failTens.every(id => hand.some(c => c.id === id))
+
+  let mustHold = []
+  if (holdsAllAces && holdsAllTens) mustHold = [...failAces, ...failTens]
+  else if (holdsAllAces) mustHold = [...failAces]
+
+  const eligible = hand.filter(c => !isTrump(c) && !mustHold.includes(c.id))
+
+  const bySuit = {}
+  for (const card of eligible) {
+    if (!bySuit[card.suit]) bySuit[card.suit] = []
+    bySuit[card.suit].push(card)
+  }
+
+  let bestPair = null
+  let bestTotal = 10  // require > 10 (i.e., >= 11)
+
+  for (const [suit, cards] of Object.entries(bySuit)) {
+    if (cards.length === 1) {
+      // Need a filler from another suit (highest-point eligible card)
+      const filler = eligible
+        .filter(c => c.suit !== suit)
+        .sort((a, b) => cardPoints(b) - cardPoints(a))[0]
+      if (!filler) continue
+      const total = cardPoints(cards[0]) + cardPoints(filler)
+      if (total > bestTotal) {
+        bestTotal = total
+        bestPair = [cards[0].id, filler.id]
+      }
+    } else if (cards.length === 2) {
+      const total = cardPoints(cards[0]) + cardPoints(cards[1])
+      if (total > bestTotal) {
+        bestTotal = total
+        bestPair = [cards[0].id, cards[1].id]
+      }
+    }
+    // 3+ cards: burying 2 won't void this suit — skip
+  }
+
+  return bestPair
+}
+
 // ─── Schmear detection ────────────────────────────────────────────────────────
 
 // Returns true if the player currently winning the trick is on the same team as userId.

@@ -13,6 +13,7 @@ import {
   countTrumpPlayed, trumpRemainingElsewhere,
   buriablePoints, handScore,
   beats, currentWinner, teammateWinning,
+  bestVoidDiscard,
 } from './botInference.js'
 
 const c = (rank, suit) => ({ id: `${rank}${suit}`, rank, suit })
@@ -1857,5 +1858,48 @@ describe('teammateWinning', () => {
       partner: 'p2',
     }
     expect(teammateWinning(view, 'p1')).toBe(false)
+  })
+})
+
+describe('bestVoidDiscard', () => {
+  it('returns 2-card IDs that void a suit when burial total >= 11', () => {
+    // AC(11) + KC(4) in clubs = 15 pts >= 11 → void clubs
+    const hand = [c('Q','C'), c('J','S'), c('A','D'), c('A','C'), c('K','C'), c('9','H'), c('8','S'), c('7','S')]
+    const result = bestVoidDiscard(hand)
+    expect(result).not.toBeNull()
+    expect(result).toHaveLength(2)
+    expect(result).toContain('AC')
+    expect(result).toContain('KC')
+  })
+
+  it('returns null when no suit can be voided with >= 11 pts', () => {
+    // Clubs: 7C + 8C = 0+0 = 0 pts, Hearts: 9H only (1 card), Spades: 7S + 8S = 0 pts
+    const hand = [c('Q','C'), c('J','S'), c('A','D'), c('10','D'), c('7','C'), c('8','C'), c('9','H'), c('7','S')]
+    expect(bestVoidDiscard(hand)).toBeNull()
+  })
+
+  it('handles 1-card suit: pairs with highest-point filler from another suit', () => {
+    // Spades: only KS (4 pts). Filler: AH (11 pts). Total = 15 → qualifies
+    const hand = [c('Q','C'), c('J','C'), c('A','D'), c('10','D'), c('K','S'), c('A','H'), c('8','C'), c('7','C')]
+    const result = bestVoidDiscard(hand)
+    expect(result).not.toBeNull()
+    expect(result).toContain('KS')
+    expect(result).toContain('AH')
+  })
+
+  it('returns null for suit with 3+ cards (burying 2 does not void it)', () => {
+    // Clubs: AC+KC+9C (3 cards), Hearts: AH+KH+9H (3 cards), Spades: AS+KS+9S (3 cards)
+    const hand = [c('Q','C'), c('A','C'), c('K','C'), c('A','H'), c('K','H'), c('A','S'), c('K','S'), c('9','C')]
+    expect(bestVoidDiscard(hand)).toBeNull()
+  })
+
+  it('excludes mustHold cards — cannot bury fail ace when holding all 3', () => {
+    // Picker holds AC, AH, AS — mustHold = [AC, AH, AS]
+    // After mustHold exclusion: no eligible cards in clubs except... check what's left
+    // Hand: AC(mustHold), AH(mustHold), AS(mustHold), QC, JC, KS, 9D, 8D
+    // Eligible non-trump non-mustHold: KS only (1 card, 4 pts). Need filler from other suit.
+    // No other eligible non-trump → null
+    const hand = [c('A','C'), c('A','H'), c('A','S'), c('Q','C'), c('J','C'), c('K','S'), c('9','D'), c('8','D')]
+    expect(bestVoidDiscard(hand)).toBeNull()
   })
 })
