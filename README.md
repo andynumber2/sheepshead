@@ -26,5 +26,5 @@ npm run deploy       # build and deploy to Cloudflare Pages
 
 ## Rules
 
-See [RULES.md](RULES.md) for the full game rules.
-See [BOTS.md](BOTS.md) for a description of the bot strategy.
+See [RULES.md](docs/RULES.md) for the full game rules.
+See [BOTS.md](docs/BOTS.md) for a description of the bot strategy.

@@ -58,10 +58,10 @@ Direct pushes to `main` are blocked by a pre-push hook (`.githooks/pre-push`). A
 
 ## RULES Sync
 
-`RULES.md` contains a plain-English description of the game rules. **Whenever you change game rules in `shared/gameEngine.js`, also update `RULES.md` to match.**
+`docs/RULES.md` contains a plain-English description of the game rules. **Whenever you change game rules in `shared/gameEngine.js`, also update `docs/RULES.md` to match.**
 
 ## BOTS Sync
-`BOTS.md` contains a plain-English description of the bot's strategy. **Whenever you change bot strategy in `shared/botStrategy.js` or `shared/botInference.js`, also update `BOTS.md` to match.** When you are asked to work on bot strategy, read BOTS.md first for context. Always compare BOTS.md to the code before working on strategy and make sure they are consistent with each other. If they are not, STOP, and let the user know there is an inconsistency so they can decide whether to fix it or not.
+`docs/BOTS.md` contains a plain-English description of the bot's strategy. **Whenever you change bot strategy in `shared/botStrategy.js` or `shared/botInference.js`, also update `docs/BOTS.md` to match.** When you are asked to work on bot strategy, read `docs/BOTS.md` first for context. Always compare `docs/BOTS.md` to the code before working on strategy and make sure they are consistent with each other. If they are not, STOP, and let the user know there is an inconsistency so they can decide whether to fix it or not.
 
 ## General Rules
 
