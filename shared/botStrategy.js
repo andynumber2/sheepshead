@@ -6,7 +6,7 @@
 import {
   isTrump, cardPoints, effectiveSuit, trumpRank, suitRank, schwanzerCardPoints,
 } from './gameEngine.js'
-import { currentWinner, beats, handScore } from './botInference.js'
+import { currentWinner, beats, handScore, bestVoidDiscard } from './botInference.js'
 
 // ─── Legal card helper ────────────────────────────────────────────────────────
 // Mirrors getLegalCardIds from the frontend; computes which cards can be played.
@@ -117,6 +117,9 @@ export function decideBlitz(view, userId) {
 // ─── decideDiscard ────────────────────────────────────────────────────────────
 export function decideDiscard(view, userId) {
   const hand = view.hands[userId]  // 8 cards after picking up blind
+
+  const voidCards = bestVoidDiscard(hand)
+  if (voidCards) return voidCards
 
   // Replicate mustHold logic from gameEngine.discard to avoid illegal discards
   const failAces = ['AC', 'AH', 'AS']

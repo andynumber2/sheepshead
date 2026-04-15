@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { decidePick } from './botStrategy.js'
+import { decidePick, decideDiscard } from './botStrategy.js'
 import {
   isTrump, trumpRank, suitRank, effectiveSuit, cardPoints,
   schwanzerCardPoints, resolveSchwanzer,
@@ -1933,5 +1933,25 @@ describe('decidePick', () => {
     // QC=3, JC=2 = 5 schwanzer pts; AC+AH non-trump = 22 burial; score = 42
     const hand = [c('Q','C'), c('J','C'), c('7','C'), c('A','C'), c('A','H'), c('8','S')]
     expect(decidePick({ hands: { p1: hand } }, 'p1')).toBe(true)
+  })
+})
+
+describe('decideDiscard', () => {
+  it('buries void pair when suit can be voided with >= 11 pts', () => {
+    // AC(11) + KC(4) in clubs = 15 pts → void clubs
+    const hand = [c('Q','C'), c('J','S'), c('A','D'), c('A','C'), c('K','C'), c('9','H'), c('8','S'), c('7','S')]
+    const result = decideDiscard({ hands: { p1: hand }, discard: [] }, 'p1')
+    expect(result).toHaveLength(2)
+    expect(result).toContain('AC')
+    expect(result).toContain('KC')
+  })
+
+  it('falls back to greedy when no qualifying void', () => {
+    // Hearts: 10H + 9H = 10 pts (< 11). Spades: 8S + 7S = 0 pts. No qualifying void.
+    // Greedy buries highest-point non-trump: AC(11) + 10H(10)
+    const hand = [c('Q','C'), c('J','S'), c('A','D'), c('A','C'), c('10','H'), c('9','H'), c('8','S'), c('7','S')]
+    const result = decideDiscard({ hands: { p1: hand }, discard: [] }, 'p1')
+    expect(result).toContain('AC')
+    expect(result).toContain('10H')
   })
 })
