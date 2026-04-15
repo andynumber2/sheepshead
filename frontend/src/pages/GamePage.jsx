@@ -201,7 +201,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
 
     // Schedule the play — but only once per (turn, trick-progress) pair so
     // repeated polling of an unchanged state doesn't keep resetting the timer.
-    const key = `${turnUserId}:${state.currentTrick?.length ?? 0}`
+    const key = `${state.handNumber}:${turnUserId}:${state.currentTrick?.length ?? 0}`
     if (autoPlayRef.current.key === key) return
     if (autoPlayRef.current.timer) clearTimeout(autoPlayRef.current.timer)
     autoPlayRef.current.key = key
@@ -236,7 +236,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
     const currentPlayerData = players?.find(p => String(p.user_id) === turnUserId)
     if (currentPlayerData?.bot_type !== 'play') return
 
-    const key = `${turnUserId}:${state.tricks?.length ?? 0}:${state.currentTrick?.length ?? 0}`
+    const key = `${state.handNumber}:${turnUserId}:${state.tricks?.length ?? 0}:${state.currentTrick?.length ?? 0}`
     if (botPlayRef.current.key === key) return
     if (botPlayRef.current.timer) clearTimeout(botPlayRef.current.timer)
     botPlayRef.current.key = key
