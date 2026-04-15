@@ -148,6 +148,12 @@ export function decideDiscard(view, userId) {
 export function decideCall(view, userId) {
   const { callMode, hands, discard: discardCards } = view
   const hand = hands[userId]
+
+  // Go alone with a dominant trump hand
+  const trumpCount = hand.filter(c => isTrump(c)).length
+  const queenCount = hand.filter(c => c.rank === 'Q').length
+  if (trumpCount >= 6 && queenCount >= 2) return { type: 'alone' }
+
   const buried = (discardCards ?? []).filter(c => !c.hidden)
   const suits = ['C', 'H', 'S']
 

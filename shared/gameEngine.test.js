@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { decidePick, decideDiscard } from './botStrategy.js'
+import { decidePick, decideDiscard, decideCall } from './botStrategy.js'
 import {
   isTrump, trumpRank, suitRank, effectiveSuit, cardPoints,
   schwanzerCardPoints, resolveSchwanzer,
@@ -1953,5 +1953,28 @@ describe('decideDiscard', () => {
     const result = decideDiscard({ hands: { p1: hand }, discard: [] }, 'p1')
     expect(result).toContain('AC')
     expect(result).toContain('10H')
+  })
+})
+
+describe('decideCall go-alone', () => {
+  it('goes alone with 6 trump and 2 queens', () => {
+    // QC, QS (2 queens), JC, JH, AD, 10D = 6 trump
+    const hand = [c('Q','C'), c('Q','S'), c('J','C'), c('J','H'), c('A','D'), c('10','D')]
+    const view = { callMode: 'ace', hands: { p1: hand }, discard: [] }
+    expect(decideCall(view, 'p1').type).toBe('alone')
+  })
+
+  it('does not go alone with only 1 queen even with 6 trump', () => {
+    // QC (1 queen), JC, JS, JH, JD, AD = 6 trump
+    const hand = [c('Q','C'), c('J','C'), c('J','S'), c('J','H'), c('J','D'), c('A','D')]
+    const view = { callMode: 'ace', hands: { p1: hand }, discard: [] }
+    expect(decideCall(view, 'p1').type).not.toBe('alone')
+  })
+
+  it('does not go alone with 2 queens but only 5 trump', () => {
+    // QC, QS (2 queens), JC, AD, 10D = 5 trump; AH is fail
+    const hand = [c('Q','C'), c('Q','S'), c('J','C'), c('A','D'), c('10','D'), c('A','H')]
+    const view = { callMode: 'ace', hands: { p1: hand }, discard: [] }
+    expect(decideCall(view, 'p1').type).not.toBe('alone')
   })
 })
