@@ -240,7 +240,6 @@ export function discard(state, userId, cardIds) {
   newState.pickerMustHold = mustHold
   newState.callMode = callMode
   newState.phase = 'calling'
-  newState.log.push(`${userId} discarded 2 cards.`)
 
   return newState
 }
