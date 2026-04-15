@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import { decidePick } from './botStrategy.js'
 import {
   isTrump, trumpRank, suitRank, effectiveSuit, cardPoints,
   schwanzerCardPoints, resolveSchwanzer,
@@ -1912,5 +1913,25 @@ describe('bestVoidDiscard', () => {
       c('K','S'), c('Q','C'),
     ]
     expect(bestVoidDiscard(hand)).toBeNull()
+  })
+})
+
+describe('decidePick', () => {
+  it('picks when handScore >= 24 (6 schwanzer pts, 0 burial = 24)', () => {
+    // QC=3, QS=3 = 6 schwanzer pts; 7C+8C non-trump = 0 burial; score = 24
+    const hand = [c('Q','C'), c('Q','S'), c('J','C'), c('J','S'), c('7','C'), c('8','C')]
+    expect(decidePick({ hands: { p1: hand } }, 'p1')).toBe(true)
+  })
+
+  it('passes when handScore < 24 (5 schwanzer pts, 0 burial = 20)', () => {
+    // QC=3, JC=2 = 5 schwanzer pts; 7C+8C non-trump = 0 burial; score = 20
+    const hand = [c('Q','C'), c('J','C'), c('7','C'), c('8','C'), c('9','C'), c('9','H')]
+    expect(decidePick({ hands: { p1: hand } }, 'p1')).toBe(false)
+  })
+
+  it('picks when 5 schwanzer pts + two aces (score = 42)', () => {
+    // QC=3, JC=2 = 5 schwanzer pts; AC+AH non-trump = 22 burial; score = 42
+    const hand = [c('Q','C'), c('J','C'), c('7','C'), c('A','C'), c('A','H'), c('8','S')]
+    expect(decidePick({ hands: { p1: hand } }, 'p1')).toBe(true)
   })
 })

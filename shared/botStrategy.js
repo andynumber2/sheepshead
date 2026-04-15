@@ -6,7 +6,7 @@
 import {
   isTrump, cardPoints, effectiveSuit, trumpRank, suitRank, schwanzerCardPoints,
 } from './gameEngine.js'
-import { currentWinner, beats } from './botInference.js'
+import { currentWinner, beats, handScore } from './botInference.js'
 
 // ─── Legal card helper ────────────────────────────────────────────────────────
 // Mirrors getLegalCardIds from the frontend; computes which cards can be played.
@@ -101,23 +101,7 @@ function highestValueCard(cards) {
 // ─── decidePick ───────────────────────────────────────────────────────────────
 export function decidePick(view, userId) {
   const hand = view.hands[userId]
-  const schwanzerPts = hand.reduce((sum, c) => sum + schwanzerCardPoints(c), 0)
-
-  if (schwanzerPts >= 7) return true
-
-  if (schwanzerPts >= 6) return true
-
-  if (schwanzerPts >= 5) {
-    // Must also have at least 20 points worth burying (fail aces/tens are ideal)
-    const nonTrump = hand.filter(c => !isTrump(c))
-    const burialPts = nonTrump
-      .sort((a, b) => cardPoints(b) - cardPoints(a))
-      .slice(0, 2)
-      .reduce((sum, c) => sum + cardPoints(c), 0)
-    return burialPts >= 20
-  }
-
-  return false
+  return handScore(hand) >= 24
 }
 
 // ─── decideBlitz ──────────────────────────────────────────────────────────────
