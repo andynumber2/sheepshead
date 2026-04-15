@@ -2052,7 +2052,7 @@ describe('decidePlay schmearing', () => {
       trickCard: c('Q','C'),
       handCards: [c('A','H'), c('9','S'), c('8','C')],
     })
-    // Should NOT schmear — play lowest
-    expect(decidePlay(view, 'p3')).not.toBe('AH')
+    // Should NOT schmear — play lowest (9S: 0 pts, first 0-pt non-trump encountered)
+    expect(decidePlay(view, 'p3')).toBe('9S')
   })
 })
