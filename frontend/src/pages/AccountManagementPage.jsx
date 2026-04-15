@@ -252,14 +252,16 @@ export default function AccountManagementPage({ currentUser, onNavigate }) {
       {loading
         ? <p aria-busy="true">Loading users…</p>
         : (
-          <table style={{ width: '100%', tableLayout: 'fixed', fontSize: '0.78rem' }}>
+          <>
+          <style>{`.acct-mgmt td, .acct-mgmt th { padding: 4px 6px; }`}</style>
+          <table className="acct-mgmt" style={{ width: '100%', tableLayout: 'fixed', fontSize: '0.74rem' }}>
               <colgroup>
-                <col style={{ width: '4%' }} />
-                <col style={{ width: '20%' }} />
+                <col style={{ width: '5%' }} />
+                <col style={{ width: '27%' }} />
+                <col style={{ width: '6%' }} />
                 <col style={{ width: '7%' }} />
-                <col style={{ width: '9%' }} />
-                <col style={{ width: '26%' }} />
-                <col style={{ width: '34%' }} />
+                <col style={{ width: '25%' }} />
+                <col style={{ width: '30%' }} />
               </colgroup>
               <thead>
                 <tr>
@@ -283,6 +285,7 @@ export default function AccountManagementPage({ currentUser, onNavigate }) {
                 ))}
               </tbody>
             </table>
+          </>
         )
       }
     </div>
