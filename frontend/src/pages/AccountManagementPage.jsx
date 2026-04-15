@@ -298,12 +298,12 @@ export default function AccountManagementPage({ currentUser, onNavigate }) {
               <colgroup>
                 <col style={{ width: '4%' }} />
                 <col style={{ width: '20%' }} />
-                <col style={{ width: '5%' }} />
                 <col style={{ width: '6%' }} />
-                <col style={{ width: '14%' }} />
-                <col style={{ width: '8%' }} />
+                <col style={{ width: '7%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '7%' }} />
                 <col style={{ width: '9%' }} />
-                <col style={{ width: '34%' }} />
+                <col style={{ width: '35%' }} />
               </colgroup>
               <thead>
                 <tr>
@@ -311,7 +311,7 @@ export default function AccountManagementPage({ currentUser, onNavigate }) {
                   <SortTh col="username">Username</SortTh>
                   <SortTh col="is_admin">Admin</SortTh>
                   <SortTh col="is_bot">Test Bot</SortTh>
-                  <SortTh col="created_at">Created / New password</SortTh>
+                  <SortTh col="created_at">Created</SortTh>
                   <SortTh col="day_score">Day</SortTh>
                   <SortTh col="lifetime_score">Lifetime</SortTh>
                   <th>Actions</th>
