@@ -37,6 +37,9 @@ export const api = {
     getUser:      (id)        => request('GET',   `/admin/users/${id}`),
     updateUser:   (id, patch) => request('PATCH', `/admin/users/${id}`, patch),
     deleteUser: (id)        => request('DELETE', `/admin/users/${id}`),
+    adjustScore:  (id, newDayScore, newLifetimeScore) =>
+                    request('POST', `/admin/users/${id}/score-adjustment`,
+                      { new_day_score: newDayScore, new_lifetime_score: newLifetimeScore }),
     getConfig:    ()          => request('GET',   '/admin/config'),
     updateConfig: (patch)     => request('PATCH', '/admin/config', patch),
   },

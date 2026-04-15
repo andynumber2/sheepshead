@@ -1,4 +1,4 @@
-import { json, err, getUser } from '../_helpers.js'
+import { json, err, getUser, centralDate } from '../_helpers.js'
 
 export async function onRequestGet({ request, env }) {
   const user = await getUser(request, env.DB)
@@ -10,8 +10,8 @@ export async function onRequestGet({ request, env }) {
   ).bind(user.user_id).first()
 
   const today = await env.DB.prepare(
-    "SELECT COALESCE(SUM(delta), 0) as total FROM score_events WHERE user_id = ? AND date(recorded_at) = date('now')"
-  ).bind(user.user_id).first()
+    'SELECT COALESCE(SUM(delta), 0) as total FROM score_events WHERE user_id = ? AND game_date = ?'
+  ).bind(user.user_id, centralDate()).first()
 
   return json({
     id: user.user_id,

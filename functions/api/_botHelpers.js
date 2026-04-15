@@ -1,6 +1,8 @@
 // ─── Bot helpers ─────────────────────────────────────────────────────────────
 // Shared utilities for play bot allocation and server-side bot turn processing.
 
+import { centralDate } from './_helpers.js'
+
 import {
   currentPicker, currentPlayer,
   pick, blitz, pass, discard,
@@ -27,10 +29,11 @@ export async function finishHand(DB, gameId, state) {
     state.scores = scores
   }
 
+  const today = centralDate()
   const stmts = Object.entries(scores).map(([userId, delta]) =>
     DB.prepare(
-      'INSERT INTO score_events (user_id, game_id, hand_number, delta) VALUES (?, ?, ?, ?)'
-    ).bind(Number(userId), gameId, state.handNumber, delta)
+      'INSERT INTO score_events (user_id, game_id, hand_number, delta, game_date) VALUES (?, ?, ?, ?, ?)'
+    ).bind(Number(userId), gameId, state.handNumber, delta, today)
   )
   await DB.batch(stmts)
 

@@ -1,4 +1,4 @@
-import { json, err, requireAdmin, hashPassword, randomHex, AuthError } from '../../../_helpers.js'
+import { json, err, requireAdmin, hashPassword, randomHex, AuthError, centralDate } from '../../../_helpers.js'
 
 export async function onRequest({ request, env, params }) {
   try {
@@ -28,8 +28,8 @@ async function getUser({ request, env, params }) {
   ).bind(userId).first()
 
   const today = await env.DB.prepare(
-    "SELECT COALESCE(SUM(delta), 0) as total FROM score_events WHERE user_id = ? AND date(recorded_at) = date('now')"
-  ).bind(userId).first()
+    'SELECT COALESCE(SUM(delta), 0) as total FROM score_events WHERE user_id = ? AND game_date = ?'
+  ).bind(userId, centralDate()).first()
 
   return json({ ...user, lifetimeScore: lifetime?.total ?? 0, todayScore: today?.total ?? 0 })
 }

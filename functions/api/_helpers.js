@@ -81,3 +81,13 @@ export function sessionCookie(token, expire = false) {
   const maxAge = 7 * 24 * 60 * 60
   return `session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`
 }
+
+/**
+ * Returns today's date in America/Chicago timezone as a YYYY-MM-DD string.
+ * Uses Intl (supported in Cloudflare Workers) so DST is handled automatically.
+ */
+export function centralDate() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Chicago',
+  }).format(new Date())
+}
