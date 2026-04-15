@@ -75,7 +75,7 @@ Getting the lead is valuable for the picker team. Picker and partner behave diff
 
 - **Picker:** Always play `highestTrump(winning)`. Taking the lead is the goal; commit strongest trump.
 - **Partner with >1 trump in hand:** Play `highestTrump(winning)`. Plan is to win the trick and lead trump back to the picker.
-- **Partner with exactly 1 trump in hand:** Play `lowestCard(realCards)`. No lead-back plan exists; don't spend the only trump on this trick.
+- **Partner with exactly 1 trump in hand:** Play the trump, unless the picker is currently winning the trick AND no opponents remain to play (picker has it locked) — in that case play `lowestCard(realCards)`. A smarter future improvement using card-counting inference is tracked in andynumber2/sheepshead#92.
 
 "Trump in hand" is counted from `realCards.filter(c => isTrump(c)).length` (since the bot is void in led suit, `realCards` = full hand).
 
@@ -90,10 +90,11 @@ New tests in `gameEngine.test.js`:
 - Handles single-card input
 
 ### `decidePlay` integration (state-construction tests)
-Six branches to cover:
+Seven branches to cover:
 1. Non-trump win → `lowestCard` behavior unchanged
 2. Trump trick, 0 opponents remaining → cheapest winning trump selected
 3. Trump trick, ≥1 opponent remaining → highest winning trump selected
 4. Picker void on fail trick → highest trump
 5. Partner void on fail trick, >1 trump → highest trump
-6. Partner void on fail trick, 1 trump → low non-trump dumped
+6. Partner void on fail trick, 1 trump, picker not winning → trump played
+7. Partner void on fail trick, 1 trump, picker winning and no opponents remaining → low non-trump dumped
