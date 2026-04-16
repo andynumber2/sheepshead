@@ -1,24 +1,27 @@
-import { json, err, getUser, centralDate } from '../_helpers.js'
+import { json, err, getUser, getDayScoreRange } from '../_helpers.js'
 
 export async function onRequestGet({ request, env }) {
   const user = await getUser(request, env.DB)
   if (!user) return err('Not authenticated.', 401)
 
-  // Fetch lifetime + today scores
-  const lifetime = await env.DB.prepare(
-    'SELECT COALESCE(SUM(delta), 0) as total FROM score_events WHERE user_id = ?'
+  const tzRow = await env.DB.prepare("SELECT value FROM config WHERE key = 'score_timezone'").first()
+  const timezone = tzRow?.value ?? 'America/Chicago'
+  const [dayStart, dayEnd] = getDayScoreRange(timezone)
+
+  const lifetimeRow = await env.DB.prepare(
+    'SELECT lifetime_score FROM user_scores WHERE user_id = ?'
   ).bind(user.user_id).first()
 
-  const today = await env.DB.prepare(
-    'SELECT COALESCE(SUM(delta), 0) as total FROM score_events WHERE user_id = ? AND game_date = ?'
-  ).bind(user.user_id, centralDate()).first()
+  const todayRow = await env.DB.prepare(
+    'SELECT COALESCE(SUM(delta), 0) as total FROM score_events WHERE user_id = ? AND recorded_at >= ? AND recorded_at < ?'
+  ).bind(user.user_id, dayStart, dayEnd).first()
 
   return json({
-    id: user.user_id,
-    username: user.username,
-    is_admin: user.is_admin === 1,
-    is_bot:   user.is_bot   === 1,
-    lifetimeScore: lifetime?.total ?? 0,
-    todayScore:    today?.total    ?? 0,
+    id:            user.user_id,
+    username:      user.username,
+    is_admin:      user.is_admin === 1,
+    is_bot:        user.is_bot   === 1,
+    lifetimeScore: lifetimeRow?.lifetime_score ?? 0,
+    todayScore:    todayRow?.total ?? 0,
   })
 }

@@ -1,4 +1,4 @@
-import { json, err, requireAdmin, hashPassword, randomHex, AuthError, centralDate } from '../../../_helpers.js'
+import { json, err, requireAdmin, hashPassword, randomHex, getDayScoreRange, AuthError } from '../../../_helpers.js'
 
 export async function onRequest({ request, env, params }) {
   try {
@@ -19,19 +19,25 @@ async function getUser({ request, env, params }) {
   const user = await env.DB.prepare(
     'SELECT id, username, is_admin, is_bot, created_at FROM users WHERE id = ?'
   ).bind(userId).first()
-
   if (!user) return err('User not found.', 404)
 
-  // Lifetime and today scores
-  const lifetime = await env.DB.prepare(
-    'SELECT COALESCE(SUM(delta), 0) as total FROM score_events WHERE user_id = ?'
+  const tzRow = await env.DB.prepare("SELECT value FROM config WHERE key = 'score_timezone'").first()
+  const timezone = tzRow?.value ?? 'America/Chicago'
+  const [dayStart, dayEnd] = getDayScoreRange(timezone)
+
+  const lifetimeRow = await env.DB.prepare(
+    'SELECT lifetime_score FROM user_scores WHERE user_id = ?'
   ).bind(userId).first()
 
-  const today = await env.DB.prepare(
-    'SELECT COALESCE(SUM(delta), 0) as total FROM score_events WHERE user_id = ? AND game_date = ?'
-  ).bind(userId, centralDate()).first()
+  const todayRow = await env.DB.prepare(
+    'SELECT COALESCE(SUM(delta), 0) as total FROM score_events WHERE user_id = ? AND recorded_at >= ? AND recorded_at < ?'
+  ).bind(userId, dayStart, dayEnd).first()
 
-  return json({ ...user, lifetimeScore: lifetime?.total ?? 0, todayScore: today?.total ?? 0 })
+  return json({
+    ...user,
+    lifetimeScore: lifetimeRow?.lifetime_score ?? 0,
+    todayScore:    todayRow?.total ?? 0,
+  })
 }
 
 async function updateUser({ request, env, params }) {
@@ -124,6 +130,7 @@ async function deleteUser({ request, env, params }) {
   await env.DB.batch([
     env.DB.prepare('DELETE FROM game_players WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM score_events WHERE user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM user_scores WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId),
   ])
 
