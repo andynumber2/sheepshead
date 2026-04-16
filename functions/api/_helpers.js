@@ -83,11 +83,31 @@ export function sessionCookie(token, expire = false) {
 }
 
 /**
- * Returns today's date in America/Chicago timezone as a YYYY-MM-DD string.
- * Uses Intl (supported in Cloudflare Workers) so DST is handled automatically.
+ * Returns [startISO, endISO] as UTC ISO strings bounding "today" in the given timezone.
+ * Uses Intl for DST-correct boundary calculation.
+ *
+ * @param {string} timezone  IANA timezone name, e.g. 'America/Chicago'
+ * @returns {[string, string]}
  */
-export function centralDate() {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Chicago',
-  }).format(new Date())
+export function getDayScoreRange(timezone) {
+  const now = new Date()
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(now)
+  const [y, m, d] = today.split('-').map(Number)
+  const start = _localMidnightUTC(y, m, d,     timezone)
+  const end   = _localMidnightUTC(y, m, d + 1, timezone)
+  return [start.toISOString(), end.toISOString()]
+}
+
+function _localMidnightUTC(y, m, d, timezone) {
+  // Noon UTC of the given date (JS handles day-overflow in Date.UTC, e.g. day=32 → next month)
+  const noonRef = new Date(Date.UTC(y, m - 1, d, 12, 0, 0))
+  // What local time does noon UTC correspond to in the timezone?
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).formatToParts(noonRef)
+  const h   = parseInt(parts.find(p => p.type === 'hour').value)
+  const min = parseInt(parts.find(p => p.type === 'minute').value)
+  const sec = parseInt(parts.find(p => p.type === 'second').value)
+  // Local midnight = noonRef minus the local time at noonRef
+  return new Date(noonRef.getTime() - (h * 3600 + min * 60 + sec) * 1000)
 }
