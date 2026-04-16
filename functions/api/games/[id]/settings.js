@@ -9,8 +9,6 @@ export async function onRequestPatch({ request, env, params }) {
     const game = await env.DB.prepare('SELECT * FROM games WHERE id = ?').bind(gameId).first()
     if (!game) return err('Game not found.', 404)
     if (game.status === 'complete') return err('Game is already complete.')
-
-    // Only admin (creator) may change settings
     if (game.created_by !== userId) return err('Only the game admin can change settings.', 403)
 
     let body
@@ -28,24 +26,35 @@ export async function onRequestPatch({ request, env, params }) {
       return err('double_on_bump must be a boolean.')
     }
 
-    const fields = []
-    const values = []
-    if (no_pick_variant !== undefined) { fields.push('no_pick_variant = ?'); values.push(no_pick_variant) }
-    if (reveal_partner  !== undefined) { fields.push('reveal_partner = ?');  values.push(reveal_partner ? 1 : 0) }
-    if (double_on_bump !== undefined) { fields.push('double_on_bump = ?'); values.push(double_on_bump ? 1 : 0) }
+    // Build json_set args for the fields that were provided
+    let jsonSetExpr = 'settings_json'
+    const bindings = []
+    // Note: use json(?) with 'true'/'false' strings to ensure SQLite stores proper
+    // JSON booleans rather than integers (D1 binds JS true as SQLite 1 otherwise).
+    if (no_pick_variant !== undefined) {
+      jsonSetExpr = `json_set(${jsonSetExpr}, '$.no_pick_variant', ?)`
+      bindings.push(no_pick_variant)
+    }
+    if (reveal_partner !== undefined) {
+      jsonSetExpr = `json_set(${jsonSetExpr}, '$.reveal_partner', json(?))`
+      bindings.push(reveal_partner ? 'true' : 'false')
+    }
+    if (double_on_bump !== undefined) {
+      jsonSetExpr = `json_set(${jsonSetExpr}, '$.double_on_bump', json(?))`
+      bindings.push(double_on_bump ? 'true' : 'false')
+    }
 
-    if (fields.length === 0) return err('No settings to update.')
+    if (bindings.length === 0) return err('No settings to update.')
 
-    values.push(gameId)
+    bindings.push(gameId)
     await env.DB.prepare(
-      `UPDATE games SET ${fields.join(', ')}, updated_at = datetime('now') WHERE id = ?`
-    ).bind(...values).run()
+      `UPDATE games SET settings_json = ${jsonSetExpr}, updated_at = datetime('now') WHERE id = ?`
+    ).bind(...bindings).run()
 
-    const updated = await env.DB.prepare(
-      'SELECT no_pick_variant, reveal_partner, double_on_bump FROM games WHERE id = ?'
-    ).bind(gameId).first()
+    const updated = await env.DB.prepare('SELECT settings_json FROM games WHERE id = ?').bind(gameId).first()
+    const settings = JSON.parse(updated.settings_json)
 
-    return json({ ok: true, ...updated, reveal_partner: updated.reveal_partner === 1, double_on_bump: updated.double_on_bump === 1 })
+    return json({ ok: true, settings })
   } catch (e) {
     if (e instanceof AuthError) return err(e.message, 401)
     return err(e.message, 500)
