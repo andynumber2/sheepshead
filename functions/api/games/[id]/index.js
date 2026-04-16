@@ -1,4 +1,4 @@
-import { json, err, requireUser, AuthError } from '../../_helpers.js'
+import { json, err, requireUser, getDayScoreRange, AuthError } from '../../_helpers.js'
 import { getPlayerView } from '../../../../shared/gameEngine.js'
 
 export async function onRequestGet({ request, env, params }) {
@@ -6,10 +6,17 @@ export async function onRequestGet({ request, env, params }) {
     const user = await requireUser(request, env.DB)
     const gameId = params.id
 
-    const game = await env.DB.prepare(
-      'SELECT * FROM games WHERE id = ?'
-    ).bind(gameId).first()
+    const game = await env.DB.prepare('SELECT * FROM games WHERE id = ?').bind(gameId).first()
     if (!game) return err('Game not found.', 404)
+
+    const rawSettings = JSON.parse(game.settings_json)
+    // Normalize booleans: json_set may store 1/0 (SQLite integers) instead of true/false
+    const settings = {
+      ...rawSettings,
+      is_test_mode:   !!rawSettings.is_test_mode,
+      reveal_partner: !!rawSettings.reveal_partner,
+      double_on_bump: !!rawSettings.double_on_bump,
+    }
 
     const { results: players } = await env.DB.prepare(
       `SELECT gp.seat, gp.user_id, u.username, u.is_bot, u.bot_type
@@ -19,29 +26,36 @@ export async function onRequestGet({ request, env, params }) {
        ORDER BY gp.seat`
     ).bind(gameId).all()
 
-    // Game score + day score + lifetime score for each player in one query
+    // Lifetime from user_scores cache; game score and day score from bounded score_events queries
+    const tzRow = await env.DB.prepare("SELECT value FROM config WHERE key = 'score_timezone'").first()
+    const timezone = tzRow?.value ?? 'America/Chicago'
+    const [dayStart, dayEnd] = getDayScoreRange(timezone)
+
     const { results: scoreRows } = await env.DB.prepare(`
       SELECT
         user_id,
-        COALESCE(SUM(CASE WHEN game_id = ? THEN delta ELSE 0 END), 0)                        AS game_score,
-        COALESCE(SUM(CASE WHEN date(recorded_at) = date('now') THEN delta ELSE 0 END), 0)    AS day_score,
-        COALESCE(SUM(delta), 0)                                                               AS lifetime_score
+        COALESCE(SUM(CASE WHEN game_id = ? THEN delta ELSE 0 END), 0) AS game_score,
+        COALESCE(SUM(CASE WHEN recorded_at >= ? AND recorded_at < ? THEN delta ELSE 0 END), 0) AS day_score
       FROM score_events
       WHERE user_id IN (SELECT user_id FROM game_players WHERE game_id = ?)
       GROUP BY user_id
-    `).bind(gameId, gameId).all()
+    `).bind(gameId, dayStart, dayEnd, gameId).all()
 
-    const scoreMap = Object.fromEntries(scoreRows.map(r => [r.user_id, r]))
+    const { results: lifetimeRows } = await env.DB.prepare(`
+      SELECT user_id, lifetime_score
+      FROM user_scores
+      WHERE user_id IN (SELECT user_id FROM game_players WHERE game_id = ?)
+    `).bind(gameId).all()
 
-    const playersWithScores = players.map(p => {
-      const s = scoreMap[p.user_id] ?? {}
-      return {
-        ...p,
-        score:           s.game_score     ?? 0,
-        day_score:       s.day_score      ?? 0,
-        lifetime_score:  s.lifetime_score ?? 0,
-      }
-    })
+    const scoreMap    = Object.fromEntries(scoreRows.map(r => [r.user_id, r]))
+    const lifetimeMap = Object.fromEntries(lifetimeRows.map(r => [r.user_id, r.lifetime_score]))
+
+    const playersWithScores = players.map(p => ({
+      ...p,
+      score:          scoreMap[p.user_id]?.game_score  ?? 0,
+      day_score:      scoreMap[p.user_id]?.day_score    ?? 0,
+      lifetime_score: lifetimeMap[p.user_id]            ?? 0,
+    }))
 
     let stateView = null
     if (game.status === 'active') {
@@ -52,21 +66,19 @@ export async function onRequestGet({ request, env, params }) {
       if (stateRow) {
         const state = JSON.parse(stateRow.state_json)
         const userId = String(user.user_id)
-        const isTestModeAdmin = game.is_test_mode && user.is_admin
-
-        // In test mode the admin sees all hands unredacted
+        const isTestModeAdmin = settings.is_test_mode && user.is_admin
         stateView = isTestModeAdmin ? state : getPlayerView(state, userId)
       }
     }
 
     return json({
-      ...game,
-      is_test_mode:    game.is_test_mode    === 1,
-      reveal_partner:  game.reveal_partner  === 1,
-      double_on_bump:  game.double_on_bump  === 1,
-      is_admin:        game.created_by      === user.user_id,
-      players:         playersWithScores,
-      state:           stateView,
+      id:       game.id,
+      name:     game.name,
+      status:   game.status,
+      is_admin: game.created_by === user.user_id,
+      settings,
+      players:  playersWithScores,
+      state:    stateView,
     })
   } catch (e) {
     if (e instanceof AuthError) return err(e.message, 401)
