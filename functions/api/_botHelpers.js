@@ -52,8 +52,6 @@ export async function finishHand(DB, gameId, state) {
     "UPDATE hands SET variant = ?, completed_at = datetime('now') WHERE game_id = ? AND hand_number = ?"
   ).bind(variant, gameId, state.handNumber)
 
-  await DB.batch([...scoreStmts, ...upsertStmts, completeHandStmt])
-
   // Deal the next hand
   const { results: players } = await DB.prepare(
     'SELECT user_id FROM game_players WHERE game_id = ? ORDER BY seat'
@@ -62,6 +60,7 @@ export async function finishHand(DB, gameId, state) {
   const nextDealer = (state.dealerSeat + 1) % 5
   const nextHandNumber = state.handNumber + 1
   const nextState = dealHand(playerIds, nextDealer, nextHandNumber, 1)
+  nextState.doublerMultiplier = 1
 
   const gameRow = await DB.prepare('SELECT settings_json FROM games WHERE id = ?').bind(gameId).first()
   const settings = JSON.parse(gameRow.settings_json)
@@ -72,24 +71,20 @@ export async function finishHand(DB, gameId, state) {
   nextState.lastTrick = state.lastTrick
 
   // Reset doubler_multiplier in settings_json
-  await DB.prepare(
+  const gameUpdateStmt = DB.prepare(
     "UPDATE games SET settings_json = json_set(settings_json, '$.doubler_multiplier', 1), updated_at = datetime('now') WHERE id = ?"
-  ).bind(gameId).run()
+  ).bind(gameId)
 
-  // Insert next hands row + deal action
-  const nextSeq = await DB.prepare(
-    'SELECT COALESCE(MAX(seq), -1) + 1 AS next FROM hand_actions WHERE game_id = ? AND hand_number = ?'
-  ).bind(gameId, nextHandNumber).first()
-
+  // Insert next hands row + deal action (seq is always 0 for the first action of a new hand)
   const nextHandStmt = DB.prepare(
     'INSERT INTO hands (game_id, hand_number) VALUES (?, ?)'
   ).bind(gameId, nextHandNumber)
 
   const dealActionStmt = DB.prepare(
-    'INSERT INTO hand_actions (game_id, hand_number, seq, type, user_id, payload_json) VALUES (?, ?, ?, ?, NULL, ?)'
-  ).bind(gameId, nextHandNumber, nextSeq.next, 'deal', JSON.stringify(nextState))
+    'INSERT INTO hand_actions (game_id, hand_number, seq, type, user_id, payload_json) VALUES (?, ?, 0, ?, NULL, ?)'
+  ).bind(gameId, nextHandNumber, 'deal', JSON.stringify(nextState))
 
-  await DB.batch([nextHandStmt, dealActionStmt])
+  await DB.batch([...scoreStmts, ...upsertStmts, completeHandStmt, gameUpdateStmt, nextHandStmt, dealActionStmt])
 
   return nextState
 }
@@ -312,25 +307,13 @@ async function resolveNoPick(state, game, DB, gameId) {
   newState.double_on_bump = settings.double_on_bump
   newState.log = [...state.log, ...newState.log, `Doubler! Stakes are now ×${newMultiplier}.`]
 
-  // Complete current hands row (no-pick, no variant)
-  await DB.prepare(
-    "UPDATE hands SET variant = 'no_pick', completed_at = datetime('now') WHERE game_id = ? AND hand_number = ?"
-  ).bind(gameId, state.handNumber).run()
-
-  await DB.prepare(
-    "UPDATE games SET settings_json = json_set(settings_json, '$.doubler_multiplier', ?), updated_at = datetime('now') WHERE id = ?"
-  ).bind(newMultiplier, gameId).run()
-
-  // Insert next hands row + deal action
-  const nextSeq = await DB.prepare(
-    'SELECT COALESCE(MAX(seq), -1) + 1 AS next FROM hand_actions WHERE game_id = ? AND hand_number = ?'
-  ).bind(gameId, nextHandNumber).first()
-
+  // Complete current hand, update multiplier, and insert next hand + deal action atomically
+  // seq is always 0 for the first action of a new hand
   await DB.batch([
+    DB.prepare("UPDATE hands SET variant = 'no_pick', completed_at = datetime('now') WHERE game_id = ? AND hand_number = ?").bind(gameId, state.handNumber),
+    DB.prepare("UPDATE games SET settings_json = json_set(settings_json, '$.doubler_multiplier', ?), updated_at = datetime('now') WHERE id = ?").bind(newMultiplier, gameId),
     DB.prepare('INSERT INTO hands (game_id, hand_number) VALUES (?, ?)').bind(gameId, nextHandNumber),
-    DB.prepare(
-      'INSERT INTO hand_actions (game_id, hand_number, seq, type, user_id, payload_json) VALUES (?, ?, ?, ?, NULL, ?)'
-    ).bind(gameId, nextHandNumber, nextSeq.next, 'deal', JSON.stringify(newState)),
+    DB.prepare('INSERT INTO hand_actions (game_id, hand_number, seq, type, user_id, payload_json) VALUES (?, ?, 0, ?, NULL, ?)').bind(gameId, nextHandNumber, 'deal', JSON.stringify(newState)),
   ])
 
   return newState
