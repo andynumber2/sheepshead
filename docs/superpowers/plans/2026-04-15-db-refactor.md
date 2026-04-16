@@ -163,7 +163,6 @@ PRAGMA foreign_keys = ON;
 -- Seed users
 INSERT INTO users (username, password_hash, salt, is_bot, is_admin)
 VALUES ('Andy', '2f3e5a700d5c568561c5bb1db688c20e70b04ac2c4c30d63b61e963dcaf1d146', 'd4c672acd04728977b0d24e409b46321', 0, 1);
-UPDATE users SET is_admin = 1 WHERE lower(username) = 'andy';
 
 INSERT OR IGNORE INTO users (username, password_hash, salt, is_bot, bot_type) VALUES
   ('Bot01', 'bot-no-login', 'bot-salt-01', 1, 'test'),
