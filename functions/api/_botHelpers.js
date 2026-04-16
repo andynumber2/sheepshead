@@ -15,6 +15,15 @@ import {
   decidePick, decideBlitz, decideDiscard, decideCall, decidePlay,
 } from '../../shared/botStrategy.js'
 
+async function appendAction(DB, gameId, handNumber, type, userId, payload) {
+  const row = await DB.prepare(
+    'SELECT COALESCE(MAX(seq), -1) + 1 AS next FROM hand_actions WHERE game_id = ? AND hand_number = ?'
+  ).bind(gameId, handNumber).first()
+  await DB.prepare(
+    'INSERT INTO hand_actions (game_id, hand_number, seq, type, user_id, payload_json) VALUES (?, ?, ?, ?, ?, ?)'
+  ).bind(gameId, handNumber, row.next, type, userId ? Number(userId) : null, payload ? JSON.stringify(payload) : null).run()
+}
+
 // ─── finishHand ───────────────────────────────────────────────────────────────
 // Called when the hand reaches scoring phase. Writes score events, deals the
 // next hand, and returns the fresh state. Shared by action.js and processBotTurns.
@@ -195,11 +204,21 @@ export async function processBotTurns(state, gameId, DB, game, { allowTrick1Lead
     }
 
     const view = getPlayerView(current, nextActorId)
-    current = applyBotDecision(current, nextActorId, view)
+    const handNumberBeforeAction = current.handNumber
+    const { state: newState, actionType, payload } = applyBotDecision(current, nextActorId, view)
+    current = newState
+    if (actionType) {
+      await appendAction(DB, gameId, handNumberBeforeAction, actionType, nextActorId, payload)
+    }
 
     // Resolve no-pick (all players passed)
     if (current.phase === 'no_pick') {
+      const noPickHandNumber = current.handNumber
       current = await resolveNoPick(current, game, DB, gameId)
+      const noPickSettings = JSON.parse(game.settings_json)
+      if (noPickSettings.no_pick_variant === 'leasters') {
+        await appendAction(DB, gameId, noPickHandNumber, 'setup_leaster', null, null)
+      }
     }
 
     if (wasPlayingPhase) {
@@ -247,35 +266,43 @@ function applyBotDecision(state, userId, view) {
     case 'picking': {
       const potentialBlitz = (view.potentialBlitzes ?? []).find(b => b.userId === userId)
       if (potentialBlitz && decideBlitz(view, userId)) {
-        return blitz(state, userId)
+        return { state: blitz(state, userId), actionType: 'blitz', payload: null }
       }
       const shouldPick = decidePick(view, userId)
-      return shouldPick ? pick(state, userId) : pass(state, userId)
+      if (shouldPick) {
+        return { state: pick(state, userId), actionType: 'pick', payload: null }
+      }
+      return { state: pass(state, userId), actionType: 'pass', payload: null }
     }
 
     case 'discarding': {
       const cardIds = decideDiscard(view, userId)
-      return discard(state, userId, cardIds)
+      return { state: discard(state, userId, cardIds), actionType: 'discard', payload: { cardIds } }
     }
 
     case 'calling': {
       const decision = decideCall(view, userId)
       switch (decision.type) {
-        case 'ace':         return callAce(state, userId, decision.suit)
-        case 'ace_unknown': return callAceUnknown(state, userId, decision.suit, decision.underCardId)
-        case 'ten':         return callTen(state, userId, decision.suit)
-        case 'king':        return callKing(state, userId, decision.suit)
-        default:            return goAlone(state, userId)
+        case 'ace':
+          return { state: callAce(state, userId, decision.suit), actionType: 'call_ace', payload: { suit: decision.suit } }
+        case 'ace_unknown':
+          return { state: callAceUnknown(state, userId, decision.suit, decision.underCardId), actionType: 'call_ace_unknown', payload: { suit: decision.suit, underCardId: decision.underCardId } }
+        case 'ten':
+          return { state: callTen(state, userId, decision.suit), actionType: 'call_ten', payload: { suit: decision.suit } }
+        case 'king':
+          return { state: callKing(state, userId, decision.suit), actionType: 'call_king', payload: { suit: decision.suit } }
+        default:
+          return { state: goAlone(state, userId), actionType: 'go_alone', payload: null }
       }
     }
 
     case 'playing': {
       const cardId = decidePlay(view, userId)
-      return playCard(state, userId, cardId)
+      return { state: playCard(state, userId, cardId), actionType: 'play_card', payload: { cardId } }
     }
 
     default:
-      return state
+      return { state, actionType: null, payload: null }
   }
 }
 
