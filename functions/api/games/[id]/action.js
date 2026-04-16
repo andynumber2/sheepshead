@@ -101,11 +101,12 @@ export async function onRequestPost({ request, env, params }) {
             newState.double_on_bump = freshSettings.double_on_bump
             newState.log = [...state.log, ...newState.log, `Doubler! Stakes are now ×${newMultiplier}.`]
 
+            const { rewindHistory: _dNew, ...newStateToStore } = newState
             await env.DB.batch([
               env.DB.prepare("UPDATE hands SET variant = 'no_pick', completed_at = datetime('now') WHERE game_id = ? AND hand_number = ?").bind(gameId, handNumberBeforePass),
               env.DB.prepare("UPDATE games SET settings_json = json_set(settings_json, '$.doubler_multiplier', ?), updated_at = datetime('now') WHERE id = ?").bind(newMultiplier, gameId),
               env.DB.prepare('INSERT INTO hands (game_id, hand_number) VALUES (?, ?)').bind(gameId, nextHandNumber),
-              env.DB.prepare('INSERT INTO hand_actions (game_id, hand_number, seq, type, user_id, payload_json) VALUES (?, ?, 0, ?, NULL, ?)').bind(gameId, nextHandNumber, 'deal', JSON.stringify(newState)),
+              env.DB.prepare('INSERT INTO hand_actions (game_id, hand_number, seq, type, user_id, payload_json) VALUES (?, ?, 0, ?, NULL, ?)').bind(gameId, nextHandNumber, 'deal', JSON.stringify(newStateToStore)),
             ])
             state = newState
           }
