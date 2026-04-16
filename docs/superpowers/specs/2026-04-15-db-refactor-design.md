@@ -198,6 +198,59 @@ Lifetime scores read from `user_scores` (single-row lookup). Game scores and day
 
 ---
 
+## Code changes
+
+### Migration
+A single new migration (`0010_refactor.sql`) that drops and recreates all affected tables. Clean slate — no data migration.
+
+### `shared/gameEngine.js`
+- Remove the `rewindHistory` field from the `dealHand` return value.
+- Remove `rewindPlay` and `rewindTrick` — rewind is now handled by the API layer via action log replay.
+- No other changes to game logic; all state transitions remain pure functions.
+
+### `shared/actionReplay.js` (new)
+A new module with two exports:
+- `replayActions(actions)` — takes an array of `hand_actions` rows (ordered by `seq`) and replays them through `gameEngine.js` to produce a final state. The `deal` action seeds the initial state via `dealHand`; subsequent actions are dispatched to the appropriate engine function. Returns the resulting state.
+- Used by both the rewind path and (eventually) the recap UI.
+
+### `functions/api/games/[id]/index.js` (game read)
+- Parse `settings_json` from `games` instead of reading individual columns.
+- Source lifetime scores from `user_scores` (single-row lookup per player).
+- Source game scores from a bounded `score_events` query filtered by `game_id`.
+- Source day scores from a bounded `score_events` query using a UTC range derived from `score_timezone` in `config` (per #111).
+
+### `functions/api/games/` (game creation)
+- Write `settings_json` to `games` instead of individual setting columns.
+- Insert a row into `hands` when the first hand is dealt.
+
+### Action processing (all action endpoints)
+Every action handler must:
+1. Execute the engine function to get the new state.
+2. Append a row to `hand_actions` (game_id, hand_number, seq, type, user_id, payload_json).
+3. Write the new state (without `rewindHistory`) to `game_state`.
+
+Hand completion additionally:
+4. Update `hands` row: set `variant` and `completed_at`.
+5. Insert one `score_events` row per player.
+6. Upsert `user_scores` for each player (increment `lifetime_score`).
+7. Insert a row into `hands` for the next hand when it is dealt.
+
+### Rewind endpoint
+- Fetch `hand_actions` for the current hand ordered by `seq`.
+- Delete the last row (for `rewindPlay`) or all rows in the current trick (for `rewindTrick`).
+- Call `replayActions` on the remaining rows to get the new state.
+- Write the replayed state to `game_state`.
+
+### `functions/api/admin/users/[id]/score-adjustment.js`
+- Remove the `score_events` insert.
+- Write the adjustment delta directly to `user_scores` (upsert, increment `lifetime_score`).
+
+### `functions/api/_botHelpers.js` and bot action handlers
+- Read game settings from `settings_json` instead of individual columns.
+- Append to `hand_actions` on each bot action (same as human action handlers).
+
+---
+
 ## What's not in this refactor
 
 - Game recap UI (#120) — the data layer is laid here; the frontend step-through UI is separate scope.
