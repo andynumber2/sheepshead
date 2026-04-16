@@ -198,6 +198,48 @@ Lifetime scores read from `user_scores` (single-row lookup). Game scores and day
 
 ---
 
+## API interface changes
+
+### `GET /api/games/[id]` and `GET /api/games`
+Game settings are nested under a `settings` object in the response, matching the storage model:
+```json
+{
+  "id": 1,
+  "name": "Andy's game",
+  "status": "active",
+  "settings": {
+    "no_pick_variant": "leasters",
+    "doubler_multiplier": 1,
+    "is_test_mode": false,
+    "reveal_partner": true,
+    "double_on_bump": true
+  },
+  ...
+}
+```
+Previously these were flat fields on the game object (`game.is_test_mode`, `game.reveal_partner`, etc.). All frontend references update accordingly.
+
+### `POST /api/games` (create)
+Request body uses the same nested `settings` shape:
+```json
+{ "name": "My game", "settings": { "no_pick_variant": "leasters", "reveal_partner": false } }
+```
+
+### `PATCH /api/games/[id]/settings`
+Request body is a partial `settings` object:
+```json
+{ "no_pick_variant": "schwanzers", "double_on_bump": false }
+```
+Implementation reads the current `settings_json`, merges the patch, and writes back. Response returns the full updated `settings` object.
+
+### `POST /api/admin/users/[id]/score-adjustment`
+`new_day_score` is dropped entirely. Day score is a derived value (sum of real `score_events` rows for today) and cannot be directly set. The endpoint now accepts only `new_lifetime_score` (absolute integer). The server reads `user_scores.lifetime_score`, computes the delta, and applies it directly to `user_scores` — no `score_events` insert.
+
+### Future surface (out of scope for this refactor)
+`GET /api/games/[id]/hands/[hand_number]/actions` — returns the `hand_actions` log for a completed hand. Required for the recap UI (#120) but not implemented here.
+
+---
+
 ## Code changes
 
 ### Migration
@@ -214,14 +256,15 @@ A new module with two exports:
 - Used by both the rewind path and (eventually) the recap UI.
 
 ### `functions/api/games/[id]/index.js` (game read)
-- Parse `settings_json` from `games` instead of reading individual columns.
+- Parse `settings_json` and return it as a nested `settings` object.
 - Source lifetime scores from `user_scores` (single-row lookup per player).
 - Source game scores from a bounded `score_events` query filtered by `game_id`.
 - Source day scores from a bounded `score_events` query using a UTC range derived from `score_timezone` in `config` (per #111).
 
-### `functions/api/games/` (game creation)
-- Write `settings_json` to `games` instead of individual setting columns.
-- Insert a row into `hands` when the first hand is dealt.
+### `functions/api/games/index.js` (list + create)
+- List: extract `no_pick_variant` and `is_test_mode` from `settings_json` for the list response.
+- Create: accept nested `settings` in request body; write `settings_json` to `games`.
+- Insert a row into `hands` when the first hand is dealt (test-mode auto-start path).
 
 ### Action processing (all action endpoints)
 Every action handler must:
@@ -242,12 +285,17 @@ Hand completion additionally:
 - Write the replayed state to `game_state`.
 
 ### `functions/api/admin/users/[id]/score-adjustment.js`
-- Remove the `score_events` insert.
-- Write the adjustment delta directly to `user_scores` (upsert, increment `lifetime_score`).
+- Accept only `new_lifetime_score` (drop `new_day_score`).
+- Read current `user_scores.lifetime_score`, compute delta, upsert `user_scores`.
+- No `score_events` insert.
 
 ### `functions/api/_botHelpers.js` and bot action handlers
-- Read game settings from `settings_json` instead of individual columns.
+- Read game settings from `settings_json` (via the nested `settings` object) instead of individual columns.
 - Append to `hand_actions` on each bot action (same as human action handlers).
+
+### Frontend
+- All references to `game.is_test_mode`, `game.reveal_partner`, `game.double_on_bump`, `game.no_pick_variant` update to `game.settings.*`.
+- Admin score adjustment panel removes the day score field; accepts only the new lifetime score target.
 
 ---
 
