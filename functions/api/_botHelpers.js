@@ -317,6 +317,7 @@ async function resolveNoPick(state, game, DB, gameId) {
     const { scores } = resolveSchwanzer(state)
     state.scores = scores
     state.phase = 'scoring'
+    await appendAction(DB, gameId, state.handNumber, 'schwanzer_score', null, JSON.stringify({ scores }))
     return finishHand(DB, gameId, state)
   }
 

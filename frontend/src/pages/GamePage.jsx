@@ -488,10 +488,10 @@ export default function GamePage({ gameId, user, onNavigate }) {
     && (state.tricks ?? []).length === 0
     && (state.currentTrick ?? []).length === 0
 
-  const rewindHistory = state.rewindHistory ?? []
-  const canRewindPlay  = isTestMode && user.is_admin && state.phase === 'playing' && rewindHistory.length > 0
+  const canRewindPlay  = isTestMode && user.is_admin && state.phase === 'playing'
+    && ((state.currentTrick?.length ?? 0) > 0 || (state.tricks ?? []).length > 0)
   const canRewindTrick = isTestMode && user.is_admin && state.phase === 'playing'
-    && !(rewindHistory.length === 0 && (state.tricks ?? []).length === 0 && (state.currentTrick ?? []).length === 0)
+    && ((state.tricks ?? []).length > 0 || (state.currentTrick ?? []).length > 0)
 
   function seatProps(player) {
     if (!player) return {}

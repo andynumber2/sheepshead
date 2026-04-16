@@ -85,6 +85,7 @@ export async function onRequestPost({ request, env, params }) {
             const { scores } = resolveSchwanzer(state)
             state.scores = scores
             state.phase = 'scoring'
+            await appendAction(env.DB, gameId, handNumberBeforePass, 'schwanzer_score', null, JSON.stringify({ scores }))
             state = await finishHand(env.DB, gameId, state)
           } else {
             // Doublers — deal a new hand with doubled multiplier

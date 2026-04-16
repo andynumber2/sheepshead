@@ -36,6 +36,7 @@ export function replayActions(actions) {
       case 'go_alone':         state = goAlone(state, uid); break
       case 'crack':            state = crack(state, uid); break
       case 'recrack':          state = recrack(state, uid); break
+      case 'schwanzer_score':  break  // scores are applied by finishHand; no-op on replay
       case 'play_card': {
         state = playCard(state, uid, payload.cardId)
         if (state.isLeaster && state.leasterBlind?.length > 0 && state.tricks.length === 1) {
