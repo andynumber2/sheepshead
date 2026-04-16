@@ -43,9 +43,12 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
     try {
       const game = await api.games.create(
         gameName.trim() || `${user.username}'s game`,
-        gameOptions.no_pick_variant,
-        user.is_admin ? testMode : false,
-        { reveal_partner: gameOptions.reveal_partner, double_on_bump: gameOptions.double_on_bump },
+        {
+          no_pick_variant: gameOptions.no_pick_variant,
+          is_test_mode:    user.is_admin ? testMode : false,
+          reveal_partner:  gameOptions.reveal_partner,
+          double_on_bump:  gameOptions.double_on_bump,
+        }
       )
       onNavigate(`/game/${game.id}`)
     } catch (e) {
@@ -200,7 +203,7 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
                 {game.is_admin && (
                   <span className="badge badge-dealer" style={{ marginLeft: 6 }}>your game</span>
                 )}
-                {game.is_test_mode && (
+                {game.settings?.is_test_mode && (
                   <span className="badge" style={{ background: '#7c3aed', color: '#fff', marginLeft: 6 }}>test</span>
                 )}
                 <span style={{ marginLeft: 6, fontSize: '0.75rem', color: '#888' }}>
@@ -208,7 +211,7 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
                 </span>
                 <br />
                 <small>
-                  {VARIANT_LABELS[game.no_pick_variant]} ·{' '}
+                  {VARIANT_LABELS[game.settings?.no_pick_variant]} ·{' '}
                   {game.player_count}/5 players ·{' '}
                   <span style={{ color: game.status === 'active' ? '#f59e0b' : '#4ade80' }}>
                     {STATUS_LABELS[game.status]}
