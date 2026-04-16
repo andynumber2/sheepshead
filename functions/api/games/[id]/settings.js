@@ -52,7 +52,8 @@ export async function onRequestPatch({ request, env, params }) {
     ).bind(...bindings).run()
 
     const updated = await env.DB.prepare('SELECT settings_json FROM games WHERE id = ?').bind(gameId).first()
-    const settings = JSON.parse(updated.settings_json)
+    const raw = JSON.parse(updated.settings_json)
+    const settings = { ...raw, reveal_partner: !!raw.reveal_partner, double_on_bump: !!raw.double_on_bump, is_test_mode: !!raw.is_test_mode }
 
     return json({ ok: true, settings })
   } catch (e) {
