@@ -47,7 +47,19 @@ export default function ReplayControls({ actionIndex, totalActions, onJump, play
           <button disabled={atEnd} onClick={auto.toggle}>{auto.running ? '⏸ Pause' : '▶▶ Auto'}</button>
         </div>
       </div>
-      <div className="replay-scrubber">
+      <div
+        className="replay-scrubber"
+        role="slider"
+        aria-valuemin={0}
+        aria-valuemax={totalActions - 1}
+        aria-valuenow={actionIndex}
+        onClick={e => {
+          if (totalActions <= 1) return
+          const rect = e.currentTarget.getBoundingClientRect()
+          const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
+          onJump(Math.round(ratio * (totalActions - 1)))
+        }}
+      >
         <div className="fill" style={{ width: `${totalActions > 1 ? (actionIndex / (totalActions - 1)) * 100 : 0}%` }} />
       </div>
     </>

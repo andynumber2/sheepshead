@@ -82,7 +82,14 @@ export default function DetailedReplayPage({ gameId, handNumber, startSeq, onNav
   const seatTopRight = players.find(p => p.seat === 3)
   const seatRight = players.find(p => p.seat === 4)
 
-  const dealtOf = uid => digest.dealt[uid] ?? []
+  // The picker's play-phase hand is (dealt + blind) − pickerDiscards, not the raw dealt array.
+  const pickerPlayHand = pickerId && digest.blind && digest.pickerDiscards
+    ? (() => {
+        const discards = new Set(digest.pickerDiscards)
+        return [...(digest.dealt[pickerId] ?? []), ...digest.blind].filter(c => !discards.has(c))
+      })()
+    : null
+  const dealtOf = uid => (uid === pickerId && pickerPlayHand) ? pickerPlayHand : (digest.dealt[uid] ?? [])
   const rolesOf = uid => ({
     isPicker: uid === pickerId,
     isPartner: uid === partnerId,
@@ -147,13 +154,15 @@ export default function DetailedReplayPage({ gameId, handNumber, startSeq, onNav
         </div>
       </div>
 
-      <ReplayControls
-        actionIndex={actionIndex}
-        totalActions={rawActions.length}
-        onJump={setActionIndex}
-        playLabel={playLabel}
-        trickBoundaries={trickBoundaries}
-      />
+      <div className="replay-sticky">
+        <ReplayControls
+          actionIndex={actionIndex}
+          totalActions={rawActions.length}
+          onJump={setActionIndex}
+          playLabel={playLabel}
+          trickBoundaries={trickBoundaries}
+        />
+      </div>
     </div>
   )
 }
