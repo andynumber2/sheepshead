@@ -7,6 +7,7 @@ import GamePage from './pages/GamePage.jsx'
 import AccountManagementPage from './pages/AccountManagementPage.jsx'
 import AdminPanelPage from './pages/AdminPanelPage.jsx'
 import RecapPage from './pages/RecapPage.jsx'
+import DetailedReplayPage from './pages/DetailedReplayPage.jsx'
 
 function getRoute() {
   return window.location.hash.replace('#', '') || '/'
@@ -66,11 +67,15 @@ export default function App() {
     )
   }
 
-  const { page, gameId, handNumber } = parseRoute(route)
+  const { page, gameId, handNumber, seq } = parseRoute(route)
 
   // Recap page is public — no auth required. Render before the auth guard.
   if (page === 'recap') {
     return <RecapPage gameId={gameId} handNumber={handNumber} onNavigate={navigate} />
+  }
+
+  if (page === 'recap-replay') {
+    return <DetailedReplayPage gameId={gameId} handNumber={handNumber} startSeq={seq} onNavigate={navigate} />
   }
 
   if (!user) {
