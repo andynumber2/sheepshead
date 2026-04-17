@@ -85,3 +85,28 @@ describe('buildHandDigest — Normal variant', () => {
     expect(digest.scores).toContainEqual({ userId: '1', cardPoints: expect.any(Number), scoreDelta: -2 })
   })
 })
+
+describe('buildHandDigest — Leaster variant', () => {
+  it('sets variant to leaster and nulls picker/partner/blind', () => {
+    // Simulate a completed leaster hand: all players passed, setup_leaster ran,
+    // tricks were played. We inject isLeaster directly into the deal payload to
+    // match the state that setup_leaster would have produced, avoiding engine
+    // phase-assertion issues in the replay path (pass() requires phase='picking').
+    const initial = dealHand(['1', '2', '3', '4', '5'], 0, 1, 1)
+    initial.isLeaster = true
+    initial.phase = 'playing'
+    initial.tricks = []  // no tricks yet
+
+    const actions = [
+      { type: 'deal', user_id: null, payload_json: JSON.stringify(initial), seq: 0 },
+    ]
+    const digest = buildHandDigest(actions, PLAYERS, { 1: -1, 2: -1, 3: -1, 4: -1, 5: 4 })
+
+    expect(digest.variant).toBe('leaster')
+    expect(digest.picker).toBeNull()
+    expect(digest.partner).toBeNull()
+    expect(digest.calledCard).toBeNull()
+    expect(digest.blind).toBeNull()
+    expect(digest.pickerDiscards).toBeNull()
+  })
+})
