@@ -706,7 +706,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
       )}
 
       {/* ── Game log ── */}
-      <GameLog entries={resolvedLog} />
+      <GameLog entries={resolvedLog} gameId={gameId} />
 
 
     </div>

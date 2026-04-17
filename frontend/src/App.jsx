@@ -6,12 +6,18 @@ import LobbyPage from './pages/LobbyPage.jsx'
 import GamePage from './pages/GamePage.jsx'
 import AccountManagementPage from './pages/AccountManagementPage.jsx'
 import AdminPanelPage from './pages/AdminPanelPage.jsx'
+import RecapPage from './pages/RecapPage.jsx'
+import DetailedReplayPage from './pages/DetailedReplayPage.jsx'
 
 function getRoute() {
   return window.location.hash.replace('#', '') || '/'
 }
 
 function parseRoute(route) {
+  const replayMatch = route.match(/^\/recap\/(\d+)\/(\d+)\/replay(?:\?seq=(\d+))?$/)
+  if (replayMatch) return { page: 'recap-replay', gameId: replayMatch[1], handNumber: replayMatch[2], seq: replayMatch[3] ? Number(replayMatch[3]) : null }
+  const recapMatch = route.match(/^\/recap\/(\d+)\/(\d+)$/)
+  if (recapMatch) return { page: 'recap', gameId: recapMatch[1], handNumber: recapMatch[2] }
   const gameMatch = route.match(/^\/game\/(\d+)$/)
   if (gameMatch) return { page: 'game', gameId: gameMatch[1] }
   if (route === '/register')           return { page: 'register' }
@@ -61,7 +67,16 @@ export default function App() {
     )
   }
 
-  const { page, gameId } = parseRoute(route)
+  const { page, gameId, handNumber, seq } = parseRoute(route)
+
+  // Recap page is public — no auth required. Render before the auth guard.
+  if (page === 'recap') {
+    return <RecapPage gameId={gameId} handNumber={handNumber} onNavigate={navigate} />
+  }
+
+  if (page === 'recap-replay') {
+    return <DetailedReplayPage gameId={gameId} handNumber={handNumber} startSeq={seq} onNavigate={navigate} />
+  }
 
   if (!user) {
     if (page === 'register') return <RegisterPage onLogin={handleLogin} />
