@@ -86,6 +86,27 @@ describe('buildHandDigest — Normal variant', () => {
   })
 })
 
+describe('buildHandDigest — Schwanzer variant', () => {
+  it('sets variant to schwanzer and returns empty tricks', () => {
+    const initial = dealHand(['1', '2', '3', '4', '5'], 0, 1, 1)
+    initial.phase = 'no_pick'
+
+    const actions = [
+      { type: 'deal', user_id: null, payload_json: JSON.stringify(initial), seq: 0 },
+      { type: 'schwanzer_score', user_id: null, payload_json: null, seq: 1 },
+    ]
+    const digest = buildHandDigest(actions, PLAYERS, { 1: 1, 2: 1, 3: 1, 4: -4, 5: 1 })
+
+    expect(digest.variant).toBe('schwanzer')
+    expect(digest.tricks).toEqual([])
+    expect(digest.picker).toBeNull()
+    expect(digest.blind).toBeNull()
+    expect(digest.pickerDiscards).toBeNull()
+    expect(digest.dealt['1']).toHaveLength(6)
+    expect(digest.scores.find(s => s.userId === '4').scoreDelta).toBe(-4)
+  })
+})
+
 describe('buildHandDigest — Leaster variant', () => {
   it('sets variant to leaster and nulls picker/partner/blind', () => {
     // Simulate a completed leaster hand: all players passed, setup_leaster ran,
