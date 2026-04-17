@@ -24,7 +24,7 @@ export const api = {
   },
   games: {
     list:           ()                              => request('GET',   '/games'),
-    create:         (name, noPickVariant, testMode, options = {}) => request('POST',  '/games', { name, no_pick_variant: noPickVariant, test_mode: testMode, ...options }),
+    create:         (name, settings = {}) => request('POST', '/games', { name, settings }),
     get:            (id)                            => request('GET',   `/games/${id}`),
     join:           (id)                            => request('POST',  `/games/${id}/join`),
     fillWithBots:   (id)                            => request('POST',  `/games/${id}/fill-with-bots`),
@@ -37,9 +37,9 @@ export const api = {
     getUser:      (id)        => request('GET',   `/admin/users/${id}`),
     updateUser:   (id, patch) => request('PATCH', `/admin/users/${id}`, patch),
     deleteUser: (id)        => request('DELETE', `/admin/users/${id}`),
-    adjustScore:  (id, newDayScore, newLifetimeScore) =>
+    adjustScore:  (id, newLifetimeScore) =>
                     request('POST', `/admin/users/${id}/score-adjustment`,
-                      { new_day_score: newDayScore, new_lifetime_score: newLifetimeScore }),
+                      { new_lifetime_score: newLifetimeScore }),
     getConfig:    ()          => request('GET',   '/admin/config'),
     updateConfig: (patch)     => request('PATCH', '/admin/config', patch),
   },

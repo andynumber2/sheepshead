@@ -134,7 +134,6 @@ export function dealHand(playerIds, dealerSeat, handNumber, doublerMultiplier) {
     blitzes: [],               // [{ userId, type: 'black'|'red' }] — players who declared a blitz
     log: [],                   // string messages
     scores: {},                // { userId: delta } — populated at scoring
-    rewindHistory: [],         // card play snapshots for rewinding
   }
 }
 
@@ -460,12 +459,7 @@ export function playCard(state, userId, cardId) {
   assertPhase(state, 'playing')
   assertTurn(state, userId, currentPlayer(state))
 
-  // Capture pre-play snapshot. Strip rewindHistory to prevent exponential nesting.
-  const snapshot = deepClone(state)
-  snapshot.rewindHistory = []
-
   const newState = deepClone(state)
-  newState.rewindHistory = [...(state.rewindHistory ?? []), snapshot]
 
   const isUnderCardPlay =
     newState.underCard &&
@@ -538,50 +532,6 @@ export function playCard(state, userId, cardId) {
   }
 
   return newState
-}
-
-// ─── Rewind ──────────────────────────────────────────────────────────────────
-export function rewindPlay(state) {
-  assertPhase(state, 'playing')
-  const history = state.rewindHistory ?? []
-  if (history.length === 0) throw new Error('Nothing to rewind.')
-
-  const remaining = history.slice(0, -1)
-  let restored = { ...history[history.length - 1], rewindHistory: remaining }
-
-  // Rewinding to the start of the hand resets crack/recrack state
-  if (restored.tricks.length === 0 && restored.currentTrick.length === 0) {
-    restored = { ...restored, crackState: null, handCrackMultiplier: 1 }
-  }
-
-  return restored
-}
-
-export function rewindTrick(state) {
-  assertPhase(state, 'playing')
-  const history = state.rewindHistory ?? []
-  if (history.length === 0) return state  // no-op at start of hand
-
-  let entries = [...history]
-  let poppedSnapshot
-
-  // Pop snapshots until we land at the start of a trick (currentTrick empty).
-  // Works for both mid-trick and start-of-trick cases: if we're already at
-  // currentTrick=[], the first pop goes back into the previous trick's plays,
-  // then we keep popping until we hit the previous trick's start.
-  do {
-    poppedSnapshot = entries[entries.length - 1]
-    entries = entries.slice(0, -1)
-  } while (entries.length > 0 && poppedSnapshot.currentTrick.length > 0)
-
-  const restored = { ...poppedSnapshot, rewindHistory: entries }
-
-  // Rewinding to the start of the hand resets crack/recrack state
-  if (restored.tricks.length === 0) {
-    return { ...restored, crackState: null, handCrackMultiplier: 1 }
-  }
-
-  return restored
 }
 
 // Who plays next in the current trick?
@@ -912,7 +862,6 @@ export function resolveSchwanzer(state) {
 // ─── Player view (redact other hands) ────────────────────────────────────────
 export function getPlayerView(state, userId) {
   const view = deepClone(state)
-  view.rewindHistory = []   // strip snapshots — each contains all players' unredacted hands
 
   for (const uid of Object.keys(view.hands)) {
     if (uid !== userId) {

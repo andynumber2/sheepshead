@@ -5,13 +5,11 @@ export async function onRequestPost({ request, env, params }) {
   try {
     const user = await requireUser(request, env.DB)
     const gameId = params.id
-    const userId = String(user.user_id)
 
     const game = await env.DB.prepare('SELECT * FROM games WHERE id = ?').bind(gameId).first()
     if (!game) return err('Game not found.', 404)
     if (game.status !== 'waiting') return err('Game is not open for joining.')
 
-    // Block joining if already in any active/waiting game
     const existingGame = await env.DB.prepare(`
       SELECT g.id, g.name FROM game_players gp
       JOIN games g ON g.id = gp.game_id
@@ -28,7 +26,6 @@ export async function onRequestPost({ request, env, params }) {
 
     if (players.length >= 5) return err('Game is full.')
 
-    // Find next open seat
     const takenSeats = new Set(players.map(p => p.seat))
     let seat = 0
     while (takenSeats.has(seat)) seat++
@@ -40,23 +37,28 @@ export async function onRequestPost({ request, env, params }) {
     const newCount = players.length + 1
 
     if (newCount === 5) {
-      // Start the game — deal first hand
       const allPlayers = [...players, { user_id: user.user_id, seat }]
         .sort((a, b) => a.seat - b.seat)
         .map(p => String(p.user_id))
 
-      const dealerSeat = 0
-      const state = dealHand(allPlayers, dealerSeat, 1, 1)
-      state.reveal_partner = game.reveal_partner === 1
-      state.double_on_bump = game.double_on_bump === 1
+      const settings = JSON.parse(game.settings_json)
+      const state = dealHand(allPlayers, 0, 1, 1)
+      state.reveal_partner = settings.reveal_partner
+      state.double_on_bump = settings.double_on_bump
 
-      await env.DB.prepare(
-        'INSERT INTO game_state (game_id, state_json, updated_at) VALUES (?, ?, datetime(\'now\'))'
-      ).bind(gameId, JSON.stringify(state)).run()
+      const { rewindHistory: _dropped, ...stateToStore } = state
 
-      await env.DB.prepare(
-        'UPDATE games SET status = \'active\', updated_at = datetime(\'now\') WHERE id = ?'
-      ).bind(gameId).run()
+      await env.DB.batch([
+        env.DB.prepare("INSERT INTO game_state (game_id, state_json, updated_at) VALUES (?, ?, datetime('now'))")
+          .bind(gameId, JSON.stringify(stateToStore)),
+        env.DB.prepare("UPDATE games SET status = 'active', current_hand = 1, updated_at = datetime('now') WHERE id = ?")
+          .bind(gameId),
+        env.DB.prepare('INSERT INTO hands (game_id, hand_number) VALUES (?, 1)')
+          .bind(gameId),
+        env.DB.prepare(
+          'INSERT INTO hand_actions (game_id, hand_number, seq, type, user_id, payload_json) VALUES (?, 1, 0, ?, NULL, ?)'
+        ).bind(gameId, 'deal', JSON.stringify(stateToStore)),
+      ])
 
       return json({ joined: true, started: true })
     }

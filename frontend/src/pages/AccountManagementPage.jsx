@@ -7,7 +7,6 @@ function UserRow({ user, currentUserId, onSaved, onDeleted }) {
   const [isAdmin, setIsAdmin]         = useState(!!user.is_admin)
   const [isBot, setIsBot]             = useState(!!user.is_bot)
   const [password, setPassword]       = useState('')
-  const [draftDay, setDraftDay]       = useState(String(user.day_score ?? 0))
   const [draftLifetime, setDraftLifetime] = useState(String(user.lifetime_score ?? 0))
   const [saving, setSaving]           = useState(false)
   const [deleting, setDeleting]       = useState(false)
@@ -18,7 +17,6 @@ function UserRow({ user, currentUserId, onSaved, onDeleted }) {
       setUsername(user.username)
       setIsAdmin(!!user.is_admin)
       setIsBot(!!user.is_bot)
-      setDraftDay(String(user.day_score ?? 0))
       setDraftLifetime(String(user.lifetime_score ?? 0))
     }
   }, [user, editing])
@@ -33,9 +31,7 @@ function UserRow({ user, currentUserId, onSaved, onDeleted }) {
       )) return
     }
 
-    const newDay = parseInt(draftDay, 10)
     const newLifetime = parseInt(draftLifetime, 10)
-    if (!Number.isInteger(newDay))      return setError('Day score must be an integer.')
     if (!Number.isInteger(newLifetime)) return setError('Lifetime score must be an integer.')
 
     setSaving(true)
@@ -50,10 +46,10 @@ function UserRow({ user, currentUserId, onSaved, onDeleted }) {
       updated = { ...updated, ...accountResult }
 
       // Score adjustment (only if values changed)
-      const scoreChanged = newDay !== (user.day_score ?? 0) || newLifetime !== (user.lifetime_score ?? 0)
+      const scoreChanged = newLifetime !== (user.lifetime_score ?? 0)
       if (scoreChanged) {
-        const scoreResult = await api.admin.adjustScore(user.id, newDay, newLifetime)
-        updated = { ...updated, day_score: scoreResult.day_score, lifetime_score: scoreResult.lifetime_score }
+        const scoreResult = await api.admin.adjustScore(user.id, newLifetime)
+        updated = { ...updated, lifetime_score: scoreResult.lifetime_score }
       }
 
       setPassword('')
@@ -71,7 +67,6 @@ function UserRow({ user, currentUserId, onSaved, onDeleted }) {
     setIsAdmin(!!user.is_admin)
     setIsBot(!!user.is_bot)
     setPassword('')
-    setDraftDay(String(user.day_score ?? 0))
     setDraftLifetime(String(user.lifetime_score ?? 0))
     setError(null)
     setEditing(false)
@@ -168,14 +163,7 @@ function UserRow({ user, currentUserId, onSaved, onDeleted }) {
           style={{ margin: 0, padding: '2px 6px', width: '100%', boxSizing: 'border-box' }}
         />
       </td>
-      <td>
-        <input
-          type="number"
-          value={draftDay}
-          onChange={e => setDraftDay(e.target.value)}
-          style={{ margin: 0, padding: '2px 6px', width: '100%', boxSizing: 'border-box', textAlign: 'right' }}
-        />
-      </td>
+      <td style={{ textAlign: 'right' }}>{user.day_score ?? 0}</td>
       <td>
         <input
           type="number"

@@ -150,9 +150,9 @@ export default function GamePage({ gameId, user, onNavigate }) {
       const data = await api.games.get(gameId)
       setGameData(data)
       // Only set once — don't clobber in-flight admin changes
-      setCurrentVariant(prev => prev ?? data.no_pick_variant)
-      setRevealPartner(prev => prev ?? data.reveal_partner)
-      setDobEnabled(prev => prev ?? data.double_on_bump)
+      setCurrentVariant(prev => prev ?? data.settings?.no_pick_variant)
+      setRevealPartner(prev => prev ?? data.settings?.reveal_partner)
+      setDobEnabled(prev => prev ?? data.settings?.double_on_bump)
       setError(null)
     } catch (e) {
       setError(e.message)
@@ -172,7 +172,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
   // admin acts on behalf of any player whose turn it is.
   useEffect(() => {
     const state    = gameData?.state
-    const isTestMode = gameData?.is_test_mode
+    const isTestMode = gameData?.settings?.is_test_mode
     if (!state || state.phase !== 'playing') return
 
     const turnUserId = currentTurnPlayer(state)
@@ -228,7 +228,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
     const state   = gameData?.state
     const players = gameData?.players
     if (!state || state.phase !== 'playing') return
-    if (gameData?.is_test_mode) return
+    if (gameData?.settings?.is_test_mode) return
 
     const turnUserId = currentTurnPlayer(state)
     if (!turnUserId) return
@@ -321,9 +321,10 @@ export default function GamePage({ gameId, user, onNavigate }) {
   }
 
   function handleSettingsUpdate(result) {
-    if (result.no_pick_variant !== undefined) setCurrentVariant(result.no_pick_variant)
-    if (result.reveal_partner  !== undefined) setRevealPartner(result.reveal_partner)
-    if (result.double_on_bump  !== undefined) setDobEnabled(result.double_on_bump)
+    const s = result.settings ?? {}
+    if (s.no_pick_variant !== undefined) setCurrentVariant(s.no_pick_variant)
+    if (s.reveal_partner  !== undefined) setRevealPartner(s.reveal_partner)
+    if (s.double_on_bump  !== undefined) setDobEnabled(s.double_on_bump)
   }
 
   async function handleFillWithBots() {
@@ -362,9 +363,11 @@ export default function GamePage({ gameId, user, onNavigate }) {
     players,
     state,
     status,
-    is_admin:     isGameAdmin,    // game creator → controls settings panel
-    is_test_mode: isTestMode,     // test mode flag
-    no_pick_variant: noPickVariant,
+    is_admin:    isGameAdmin,
+    settings: {
+      is_test_mode:    isTestMode,
+      no_pick_variant: noPickVariant,
+    } = {},
   } = gameData
 
   // ── Game ended ──────────────────────────────────────────────────────────────
@@ -402,8 +405,8 @@ export default function GamePage({ gameId, user, onNavigate }) {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                 <span style={{ color: '#ccc', fontSize: '0.85rem' }}>
                   {VARIANT_LABELS[currentVariant ?? noPickVariant]} ·{' '}
-                  Partner: {(revealPartner ?? gameData.reveal_partner ?? true) ? 'shown' : 'hidden'}
-                  {(dobEnabled ?? gameData.double_on_bump ?? true) ? ' · DOB' : ''}
+                  Partner: {(revealPartner ?? gameData.settings?.reveal_partner ?? true) ? 'shown' : 'hidden'}
+                  {(dobEnabled ?? gameData.settings?.double_on_bump ?? true) ? ' · DOB' : ''}
                 </span>
                 <button className="outline" style={{ fontSize: '0.8rem', padding: '2px 10px' }}
                   onClick={() => setShowOptions(true)}>
@@ -415,7 +418,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
               mode="update"
               gameId={gameId}
               open={showOptions}
-              values={{ no_pick_variant: currentVariant ?? noPickVariant, reveal_partner: revealPartner ?? gameData.reveal_partner ?? true, double_on_bump: dobEnabled ?? gameData.double_on_bump ?? true }}
+              values={{ no_pick_variant: currentVariant ?? noPickVariant, reveal_partner: revealPartner ?? gameData.settings?.reveal_partner ?? true, double_on_bump: dobEnabled ?? gameData.settings?.double_on_bump ?? true }}
               onUpdated={handleSettingsUpdate}
               onClose={() => setShowOptions(false)}
             />
@@ -485,10 +488,10 @@ export default function GamePage({ gameId, user, onNavigate }) {
     && (state.tricks ?? []).length === 0
     && (state.currentTrick ?? []).length === 0
 
-  const rewindHistory = state.rewindHistory ?? []
-  const canRewindPlay  = isTestMode && user.is_admin && state.phase === 'playing' && rewindHistory.length > 0
+  const canRewindPlay  = isTestMode && user.is_admin && state.phase === 'playing'
+    && ((state.currentTrick?.length ?? 0) > 0 || (state.tricks ?? []).length > 0)
   const canRewindTrick = isTestMode && user.is_admin && state.phase === 'playing'
-    && !(rewindHistory.length === 0 && (state.tricks ?? []).length === 0 && (state.currentTrick ?? []).length === 0)
+    && ((state.tricks ?? []).length > 0 || (state.currentTrick ?? []).length > 0)
 
   function seatProps(player) {
     if (!player) return {}
@@ -595,8 +598,8 @@ export default function GamePage({ gameId, user, onNavigate }) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
               <span style={{ color: '#aaa', fontSize: '0.78rem' }}>
                 {VARIANT_LABELS[currentVariant ?? noPickVariant]} ·{' '}
-                Partner: {(revealPartner ?? gameData.reveal_partner ?? true) ? 'shown' : 'hidden'}
-                {(dobEnabled ?? gameData.double_on_bump ?? true) ? ' · DOB' : ''}
+                Partner: {(revealPartner ?? gameData.settings?.reveal_partner ?? true) ? 'shown' : 'hidden'}
+                {(dobEnabled ?? gameData.settings?.double_on_bump ?? true) ? ' · DOB' : ''}
               </span>
               <button className="outline" style={{ fontSize: '0.78rem', padding: '2px 8px' }}
                 onClick={() => setShowOptions(true)}>
@@ -607,7 +610,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
               mode="update"
               gameId={gameId}
               open={showOptions}
-              values={{ no_pick_variant: currentVariant ?? noPickVariant, reveal_partner: revealPartner ?? gameData.reveal_partner ?? true, double_on_bump: dobEnabled ?? gameData.double_on_bump ?? true }}
+              values={{ no_pick_variant: currentVariant ?? noPickVariant, reveal_partner: revealPartner ?? gameData.settings?.reveal_partner ?? true, double_on_bump: dobEnabled ?? gameData.settings?.double_on_bump ?? true }}
               onUpdated={handleSettingsUpdate}
               onClose={() => setShowOptions(false)}
             />

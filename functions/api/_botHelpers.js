@@ -1,8 +1,6 @@
 // ─── Bot helpers ─────────────────────────────────────────────────────────────
 // Shared utilities for play bot allocation and server-side bot turn processing.
 
-import { centralDate } from './_helpers.js'
-
 import {
   currentPicker, currentPlayer,
   pick, blitz, pass, discard,
@@ -17,6 +15,15 @@ import {
   decidePick, decideBlitz, decideDiscard, decideCall, decidePlay,
 } from '../../shared/botStrategy.js'
 
+async function appendAction(DB, gameId, handNumber, type, userId, payload) {
+  const row = await DB.prepare(
+    'SELECT COALESCE(MAX(seq), -1) + 1 AS next FROM hand_actions WHERE game_id = ? AND hand_number = ?'
+  ).bind(gameId, handNumber).first()
+  await DB.prepare(
+    'INSERT INTO hand_actions (game_id, hand_number, seq, type, user_id, payload_json) VALUES (?, ?, ?, ?, ?, ?)'
+  ).bind(gameId, handNumber, row.next, type, userId ? Number(userId) : null, payload ? JSON.stringify(payload) : null).run()
+}
+
 // ─── finishHand ───────────────────────────────────────────────────────────────
 // Called when the hand reaches scoring phase. Writes score events, deals the
 // next hand, and returns the fresh state. Shared by action.js and processBotTurns.
@@ -29,31 +36,64 @@ export async function finishHand(DB, gameId, state) {
     state.scores = scores
   }
 
-  const today = centralDate()
-  const stmts = Object.entries(scores).map(([userId, delta]) =>
-    DB.prepare(
-      'INSERT INTO score_events (user_id, game_id, hand_number, delta, game_date) VALUES (?, ?, ?, ?, ?)'
-    ).bind(Number(userId), gameId, state.handNumber, delta, today)
-  )
-  await DB.batch(stmts)
+  const variant = state.isLeaster ? 'leaster' : (state.picker === null ? 'schwanzer' : 'normal')
 
+  // Insert score_events (one per player)
+  const scoreStmts = Object.entries(scores).map(([userId, delta]) =>
+    DB.prepare(
+      'INSERT INTO score_events (user_id, game_id, hand_number, delta) VALUES (?, ?, ?, ?)'
+    ).bind(Number(userId), gameId, state.handNumber, delta)
+  )
+
+  // Upsert user_scores (increment lifetime totals)
+  const upsertStmts = Object.entries(scores).map(([userId, delta]) =>
+    DB.prepare(`
+      INSERT INTO user_scores (user_id, lifetime_score, updated_at)
+      VALUES (?, ?, datetime('now'))
+      ON CONFLICT(user_id) DO UPDATE SET
+        lifetime_score = lifetime_score + excluded.lifetime_score,
+        updated_at = datetime('now')
+    `).bind(Number(userId), delta)
+  )
+
+  // Complete the current hands row
+  const completeHandStmt = DB.prepare(
+    "UPDATE hands SET variant = ?, completed_at = datetime('now') WHERE game_id = ? AND hand_number = ?"
+  ).bind(variant, gameId, state.handNumber)
+
+  // Deal the next hand
   const { results: players } = await DB.prepare(
     'SELECT user_id FROM game_players WHERE game_id = ? ORDER BY seat'
   ).bind(gameId).all()
   const playerIds = players.map(p => String(p.user_id))
   const nextDealer = (state.dealerSeat + 1) % 5
-  const nextState = dealHand(playerIds, nextDealer, state.handNumber + 1, 1)
+  const nextHandNumber = state.handNumber + 1
+  const nextState = dealHand(playerIds, nextDealer, nextHandNumber, 1)
+  nextState.doublerMultiplier = 1
 
-  const gameRow = await DB.prepare('SELECT reveal_partner, double_on_bump FROM games WHERE id = ?').bind(gameId).first()
-  nextState.reveal_partner = gameRow.reveal_partner === 1
-  nextState.double_on_bump = gameRow.double_on_bump === 1
+  const gameRow = await DB.prepare('SELECT settings_json FROM games WHERE id = ?').bind(gameId).first()
+  const settings = JSON.parse(gameRow.settings_json)
+  nextState.reveal_partner = settings.reveal_partner
+  nextState.double_on_bump = settings.double_on_bump
 
   nextState.log = [...state.log, `--- Hand ${state.handNumber} complete ---`]
   nextState.lastTrick = state.lastTrick
 
-  await DB.prepare(
-    "UPDATE games SET doubler_multiplier = 1, updated_at = datetime('now') WHERE id = ?"
-  ).bind(gameId).run()
+  // Reset doubler_multiplier in settings_json
+  const gameUpdateStmt = DB.prepare(
+    "UPDATE games SET settings_json = json_set(settings_json, '$.doubler_multiplier', 1), updated_at = datetime('now') WHERE id = ?"
+  ).bind(gameId)
+
+  // Insert next hands row + deal action (seq is always 0 for the first action of a new hand)
+  const nextHandStmt = DB.prepare(
+    'INSERT INTO hands (game_id, hand_number) VALUES (?, ?)'
+  ).bind(gameId, nextHandNumber)
+
+  const dealActionStmt = DB.prepare(
+    'INSERT INTO hand_actions (game_id, hand_number, seq, type, user_id, payload_json) VALUES (?, ?, 0, ?, NULL, ?)'
+  ).bind(gameId, nextHandNumber, 'deal', JSON.stringify(nextState))
+
+  await DB.batch([...scoreStmts, ...upsertStmts, completeHandStmt, gameUpdateStmt, nextHandStmt, dealActionStmt])
 
   return nextState
 }
@@ -164,11 +204,21 @@ export async function processBotTurns(state, gameId, DB, game, { allowTrick1Lead
     }
 
     const view = getPlayerView(current, nextActorId)
-    current = applyBotDecision(current, nextActorId, view)
+    const handNumberBeforeAction = current.handNumber
+    const { state: newState, actionType, payload } = applyBotDecision(current, nextActorId, view)
+    current = newState
+    if (actionType) {
+      await appendAction(DB, gameId, handNumberBeforeAction, actionType, nextActorId, payload)
+    }
 
     // Resolve no-pick (all players passed)
     if (current.phase === 'no_pick') {
+      const noPickHandNumber = current.handNumber
       current = await resolveNoPick(current, game, DB, gameId)
+      const noPickSettings = JSON.parse(game.settings_json)
+      if (noPickSettings.no_pick_variant === 'leasters') {
+        await appendAction(DB, gameId, noPickHandNumber, 'setup_leaster', null, null)
+      }
     }
 
     if (wasPlayingPhase) {
@@ -216,47 +266,58 @@ function applyBotDecision(state, userId, view) {
     case 'picking': {
       const potentialBlitz = (view.potentialBlitzes ?? []).find(b => b.userId === userId)
       if (potentialBlitz && decideBlitz(view, userId)) {
-        return blitz(state, userId)
+        return { state: blitz(state, userId), actionType: 'blitz', payload: null }
       }
       const shouldPick = decidePick(view, userId)
-      return shouldPick ? pick(state, userId) : pass(state, userId)
+      if (shouldPick) {
+        return { state: pick(state, userId), actionType: 'pick', payload: null }
+      }
+      return { state: pass(state, userId), actionType: 'pass', payload: null }
     }
 
     case 'discarding': {
       const cardIds = decideDiscard(view, userId)
-      return discard(state, userId, cardIds)
+      return { state: discard(state, userId, cardIds), actionType: 'discard', payload: { cardIds } }
     }
 
     case 'calling': {
       const decision = decideCall(view, userId)
       switch (decision.type) {
-        case 'ace':         return callAce(state, userId, decision.suit)
-        case 'ace_unknown': return callAceUnknown(state, userId, decision.suit, decision.underCardId)
-        case 'ten':         return callTen(state, userId, decision.suit)
-        case 'king':        return callKing(state, userId, decision.suit)
-        default:            return goAlone(state, userId)
+        case 'ace':
+          return { state: callAce(state, userId, decision.suit), actionType: 'call_ace', payload: { suit: decision.suit } }
+        case 'ace_unknown':
+          return { state: callAceUnknown(state, userId, decision.suit, decision.underCardId), actionType: 'call_ace_unknown', payload: { suit: decision.suit, underCardId: decision.underCardId } }
+        case 'ten':
+          return { state: callTen(state, userId, decision.suit), actionType: 'call_ten', payload: { suit: decision.suit } }
+        case 'king':
+          return { state: callKing(state, userId, decision.suit), actionType: 'call_king', payload: { suit: decision.suit } }
+        default:
+          return { state: goAlone(state, userId), actionType: 'go_alone', payload: null }
       }
     }
 
     case 'playing': {
       const cardId = decidePlay(view, userId)
-      return playCard(state, userId, cardId)
+      return { state: playCard(state, userId, cardId), actionType: 'play_card', payload: { cardId } }
     }
 
     default:
-      return state
+      return { state, actionType: null, payload: null }
   }
 }
 
 async function resolveNoPick(state, game, DB, gameId) {
-  if (game.no_pick_variant === 'leasters') {
+  const settings = JSON.parse(game.settings_json)
+
+  if (settings.no_pick_variant === 'leasters') {
     return setupLeaster(state)
   }
 
-  if (game.no_pick_variant === 'schwanzers') {
+  if (settings.no_pick_variant === 'schwanzers') {
     const { scores } = resolveSchwanzer(state)
     state.scores = scores
     state.phase = 'scoring'
+    await appendAction(DB, gameId, state.handNumber, 'schwanzer_score', null, JSON.stringify({ scores }))
     return finishHand(DB, gameId, state)
   }
 
@@ -267,24 +328,30 @@ async function resolveNoPick(state, game, DB, gameId) {
   ).bind(gameId).all()
   const playerIds = players.map(p => String(p.user_id))
   const nextDealer = (state.dealerSeat + 1) % 5
-  const newState = dealHand(playerIds, nextDealer, state.handNumber + 1, newMultiplier)
+  const nextHandNumber = state.handNumber + 1
+  const newState = dealHand(playerIds, nextDealer, nextHandNumber, newMultiplier)
   newState.doublerMultiplier = newMultiplier
-  const gameRow = await DB.prepare('SELECT reveal_partner, double_on_bump FROM games WHERE id = ?').bind(gameId).first()
-  newState.reveal_partner = gameRow.reveal_partner === 1
-  newState.double_on_bump = gameRow.double_on_bump === 1
+  newState.reveal_partner = settings.reveal_partner
+  newState.double_on_bump = settings.double_on_bump
   newState.log = [...state.log, ...newState.log, `Doubler! Stakes are now ×${newMultiplier}.`]
 
-  await DB.prepare(
-    "UPDATE games SET doubler_multiplier = ?, updated_at = datetime('now') WHERE id = ?"
-  ).bind(newMultiplier, gameId).run()
+  // Complete current hand, update multiplier, and insert next hand + deal action atomically
+  // seq is always 0 for the first action of a new hand
+  await DB.batch([
+    DB.prepare("UPDATE hands SET variant = 'no_pick', completed_at = datetime('now') WHERE game_id = ? AND hand_number = ?").bind(gameId, state.handNumber),
+    DB.prepare("UPDATE games SET settings_json = json_set(settings_json, '$.doubler_multiplier', ?), updated_at = datetime('now') WHERE id = ?").bind(newMultiplier, gameId),
+    DB.prepare('INSERT INTO hands (game_id, hand_number) VALUES (?, ?)').bind(gameId, nextHandNumber),
+    DB.prepare('INSERT INTO hand_actions (game_id, hand_number, seq, type, user_id, payload_json) VALUES (?, ?, 0, ?, NULL, ?)').bind(gameId, nextHandNumber, 'deal', JSON.stringify(newState)),
+  ])
 
   return newState
 }
 
 async function persistState(DB, gameId, state) {
+  const { rewindHistory: _dropped, ...stateToStore } = state
   await DB.prepare(
     "UPDATE game_state SET state_json = ?, updated_at = datetime('now') WHERE game_id = ?"
-  ).bind(JSON.stringify(state), gameId).run()
+  ).bind(JSON.stringify(stateToStore), gameId).run()
   await DB.prepare(
     "UPDATE games SET updated_at = datetime('now') WHERE id = ?"
   ).bind(gameId).run()
