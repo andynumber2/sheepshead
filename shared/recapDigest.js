@@ -22,6 +22,9 @@ export function buildHandDigest(actions, players, scoreEventsByUser) {
 
   const variant = detectVariant(actions, finalState)
 
+  // Primary path: the discard action's cardIds is the production source of truth.
+  // Fallback reads finalState.discard for synthetic state-only fixtures that skip
+  // the discard action — inert in production since a normal hand always has one.
   const discardAction = actions.find(a => a.type === 'discard')
   const pickerDiscards = discardAction
     ? JSON.parse(discardAction.payload_json).cardIds
@@ -43,19 +46,19 @@ export function buildHandDigest(actions, players, scoreEventsByUser) {
     }
   }
 
-  const playActions = actions.filter(a => a.type === 'play_card')
+  const playSeqByUserCard = new Map()
+  for (const a of actions) {
+    if (a.type !== 'play_card') continue
+    const { cardId } = JSON.parse(a.payload_json)
+    playSeqByUserCard.set(`${a.user_id}:${cardId}`, a.seq)
+  }
+
   const tricks = finalState.tricks.map((t, idx) => {
-    const plays = t.plays.map(p => {
-      const match = playActions.find(a => {
-        const pa = JSON.parse(a.payload_json)
-        return String(a.user_id) === p.userId && pa.cardId === p.card.id
-      })
-      return {
-        userId: p.userId,
-        card: p.card.id,
-        seq: match ? match.seq : null,
-      }
-    })
+    const plays = t.plays.map(p => ({
+      userId: p.userId,
+      card: p.card.id,
+      seq: playSeqByUserCard.get(`${p.userId}:${p.card.id}`) ?? null,
+    }))
     return {
       trickNumber: idx + 1,
       leaderUserId: t.leader,
