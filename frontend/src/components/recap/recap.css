@@ -111,3 +111,52 @@
 .recap-scores .row .score { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
 .recap-scores .row .score.pos { color: #22c55e; }
 .recap-scores .row .score.neg { color: #cf222e; }
+
+.replay-shell { background: #0d1117; color: #e6edf3; padding: 16px; border-radius: 12px; font-family: ui-sans-serif, system-ui, sans-serif; }
+.replay-meta { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #161b22; border-radius: 8px; margin-bottom: 12px; font-size: 13px; }
+.replay-meta .meta-group { display: flex; gap: 24px; }
+.replay-meta .label { color: #8b949e; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 2px; }
+.replay-meta .val { color: #e6edf3; font-weight: 600; }
+.replay-meta .picker-pill { background: #d97706; color: #fff; padding: 2px 8px; border-radius: 4px; font-weight: 700; }
+.replay-meta .partner-pill { background: #15803d; color: #fff; padding: 2px 8px; border-radius: 4px; font-weight: 700; }
+
+.replay-grid { display: grid; grid-template-columns: 1fr 340px; gap: 12px; }
+.replay-table { background: #1c2128; border-radius: 8px; padding: 20px; min-height: 640px; display: grid; grid-template-rows: auto 1fr auto; gap: 20px; }
+.replay-seats-top, .replay-seats-mid { display: flex; justify-content: space-between; gap: 16px; }
+.replay-seats-mid { align-items: center; }
+.replay-seats-bottom { display: flex; justify-content: center; }
+
+.replay-seat { background: #21262d; border-radius: 8px; padding: 10px 12px; min-width: 280px; }
+.replay-seat.is-picker { box-shadow: inset 0 0 0 2px #d97706; }
+.replay-seat.is-partner { box-shadow: inset 0 0 0 2px #15803d; }
+.replay-seat.is-active { box-shadow: inset 0 0 0 2px #58a6ff; }
+.replay-seat .seat-name { font-size: 13px; font-weight: 700; margin-bottom: 8px; display: flex; justify-content: space-between; }
+.replay-seat .seat-name .role { font-size: 10px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.05em; }
+.replay-seat .hand { display: flex; gap: 4px; flex-wrap: wrap; }
+.replay-mini-card { width: 38px; height: 54px; border-radius: 4px; background: #fff; color: #111; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1px solid #30363d; }
+.replay-mini-card.red { color: #cf222e; }
+.replay-mini-card.played { opacity: 0.22; text-decoration: line-through; }
+.replay-mini-card.now { box-shadow: 0 0 0 2px #58a6ff; transform: translateY(-3px); }
+
+.replay-trick-zone { background: #0d1117; border-radius: 8px; padding: 16px; min-width: 340px; min-height: 180px; }
+.replay-trick-zone .label { color: #8b949e; font-size: 11px; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.05em; }
+.replay-trick-cards { display: flex; gap: 10px; justify-content: center; margin-top: 4px; }
+.replay-trick-card { width: 62px; height: 86px; border-radius: 6px; background: #fff; color: #111; font-size: 18px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid #30363d; position: relative; }
+.replay-trick-card.red { color: #cf222e; }
+.replay-trick-card .by { position: absolute; bottom: -18px; font-size: 10px; color: #8b949e; white-space: nowrap; }
+.replay-trick-card.winner { box-shadow: 0 0 0 3px #22c55e; }
+
+.replay-side { background: #161b22; border-radius: 8px; padding: 14px; font-size: 12px; }
+.replay-side h4 { font-size: 11px; text-transform: uppercase; color: #8b949e; letter-spacing: 0.05em; margin: 0 0 8px; font-weight: 600; }
+.replay-side .stub-block { background: #0d1117; border-radius: 6px; padding: 12px; color: #8b949e; font-style: italic; font-size: 12px; }
+
+.replay-controls { display: flex; align-items: center; justify-content: space-between; background: #161b22; border-radius: 8px; padding: 10px 12px; margin-top: 12px; }
+.replay-controls .step-info { color: #8b949e; font-size: 12px; }
+.replay-controls .step-info b { color: #e6edf3; }
+.replay-controls .ctrls { display: flex; gap: 6px; align-items: center; }
+.replay-controls button { background: #21262d; border: 1px solid #30363d; color: #e6edf3; padding: 6px 12px; border-radius: 5px; font-size: 12px; cursor: pointer; }
+.replay-controls button:disabled { opacity: 0.4; cursor: not-allowed; }
+.replay-controls button.primary { background: #58a6ff; color: #0d1117; border-color: #58a6ff; font-weight: 700; }
+.replay-controls select { background: #21262d; border: 1px solid #30363d; color: #e6edf3; padding: 5px 8px; border-radius: 5px; font-size: 12px; }
+.replay-scrubber { width: 100%; margin-top: 8px; height: 6px; background: #30363d; border-radius: 3px; overflow: hidden; }
+.replay-scrubber .fill { height: 100%; background: #58a6ff; border-radius: 3px; }
