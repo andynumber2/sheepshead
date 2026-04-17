@@ -43,4 +43,8 @@ export const api = {
     getConfig:    ()          => request('GET',   '/admin/config'),
     updateConfig: (patch)     => request('PATCH', '/admin/config', patch),
   },
+  recap: {
+    getDigest:  (gameId, handNumber) => request('GET', `/recap/${gameId}/${handNumber}`),
+    getActions: (gameId, handNumber) => request('GET', `/recap/${gameId}/${handNumber}/actions`),
+  },
 }
