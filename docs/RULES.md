@@ -68,7 +68,7 @@ The player left of the dealer leads the first trick. Players must follow suit if
 
 **Partner reveal** — the partner is identified to all players the moment they play the called card (Ace, Ten, or King) in response to the called suit being led.
 
-**Partner restrictions before reveal:**
+**Partner restrictions before the called suit has been led:**
 - The partner may not lead the called suit unless they lead with the called card.
 - The partner must play the called card when the called suit is led and they hold it.
 - The called card may not be played by the partner in any other situation (unless it is their last card).
