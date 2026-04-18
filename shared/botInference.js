@@ -169,6 +169,24 @@ export function isGuaranteedWinner(card, view, userId) {
   return true
 }
 
+// Returns the card in `candidates` with the lowest point value for which
+// isGuaranteedWinner returns true. Tiebreak by trump rank (weaker/higher-index first,
+// matching cheapestWinningTrump conventions). Returns null if no card qualifies.
+export function cheapestGuaranteedWin(candidates, view, userId) {
+  const eligible = candidates.filter(card => isGuaranteedWinner(card, view, userId))
+  if (eligible.length === 0) return null
+  return eligible.reduce((best, c) => {
+    const bestPts = cardPoints(best)
+    const cPts = cardPoints(c)
+    if (cPts !== bestPts) return cPts < bestPts ? c : best
+    // Tie on points: prefer weaker trump (higher rank index = weaker).
+    const bestTrump = isTrump(best)
+    const cTrump = isTrump(c)
+    if (cTrump && bestTrump) return trumpRank(c) > trumpRank(best) ? c : best
+    return best
+  })
+}
+
 // ─── Schmear detection ────────────────────────────────────────────────────────
 
 // Returns true if the player currently winning the trick is on the same team as userId.

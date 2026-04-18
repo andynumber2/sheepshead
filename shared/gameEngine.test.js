@@ -14,7 +14,8 @@ import {
   buriablePoints, handScore,
   beats, currentWinner, teammateWinning,
   bestVoidBury,
-  isGuaranteedWinner,  // NEW
+  isGuaranteedWinner,
+  cheapestGuaranteedWin,  // NEW
 } from './botInference.js'
 
 const c = (rank, suit) => ({ id: `${rank}${suit}`, rank, suit })
@@ -2514,5 +2515,65 @@ describe('isGuaranteedWinner', () => {
       }],
     }
     expect(isGuaranteedWinner(c('K','D'), view, 'p2')).toBe(false)
+  })
+})
+
+describe('cheapestGuaranteedWin', () => {
+  it('returns null when no candidate is guaranteed', () => {
+    // Candidates: KD, JD. Leave AD unseen → neither is guaranteed (AD beats both).
+    const view = makeTrumpEfficiencyView({
+      userId: 'p1', picker: 'p1', partner: 'p2',
+      hand: [c('K','D'), c('J','D')],
+      trick: [],
+    })
+    expect(cheapestGuaranteedWin([c('K','D'), c('J','D')], view, 'p1')).toBe(null)
+  })
+
+  it('returns lowest-point guaranteed card when multiple qualify', () => {
+    // Candidates: KD (4pts), QS (3pts). Higher trump accounted for below.
+    // Higher than KD (rank 10) = 10 cards. Higher than QS (rank 1) = just QC.
+    // Put QC in own hand (user has KD, QS, QC).
+    const higherTrumpForKD = [
+      c('Q','C'), c('Q','S'), c('Q','H'), c('Q','D'),
+      c('J','C'), c('J','S'), c('J','H'), c('J','D'),
+      c('A','D'), c('10','D'),
+    ]
+    // Hand has KD, QS. Higher trump distributed: QS/QC/etc in hand or tricks.
+    // Simpler: put QC in hand, other 9 higher trump in tricks (covers both KD and QS).
+    const baseView = makeTrumpEfficiencyView({
+      userId: 'p1', picker: 'p1', partner: 'p2',
+      hand: [c('K','D'), c('Q','S'), c('Q','C')],
+      trick: [],
+    })
+    const othersInTricks = higherTrumpForKD.filter(x => x.id !== 'QC' && x.id !== 'QS')
+    const tricks = [
+      othersInTricks.slice(0, 5).map((card, i) => ({ userId: `p${i+1}`, card })),
+      othersInTricks.slice(5, 8).map((card, i) => ({ userId: `p${i+1}`, card })).concat([
+        { userId: 'p4', card: c('7','C') },
+        { userId: 'p5', card: c('8','C') },
+      ]),
+    ]
+    const view = withTricks(baseView, tricks)
+    // Both KD (4pts) and QS (3pts) guaranteed; return QS (lowest points).
+    expect(cheapestGuaranteedWin([c('K','D'), c('Q','S')], view, 'p1').id).toBe('QS')
+  })
+
+  it('returns the single guaranteed candidate when only one qualifies', () => {
+    // Candidates: KD (not guaranteed — AD unseen), QC (always guaranteed).
+    const view = makeTrumpEfficiencyView({
+      userId: 'p1', picker: 'p1', partner: 'p2',
+      hand: [c('K','D'), c('Q','C')],
+      trick: [],
+    })
+    expect(cheapestGuaranteedWin([c('K','D'), c('Q','C')], view, 'p1').id).toBe('QC')
+  })
+
+  it('returns null for empty candidates', () => {
+    const view = makeTrumpEfficiencyView({
+      userId: 'p1', picker: 'p1', partner: 'p2',
+      hand: [],
+      trick: [],
+    })
+    expect(cheapestGuaranteedWin([], view, 'p1')).toBe(null)
   })
 })
