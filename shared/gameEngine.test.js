@@ -14,6 +14,7 @@ import {
   buriablePoints, handScore,
   beats, currentWinner, teammateWinning,
   bestVoidBury,
+  isGuaranteedWinner,  // NEW
 } from './botInference.js'
 
 const c = (rank, suit) => ({ id: `${rank}${suit}`, rank, suit })
@@ -2359,5 +2360,159 @@ describe('decidePlay trump efficiency — fail trick, bot void (Scenario 2)', ()
       ],
     })
     expect(decidePlay(view, 'p2')).toBe('KS')
+  })
+})
+
+// Helper for tests that need completed-trick history.
+// `tricks` is an array of arrays of { userId, card } plays.
+function withTricks(view, tricks) {
+  return { ...view, tricks: tricks.map(plays => ({ plays })) }
+}
+
+describe('isGuaranteedWinner', () => {
+  it('returns true for Queen of Clubs (highest trump)', () => {
+    // QC (rank 0) has no higher trump → trivially guaranteed.
+    const view = makeTrumpEfficiencyView({
+      userId: 'p1', picker: 'p1', partner: 'p2',
+      hand: [c('Q','C')],
+      trick: [],
+    })
+    expect(isGuaranteedWinner(c('Q','C'), view, 'p1')).toBe(true)
+  })
+
+  it('returns true when all higher trump played in completed tricks', () => {
+    // Own card: KD (rank 10). Higher trump (rank 0-9) = all Qs, all Js, AD, 10D.
+    // Put them all in completed tricks.
+    const higherTrump = [
+      c('Q','C'), c('Q','S'), c('Q','H'), c('Q','D'),
+      c('J','C'), c('J','S'), c('J','H'), c('J','D'),
+      c('A','D'), c('10','D'),
+    ]
+    const baseView = makeTrumpEfficiencyView({
+      userId: 'p1', picker: 'p1', partner: 'p2',
+      hand: [c('K','D')],
+      trick: [],
+    })
+    // Distribute higher trump across two completed tricks (5 cards each).
+    const tricks = [
+      higherTrump.slice(0, 5).map((card, i) => ({ userId: `p${i+1}`, card })),
+      higherTrump.slice(5, 10).map((card, i) => ({ userId: `p${i+1}`, card })),
+    ]
+    const view = withTricks(baseView, tricks)
+    expect(isGuaranteedWinner(c('K','D'), view, 'p1')).toBe(true)
+  })
+
+  it('returns true when higher trump is split between own hand and played tricks', () => {
+    // Own card: JD (rank 7). Higher trump = all Qs (0-3), JC/JS/JH (4-6).
+    // Put QC, QS, QH in own hand. Put QD, JC, JS, JH in tricks.
+    const baseView = makeTrumpEfficiencyView({
+      userId: 'p1', picker: 'p1', partner: 'p2',
+      hand: [c('J','D'), c('Q','C'), c('Q','S'), c('Q','H')],
+      trick: [],
+    })
+    const tricks = [
+      [
+        { userId: 'p1', card: c('Q','D') },
+        { userId: 'p2', card: c('J','C') },
+        { userId: 'p3', card: c('J','S') },
+        { userId: 'p4', card: c('J','H') },
+        { userId: 'p5', card: c('7','C') },
+      ],
+    ]
+    const view = withTricks(baseView, tricks)
+    expect(isGuaranteedWinner(c('J','D'), view, 'p1')).toBe(true)
+  })
+
+  it('returns false when one higher trump is unseen', () => {
+    // Own card: KD (rank 10). Higher trump (rank 0-9) = all Qs, Js, AD, 10D (10 cards).
+    // Account for 9 of them; leave AD unseen.
+    const higherTrump = [
+      c('Q','C'), c('Q','S'), c('Q','H'), c('Q','D'),
+      c('J','C'), c('J','S'), c('J','H'), c('J','D'),
+      c('10','D'),
+      // AD missing
+    ]
+    const baseView = makeTrumpEfficiencyView({
+      userId: 'p1', picker: 'p1', partner: 'p2',
+      hand: [c('K','D')],
+      trick: [],
+    })
+    const tricks = [
+      higherTrump.slice(0, 5).map((card, i) => ({ userId: `p${i+1}`, card })),
+      higherTrump.slice(5, 9).map((card, i) => ({ userId: `p${i+1}`, card })).concat([
+        { userId: 'p5', card: c('7','C') },  // filler non-trump
+      ]),
+    ]
+    const view = withTricks(baseView, tricks)
+    expect(isGuaranteedWinner(c('K','D'), view, 'p1')).toBe(false)
+  })
+
+  it('returns false for non-trump card', () => {
+    const view = makeTrumpEfficiencyView({
+      userId: 'p1', picker: 'p1', partner: 'p2',
+      hand: [c('A','C')],
+      trick: [],
+    })
+    expect(isGuaranteedWinner(c('A','C'), view, 'p1')).toBe(false)
+  })
+
+  it('counts visible buried trump (picker view)', () => {
+    // Picker view: buried cards are not hidden. KD is picker's own card; bury holds QC+QS.
+    // Higher trump than KD = QC,QS,QH,QD,JC,JS,JH,JD,AD,10D (10 cards).
+    // QC+QS are in bury, the other 8 are in the current trick.
+    const higherInTrick = [
+      c('Q','H'), c('Q','D'),
+      c('J','C'), c('J','S'), c('J','H'), c('J','D'),
+      c('A','D'), c('10','D'),
+    ]
+    const baseView = makeTrumpEfficiencyView({
+      userId: 'p1', picker: 'p1', partner: 'p2',
+      hand: [c('K','D')],
+      trick: [],
+    })
+    const view = {
+      ...baseView,
+      buried: [c('Q','C'), c('Q','S')],  // visible to picker
+      tricks: [{
+        plays: higherInTrick.slice(0, 5).map((card, i) => ({ userId: `p${i+1}`, card })),
+      }, {
+        plays: higherInTrick.slice(5, 8).map((card, i) => ({ userId: `p${i+1}`, card })).concat([
+          { userId: 'p4', card: c('7','C') },
+          { userId: 'p5', card: c('8','C') },
+        ]),
+      }],
+    }
+    expect(isGuaranteedWinner(c('K','D'), view, 'p1')).toBe(true)
+  })
+
+  it('treats hidden buried trump as unseen (partner view)', () => {
+    // Same setup as above, but buried cards are marked hidden.
+    // The KD test card can still be guaranteed only if those buried slots are
+    // filled in via other means. Mark buried as hidden; account for the 10 higher
+    // trump in tricks only (8 there) → 2 missing → false.
+    const higherInTrick = [
+      c('Q','C'), c('Q','S'),
+      c('Q','H'), c('Q','D'),
+      c('J','C'), c('J','S'), c('J','H'), c('J','D'),
+      // AD, 10D missing
+    ]
+    const baseView = makeTrumpEfficiencyView({
+      userId: 'p2', picker: 'p1', partner: 'p2',
+      hand: [c('K','D')],
+      trick: [],
+    })
+    const view = {
+      ...baseView,
+      buried: [{ ...c('A','D'), hidden: true }, { ...c('10','D'), hidden: true }],
+      tricks: [{
+        plays: higherInTrick.slice(0, 5).map((card, i) => ({ userId: `p${i+1}`, card })),
+      }, {
+        plays: higherInTrick.slice(5, 8).map((card, i) => ({ userId: `p${i+1}`, card })).concat([
+          { userId: 'p4', card: c('7','C') },
+          { userId: 'p5', card: c('8','C') },
+        ]),
+      }],
+    }
+    expect(isGuaranteedWinner(c('K','D'), view, 'p2')).toBe(false)
   })
 })

@@ -134,6 +134,41 @@ export function bestVoidBury(hand) {
   return bestPair
 }
 
+// ─── Guaranteed-winner inference ──────────────────────────────────────────────
+
+// Returns true iff every trump that outranks `card` is visible to userId:
+//   - in userId's own hand
+//   - played in completed tricks (non-hidden)
+//   - played in the current trick (non-hidden)
+//   - in the visible bury (non-hidden; picker-only)
+// Unseen higher trump is always treated as a potential opponent holding.
+// Non-trump cards are never "guaranteed" — callers combine with trumpRemainingElsewhere.
+export function isGuaranteedWinner(card, view, userId) {
+  if (!isTrump(card)) return false
+  const myRank = trumpRank(card)
+  if (myRank === 0) return true  // highest trump (Queen of Clubs)
+
+  const seenRanks = new Set()
+  const noteIfHigherTrump = (c) => {
+    if (!c || c.hidden) return
+    if (!isTrump(c)) return
+    seenRanks.add(trumpRank(c))
+  }
+
+  for (const c of (view.hands[userId] ?? [])) noteIfHigherTrump(c)
+  for (const trick of (view.tricks ?? [])) {
+    for (const play of trick.plays) noteIfHigherTrump(play.card)
+  }
+  for (const play of (view.currentTrick ?? [])) noteIfHigherTrump(play.card)
+  for (const c of (view.buried ?? [])) noteIfHigherTrump(c)
+
+  // Every rank strictly lower than myRank must be seen somewhere.
+  for (let r = 0; r < myRank; r++) {
+    if (!seenRanks.has(r)) return false
+  }
+  return true
+}
+
 // ─── Schmear detection ────────────────────────────────────────────────────────
 
 // Returns true if the player currently winning the trick is on the same team as userId.
