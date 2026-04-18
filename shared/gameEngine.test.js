@@ -2609,3 +2609,58 @@ describe('decidePlay — partner defers to picker still-to-play', () => {
     expect(decidePlay(view, 'p2')).toBe('QC')
   })
 })
+
+describe('decidePlay — cheapest-guaranteed refinement', () => {
+  it('picker plays cheapest guaranteed trump on trump trick with opponents remaining', () => {
+    // Trump trick (JC led by p3, rank 4). Partner (p2) played 9D (rank 11).
+    // Current winner: p3 (JC). Picker (p1) hand: QC (rank 0), KD (4pts, rank 10).
+    // Put 8 higher trump (excluding QC, JC) in completed tricks so KD is also guaranteed.
+    // Both QC and KD beat JC. cheapestGuaranteedWin returns QC (3pts < 4pts).
+    const higherThanKD = [
+      c('Q','C'), c('Q','S'), c('Q','H'), c('Q','D'),
+      c('J','C'), c('J','S'), c('J','H'), c('J','D'),
+      c('A','D'), c('10','D'),
+    ]
+    const baseView = makeTrumpEfficiencyView({
+      userId: 'p1', picker: 'p1', partner: 'p2',
+      hand: [c('Q','C'), c('K','D'), c('7','H'), c('8','S')],
+      trick: [
+        { userId: 'p3', card: c('J','C') },  // opponent led trump
+        { userId: 'p2', card: c('9','D') },  // partner played
+      ],
+    })
+    const inTricks = higherThanKD.filter(x => x.id !== 'QC' && x.id !== 'JC')
+    const view = withTricks(baseView, [
+      inTricks.slice(0, 5).map((card, i) => ({ userId: `p${i+1}`, card })),
+      inTricks.slice(5, 8).map((card, i) => ({ userId: `p${i+1}`, card })).concat([
+        { userId: 'p4', card: c('7','C') },
+        { userId: 'p5', card: c('8','C') },
+      ]),
+    ])
+    expect(decidePlay(view, 'p1')).toBe('QC')
+  })
+
+  it('picker on trump trick picks weaker guaranteed trump when opponents remain', () => {
+    // Trump trick. Picker (p1) hand: QC (3pts,rank0), JS (2pts,rank5).
+    // For both to be guaranteed: all trump rank 0-4 accounted for.
+    // QC in hand. QS, QH, QD, JC in tricks.
+    // Current trick: p3 leads 7D. p2 plays AC (void in trump).
+    // Opponents (p4, p5) still to play.
+    // winning = [QC, JS]. highestTrump = QC (rank 0). cheapestGuaranteedWin: JS (2pts < 3pts).
+    const higherTrumpInTricks = [c('Q','S'), c('Q','H'), c('Q','D'), c('J','C')]
+    const baseView = makeTrumpEfficiencyView({
+      userId: 'p1', picker: 'p1', partner: 'p2',
+      hand: [c('Q','C'), c('J','S'), c('7','H'), c('8','H')],
+      trick: [
+        { userId: 'p3', card: c('7','D') },
+        { userId: 'p2', card: c('A','C') },
+      ],
+    })
+    const view = withTricks(baseView, [
+      higherTrumpInTricks.map((card, i) => ({ userId: `p${i+1}`, card })).concat([
+        { userId: 'p5', card: c('7','C') },
+      ]),
+    ])
+    expect(decidePlay(view, 'p1')).toBe('JS')
+  })
+})

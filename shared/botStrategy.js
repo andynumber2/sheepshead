@@ -6,7 +6,7 @@
 import {
   isTrump, cardPoints, effectiveSuit, trumpRank, suitRank, schwanzerCardPoints,
 } from './gameEngine.js'
-import { currentWinner, beats, handScore, bestVoidBury, teammateWinning, trumpRemainingElsewhere, isGuaranteedWinner } from './botInference.js'
+import { currentWinner, beats, handScore, bestVoidBury, teammateWinning, trumpRemainingElsewhere, isGuaranteedWinner, cheapestGuaranteedWin } from './botInference.js'
 
 // ─── Legal card helper ────────────────────────────────────────────────────────
 // Mirrors getLegalCardIds from the frontend; computes which cards can be played.
@@ -355,11 +355,17 @@ export function decidePlay(view, userId) {
       if (ledSuit === 'T') {
         // Scenario 1: Trump trick
         if (opponentsRemaining === 0) return cheapestWinningTrump(winning).id
+        const guaranteed = cheapestGuaranteedWin(winning, view, userId)
+        if (guaranteed) return guaranteed.id
         return highestTrump(winning).id
       }
 
       // Scenario 2: Fail trick, bot is void, playing trump to contest the lead
-      if (userId === picker) return highestTrump(winning).id
+      if (userId === picker) {
+        const guaranteed = cheapestGuaranteedWin(winning, view, userId)
+        if (guaranteed) return guaranteed.id
+        return highestTrump(winning).id
+      }
 
       // Partner (void in led fail suit). playedIds already defined above.
       const myTrumpCount = realCards.filter(c => isTrump(c)).length
@@ -388,7 +394,11 @@ export function decidePlay(view, userId) {
       )
       if (pickerCardLocked) return lowestCard(realCards).id
 
-      if (myTrumpCount > 1) return highestTrump(winning).id
+      if (myTrumpCount > 1) {
+        const guaranteed = cheapestGuaranteedWin(winning, view, userId)
+        if (guaranteed) return guaranteed.id
+        return highestTrump(winning).id
+      }
       return highestTrump(winning).id  // 1 trump, picker already played — play it
     }
 
