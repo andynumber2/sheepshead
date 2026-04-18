@@ -9,7 +9,7 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
     : {}
   const turnLabel = actingForName ? `Acting for ${actingForName}` : 'Your turn'
   const [selectedBuried, setSelectedBuried] = useState([])
-  const [unknownSelectedSuit, setUnknownSelectedSuit] = useState(null)
+  const [underSelectedSuit, setUnderSelectedSuit] = useState(null)
   const [selectedUnderCard, setSelectedUnderCard] = useState(null)
   const [confirmingAlone, setConfirmingAlone] = useState(false)
   const [error, setError] = useState(null)
@@ -208,13 +208,13 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
     const isFailCard = (c, s) => c.suit === s && c.rank !== 'Q' && c.rank !== 'J'
     const candidateSuits = ['C', 'H', 'S'].filter(s => !heldIds.has(`A${s}`) && !buriedIds.has(`A${s}`))
     const normalSuits = candidateSuits.filter(s => myHand.some(c => isFailCard(c, s)))
-    const unknownSuits = candidateSuits.filter(s => !myHand.some(c => isFailCard(c, s)))
+    const underSuits = candidateSuits.filter(s => !myHand.some(c => isFailCard(c, s)))
 
-    if (unknownSelectedSuit) {
+    if (underSelectedSuit) {
       // Situation B: pick the under card from hand
       return (
         <div className="action-panel" style={botStyle}>
-          <h4>Place an under card for A{SUIT_SYMBOLS[unknownSelectedSuit]} Unknown</h4>
+          <h4>Place an under card for A{SUIT_SYMBOLS[underSelectedSuit]} Under</h4>
           <p style={{ fontSize: '0.85rem', color: '#ccc' }}>
             Choose any card to place face-down as the under card. It has no power; it must be played
             when the called suit is led.
@@ -228,14 +228,14 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 8 }}>
             <button
               disabled={!selectedUnderCard || loading}
-              onClick={() => act('call_ace_unknown', { suit: unknownSelectedSuit, underCardId: selectedUnderCard })
-                .then(() => { setUnknownSelectedSuit(null); setSelectedUnderCard(null) })}
+              onClick={() => act('call_ace_under', { suit: underSelectedSuit, underCardId: selectedUnderCard })
+                .then(() => { setUnderSelectedSuit(null); setSelectedUnderCard(null) })}
             >
               Confirm
             </button>
             <button
               className="secondary"
-              onClick={() => { setUnknownSelectedSuit(null); setSelectedUnderCard(null) }}
+              onClick={() => { setUnderSelectedSuit(null); setSelectedUnderCard(null) }}
               disabled={loading}
             >
               Back
@@ -264,19 +264,19 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
           ))}
         </div>
         {/* Under card calls are only allowed when there is no normal call available. */}
-        {normalSuits.length === 0 && unknownSuits.length > 0 && (
+        {normalSuits.length === 0 && underSuits.length > 0 && (
           <>
             <p style={{ fontSize: '0.8rem', color: '#ccc', marginTop: 8 }}>
-              You hold no fail card of any callable suit. Place an under card and call Unknown:
+              You hold no fail card of any callable suit. Place an under card and call Under:
             </p>
             <div className="suit-picker">
-              {unknownSuits.map(suit => (
+              {underSuits.map(suit => (
                 <button
                   key={suit}
                   className={`suit-btn ${suit === 'H' ? 'red' : 'black'}`}
-                  onClick={() => setUnknownSelectedSuit(suit)}
+                  onClick={() => setUnderSelectedSuit(suit)}
                   disabled={loading}
-                  title={`Call A${suit} Unknown`}
+                  title={`Call A${suit} Under`}
                 >
                   A{SUIT_SYMBOLS[suit]}?
                 </button>
@@ -284,7 +284,7 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
             </div>
           </>
         )}
-        {normalSuits.length === 0 && unknownSuits.length === 0 && (
+        {normalSuits.length === 0 && underSuits.length === 0 && (
           <p style={{ color: '#f87171' }}>No valid suit to call. Contact the game admin.</p>
         )}
         {goAloneSection}

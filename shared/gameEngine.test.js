@@ -5,7 +5,7 @@ import {
   schwanzerCardPoints, resolveSchwanzer,
   dealHand, pick, pass, blitz,
   bury, callAce, goAlone, callTen, callKing,
-  callAceUnknown, crack, recrack,
+  callAceUnder, crack, recrack,
   playCard, computeScores, resolveLeaster,
   setupLeaster, awardLeasterBlind, getPlayerView,
 } from './gameEngine.js'
@@ -1110,8 +1110,8 @@ describe('resolveLeaster', () => {
   })
 })
 
-describe('callAceUnknown', () => {
-  function makeUnknownCallingState() {
+describe('callAceUnder', () => {
+  function makeUnderCallingState() {
     return {
       phase: 'calling',
       picker: 'p1',
@@ -1131,19 +1131,19 @@ describe('callAceUnknown', () => {
     }
   }
 
-  it('sets underCard, calledAce (unknown:true), partner, and advances to playing', () => {
-    const next = callAceUnknown(makeUnknownCallingState(), 'p1', 'C', 'QS')
+  it('sets underCard, calledAce (under:true), partner, and advances to playing', () => {
+    const next = callAceUnder(makeUnderCallingState(), 'p1', 'C', 'QS')
     expect(next.phase).toBe('playing')
     expect(next.underCard).toMatchObject({ id: 'QS', ownerId: 'p1', played: false })
-    expect(next.calledAce).toEqual({ suit: 'C', aceId: 'AC', unknown: true })
+    expect(next.calledAce).toEqual({ suit: 'C', aceId: 'AC', under: true })
     expect(next.partner).toBe('p2')
   })
 
   it('throws when a normal ace call is available for another suit', () => {
-    const state = makeUnknownCallingState()
+    const state = makeUnderCallingState()
     // Add a fail heart (KH) — p1 doesn't hold AH, AH not buried → normal call available for H
     state.hands.p1 = [c('Q','C'), c('Q','S'), c('Q','H'), c('Q','D'), c('J','C'), c('K','H')]
-    expect(() => callAceUnknown(state, 'p1', 'C', 'QS')).toThrow('normal ace call is available')
+    expect(() => callAceUnder(state, 'p1', 'C', 'QS')).toThrow('normal ace call is available')
   })
 })
 

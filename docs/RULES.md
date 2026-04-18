@@ -48,7 +48,7 @@ After burying, the picker calls a partner using one of three modes determined by
 The picker calls the Ace of a non-trump suit they neither hold nor buried.
 
 - *Normal call* — the picker holds at least one fail card of the called suit. The holder of the called Ace is the partner; the partner is revealed when the called suit is led and the partner plays the Ace.
-- *Unknown call* — the picker holds **no** fail card of the called suit (only available when no normal ace call exists). The picker places one card face-down from their hand as an **under card**. The picker must play the under card whenever the called suit is led; it is revealed only to the trick winner.
+- *Under call* — the picker holds **no** fail card of the called suit (only available when no normal ace call exists). The picker places one card face-down from their hand as an **under card**. The picker must play the under card whenever the called suit is led; it is revealed only to the trick winner.
 
 **Call Mode: Ten** (picker holds all 3 fail Aces)
 
