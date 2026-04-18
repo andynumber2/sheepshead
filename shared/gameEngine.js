@@ -635,6 +635,39 @@ function validatePlay(state, userId, card) {
       )
     }
   }
+
+  // Picker called-suit holding rule: until the called suit is led (signalled by
+  // partnerRevealed, which flips the moment the partner plays the called card),
+  // the picker must keep at least one card of the called suit in hand for the
+  // eventual called-suit trick. In ten/king calls, each forced-play card is a
+  // required hold. Only lifts on the last trick when no alternative card exists.
+  if (
+    userId === state.picker &&
+    state.calledSuit &&
+    !state.partnerRevealed &&
+    ledSuit !== state.calledSuit
+  ) {
+    const alternatives = hand.filter(c => c.id !== card.id)
+    const isForcedPlay = (state.pickerForcedPlays ?? []).includes(card.id)
+    const isCalledSuitFail = effectiveSuit(card) === state.calledSuit
+    if (alternatives.length > 0) {
+      if (isForcedPlay) {
+        throw new Error(
+          `Picker must keep ${card.id} for when the called suit is led.`
+        )
+      }
+      if (isCalledSuitFail) {
+        const remainingCalledSuit = alternatives.filter(
+          c => effectiveSuit(c) === state.calledSuit
+        ).length
+        if (remainingCalledSuit === 0) {
+          throw new Error(
+            `Picker must keep a card of the called suit (${state.calledSuit}) until it is led.`
+          )
+        }
+      }
+    }
+  }
 }
 
 // Validate that the picker is allowed to play the under card right now.

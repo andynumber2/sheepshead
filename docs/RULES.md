@@ -68,10 +68,15 @@ The player left of the dealer leads the first trick. Players must follow suit if
 
 **Partner reveal** — the partner is identified to all players the moment they play the called card (Ace, Ten, or King) in response to the called suit being led.
 
-**Partner restrictions before reveal:**
+**Partner restrictions before the called suit has been led:**
 - The partner may not lead the called suit unless they lead with the called card.
 - The partner must play the called card when the called suit is led and they hold it.
 - The called card may not be played by the partner in any other situation (unless it is their last card).
+
+**Picker restrictions before the called suit is led:**
+- The picker must keep at least one card of the called suit in hand to play when the called suit is led. They may sluff other fail cards of the called suit on off-suit tricks, but they may not empty their called-suit holding.
+- In a Ten or King call, every card listed as a forced play (the Ace for a Ten call; the Ace and Ten for a King call) must likewise be held until the called suit is led.
+- If the called suit is never led, the reserved called-suit card(s) are played on the final trick of the hand.
 
 **Under card rules:**
 - The under card has no trick-taking power (it cannot win a trick).

@@ -57,13 +57,36 @@ function getLegalCards(state, userId) {
   }
 
   // Called card cannot be played unless the called suit is led (mirrors gameEngine restriction)
-  const playableCards = (
+  let playableCards = (
     calledCardId &&
     ledSuit !== calledSuit &&
     handCards.some(c => c.id !== calledCardId)
   )
     ? handCards.filter(c => c.id !== calledCardId)
     : handCards
+
+  // Picker called-suit holding rule: until the called suit is led, the picker
+  // must keep ≥1 card of the called suit in hand (plus any pickerForcedPlays
+  // cards in ten/king calls). Mirrors gameEngine validatePlay.
+  if (
+    userId === picker &&
+    calledSuit &&
+    !partnerRevealed &&
+    ledSuit !== calledSuit &&
+    playableCards.length > 1
+  ) {
+    const filtered = playableCards.filter(card => {
+      if (pickerForcedPlays.includes(card.id)) return false
+      if (effectiveSuit(card) === calledSuit) {
+        const remaining = playableCards.filter(
+          c => c.id !== card.id && effectiveSuit(c) === calledSuit
+        ).length
+        if (remaining === 0) return false
+      }
+      return true
+    })
+    if (filtered.length > 0) playableCards = filtered
+  }
 
   const hasSuit = playableCards.some(c => effectiveSuit(c) === ledSuit)
   return hasSuit

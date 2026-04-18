@@ -794,6 +794,133 @@ describe('playCard', () => {
   })
 })
 
+describe('picker called-suit holding rule', () => {
+  // p1 is picker, called AC (clubs). Trick is led with fail spades; p1 is void in
+  // spades and is deciding what to sluff. Partner not yet revealed.
+  function makePickerSluffingState(pickerHand) {
+    return {
+      phase: 'playing',
+      picker: 'p1',
+      partner: 'p2',
+      goingAlone: false,
+      calledAce: { suit: 'C', aceId: 'AC' },
+      calledSuit: 'C',
+      calledTen: null,
+      calledKing: null,
+      partnerRevealed: false,
+      pickerForcedPlays: [],
+      underCard: null,
+      pickOrder: ['p3', 'p1', 'p2', 'p4', 'p5'],
+      doublerMultiplier: 1,
+      handCrackMultiplier: 1,
+      blitzes: [],
+      buried: [],
+      tricks: [],
+      currentTrick: [
+        { userId: 'p3', card: c('8', 'S') }, // fail-spade lead
+      ],
+      currentLeader: 'p3',
+      log: [],
+      scores: {},
+      hands: {
+        p1: pickerHand,
+        p2: [c('A', 'C')],
+        p3: [],
+        p4: [c('K', 'S')],
+        p5: [c('9', 'S')],
+      },
+    }
+  }
+
+  it('rejects picker sluffing their last fail card of the called suit', () => {
+    // p1 (picker) holds a single called-suit card (8C) plus trump/other-suit
+    // cards; sluffing 8C would leave them with zero clubs.
+    const state = makePickerSluffingState([
+      c('8', 'C'),
+      c('10', 'D'), // trump
+      c('9', 'D'),  // trump
+    ])
+    expect(() => playCard(state, 'p1', '8C')).toThrow(/called suit/)
+  })
+
+  it('allows picker to sluff a fail card of the called suit if another remains', () => {
+    // p1 holds two clubs (8C, 9C); sluffing 9C still leaves 8C in hand.
+    const state = makePickerSluffingState([
+      c('8', 'C'),
+      c('9', 'C'),
+      c('10', 'D'),
+    ])
+    expect(() => playCard(state, 'p1', '9C')).not.toThrow()
+  })
+
+  it('allows picker to play their last called-suit card when the called suit is led', () => {
+    const state = {
+      ...makePickerSluffingState([c('8', 'C'), c('10', 'D')]),
+      currentTrick: [{ userId: 'p3', card: c('7', 'C') }], // clubs led
+      currentLeader: 'p3',
+    }
+    expect(() => playCard(state, 'p1', '8C')).not.toThrow()
+  })
+
+  it('allows picker to play their last called-suit card after partner has been revealed', () => {
+    const state = {
+      ...makePickerSluffingState([c('8', 'C'), c('10', 'D')]),
+      partnerRevealed: true,
+    }
+    expect(() => playCard(state, 'p1', '8C')).not.toThrow()
+  })
+
+  it('allows picker to play their last called-suit card on the last trick (no alternative)', () => {
+    // Hand has only the club; picker must play it regardless.
+    const state = makePickerSluffingState([c('8', 'C')])
+    expect(() => playCard(state, 'p1', '8C')).not.toThrow()
+  })
+
+  it('does not restrict non-picker players from sluffing called-suit cards', () => {
+    // p4 is an opponent with a single 8C plus KS; sluffing 8C is fine.
+    const state = {
+      ...makePickerSluffingState([c('Q', 'C')]),
+      currentTrick: [
+        { userId: 'p3', card: c('10', 'S') },
+        { userId: 'p1', card: c('Q', 'C') }, // picker plays trump
+        { userId: 'p2', card: c('K', 'S') },
+      ],
+      currentLeader: 'p3',
+      hands: {
+        p1: [],
+        p2: [],
+        p3: [],
+        p4: [c('8', 'C'), c('J', 'H')],
+        p5: [c('9', 'S')],
+      },
+    }
+    expect(() => playCard(state, 'p4', '8C')).not.toThrow()
+  })
+
+  it('does not apply when the picker went alone (no called suit)', () => {
+    const state = {
+      ...makePickerSluffingState([c('8', 'C'), c('10', 'D')]),
+      goingAlone: true,
+      partner: null,
+      calledAce: null,
+      calledSuit: null,
+    }
+    expect(() => playCard(state, 'p1', '8C')).not.toThrow()
+  })
+
+  it('rejects picker sluffing the forced ace in a ten call', () => {
+    // Ten-call: picker holds all three fail aces; the ace of called suit is
+    // listed in pickerForcedPlays and must be kept for the called-suit trick.
+    const state = {
+      ...makePickerSluffingState([c('A', 'C'), c('10', 'D'), c('9', 'D')]),
+      calledAce: null,
+      calledTen: { suit: 'C', tenId: '10C' },
+      pickerForcedPlays: ['AC'],
+    }
+    expect(() => playCard(state, 'p1', 'AC')).toThrow(/called suit/)
+  })
+})
+
 describe('computeScores', () => {
   // Create a fake card with a specific point rank (suit doesn't affect scoring)
   let fakeId = 0
