@@ -432,11 +432,38 @@ export function decidePlay(view, userId) {
     // Can't win; play lowest
     return lowestCard(realCards).id
   } else {
-    // Opponent: schmear on confirmed teammate wins; otherwise play low
+    // Opponent: schmear on confirmed teammate wins — unless picker-team still to play
+    // could trump over the teammate, in which case attempt a guaranteed takeover.
     if (teammateWinning(view, userId)) {
-      const nonTrump = realCards.filter(c => !isTrump(c))
-      if (nonTrump.length > 0) return highestValueCard(nonTrump).id
-      return lowestCard(realCards).id
+      const schmearOpp = () => {
+        const nonTrump = realCards.filter(c => !isTrump(c))
+        if (nonTrump.length > 0) return highestValueCard(nonTrump).id
+        return lowestCard(realCards).id
+      }
+
+      const winnerPlay = currentWinner(currentTrick)
+      const playedIdsOpp = new Set(currentTrick.map(p => p.userId))
+      const allIdsOpp = Object.keys(view.hands)
+      // From opponent POV, "threats" (could overtake teammate) = picker + partner still to play.
+      const threatsRemaining = allIdsOpp.filter(id =>
+        !playedIdsOpp.has(id) && id !== userId && (id === picker || id === partner)
+      ).length
+
+      const teammateSafe = threatsRemaining === 0 ||
+        isGuaranteedWinner(winnerPlay.card, view, userId)
+
+      if (teammateSafe) return schmearOpp()
+
+      const ledSuitOpp = currentTrick[0].declaredSuit ?? effectiveSuit(currentTrick[0].card)
+      const winningOpp = realCards.filter(card => {
+        for (const play of currentTrick) {
+          if (!beats(card, play.card, ledSuitOpp)) return false
+        }
+        return true
+      })
+      const takeover = cheapestGuaranteedWin(winningOpp, view, userId)
+      if (takeover) return takeover.id
+      return schmearOpp()
     }
     // Trump in on called suit if picker team is currently winning the trick
     const { calledSuit } = view

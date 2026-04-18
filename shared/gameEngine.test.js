@@ -2749,3 +2749,37 @@ describe('decidePlay — picker-team schmear guard (#121)', () => {
     expect(decidePlay(view, 'p1')).toBe('AS')
   })
 })
+
+describe('decidePlay — opponent-team schmear guard (#121)', () => {
+  it('opponent takes over when teammate-opponent winning, picker still to play, takeover guaranteed', () => {
+    // Hearts led (fail). Opponent p3 currently winning with AH.
+    // Another opponent p4 follows. Picker p1 and partner p2 still to play → threats remain.
+    // p4 hand: QC (rank 0 trivially guaranteed), 7C, 8S.
+    //   teammateSafe = false (picker could trump). takeover = QC.
+    const view = makeTrumpEfficiencyView({
+      userId: 'p4', picker: 'p1', partner: 'p2',
+      hand: [c('Q','C'), c('7','C'), c('8','S')],
+      trick: [
+        { userId: 'p3', card: c('A','H') },
+      ],
+    })
+    expect(decidePlay(view, 'p4')).toBe('QC')
+  })
+
+  it('opponent schmears when no takeover available', () => {
+    // Same trick; p4 has no trump. Fall back to schmear.
+    // partnerRevealed=true in fixture; p4 is opponent. teammateWinning(p4):
+    //   winner p3, p3 is not picker (p1) nor partner (p2) → teammate of p4 → true.
+    //   threats = picker + partner still to play = 2.
+    //   teammateSafe = false AND no trump in hand → winningOpp=[] → takeover=null → schmear.
+    //   schmear nonTrump = [AS, 7C, 9S]. highestValueCard → AS (11pts).
+    const view = makeTrumpEfficiencyView({
+      userId: 'p4', picker: 'p1', partner: 'p2',
+      hand: [c('A','S'), c('7','C'), c('9','S')],
+      trick: [
+        { userId: 'p3', card: c('A','H') },
+      ],
+    })
+    expect(decidePlay(view, 'p4')).toBe('AS')
+  })
+})
