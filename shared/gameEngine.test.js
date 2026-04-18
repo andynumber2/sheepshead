@@ -2345,11 +2345,9 @@ describe('decidePlay trump efficiency — fail trick, bot void (Scenario 2)', ()
   it('partner with 1 trump plays low when picker has the trick locked', () => {
     // Clubs led. Partner (p2) void in clubs.
     // p3(AC), p4(KC), p5(9C), p1(AD — picker trumped in, currently winning).
-    // All 3 opponents (p3,p4,p5) already played. 0 opponents remaining.
-    // pickerCurrentlyWinning=true AND opponentsRemaining=0 → play low.
-    // Partner hand: 9D(only trump), AH(11pts), KS(4pts).
-    // lowestCard([9D,AH,KS]): prefer non-trump; KS=4pts < AH=11pts → KS.
-    // Old code: lowestCard([9D]) = 9D. Bug: wastes trump when picker has it locked.
+    // teammateWinning=true → schmear branch. Called ace (AH) is filtered out by
+    // the called-card-holding rule, so schmear sees non-trump [KS] and returns KS.
+    // This guards the #92 no-waste-trump behavior via the schmear path.
     const view = makeTrumpEfficiencyView({
       userId: 'p2', picker: 'p1', partner: 'p2',
       hand: [c('9','D'), c('A','H'), c('K','S')],
@@ -2662,5 +2660,92 @@ describe('decidePlay — cheapest-guaranteed refinement', () => {
       ]),
     ])
     expect(decidePlay(view, 'p1')).toBe('JS')
+  })
+})
+
+describe('decidePlay — picker-team schmear guard (#121)', () => {
+  it('partner still schmears when picker is winning but opponent could overtake (trust picker)', () => {
+    // Clubs led (so AH is NOT filtered for partner — but we omit AH from hand anyway to avoid fixture confusion).
+    // p3(AC), p4(KC), p1(QD — picker trumped in, rank 3).
+    // QC/QS/QH unseen → QD not guaranteed. p5 still to play → opponentsRemaining=1.
+    // Partner (p2) role: teammateSafe=false but partner role → schmear anyway.
+    // Partner hand: [AS(11pts spades), 7H(0pts), 8S(0pts)]. No trump, no AH. schmear picks AS.
+    const view = makeTrumpEfficiencyView({
+      userId: 'p2', picker: 'p1', partner: 'p2',
+      hand: [c('A','S'), c('7','H'), c('8','S')],
+      trick: [
+        { userId: 'p3', card: c('A','C') },
+        { userId: 'p4', card: c('K','C') },
+        { userId: 'p1', card: c('Q','D') },
+      ],
+    })
+    expect(decidePlay(view, 'p2')).toBe('AS')
+  })
+
+  it('partner still schmears when picker is winning and card IS guaranteed', () => {
+    // Same layout but picker plays QC (rank 0, trivially guaranteed).
+    // teammateSafe=true → schmear. Same hand, same expected AS.
+    const view = makeTrumpEfficiencyView({
+      userId: 'p2', picker: 'p1', partner: 'p2',
+      hand: [c('A','S'), c('7','H'), c('8','S')],
+      trick: [
+        { userId: 'p3', card: c('A','C') },
+        { userId: 'p4', card: c('K','C') },
+        { userId: 'p1', card: c('Q','C') },
+      ],
+    })
+    expect(decidePlay(view, 'p2')).toBe('AS')
+  })
+
+  it('picker takes over when partner winning a fail trick, opponent could overtake, guaranteed takeover exists', () => {
+    // Clubs led. Partner (p2) plays AC and is currently winning (highest club — no trumping yet).
+    // p4 plays KC (following). Picker (p1) to play; p5 still to play.
+    // Picker hand: [QC (guaranteed trump rank 0), AS, 7H]. QC beats AC (trump over fail).
+    // teammateWinning=true (partner p2 winning). AC not a trump (can't check "AC guaranteed" as trump —
+    //   but isGuaranteedWinner returns false for non-trump cards). So teammateSafe=false.
+    // Picker role → takeover = cheapestGuaranteedWin([QC]) = QC.
+    const view = makeTrumpEfficiencyView({
+      userId: 'p1', picker: 'p1', partner: 'p2',
+      hand: [c('Q','C'), c('A','S'), c('7','H')],
+      trick: [
+        { userId: 'p3', card: c('8','C') },
+        { userId: 'p2', card: c('A','C') },
+        { userId: 'p4', card: c('K','C') },
+      ],
+    })
+    expect(decidePlay(view, 'p1')).toBe('QC')
+  })
+
+  it('picker plays highest winning trump as risk reduction when no guaranteed takeover exists', () => {
+    // Same layout as test 3 but picker's only beating card is KD (trump rank 10, not guaranteed).
+    // winningLocal = [KD] (trump beats AC). cheapestGuaranteedWin=null. highestTrump=KD.
+    const view = makeTrumpEfficiencyView({
+      userId: 'p1', picker: 'p1', partner: 'p2',
+      hand: [c('K','D'), c('A','S'), c('7','H')],
+      trick: [
+        { userId: 'p3', card: c('8','C') },
+        { userId: 'p2', card: c('A','C') },
+        { userId: 'p4', card: c('K','C') },
+      ],
+    })
+    expect(decidePlay(view, 'p1')).toBe('KD')
+  })
+
+  it('picker schmears as fallback when partner winning, not guaranteed, and no winning trump in hand', () => {
+    // Same trick. Picker hand: [7D, AS, 7H]. Must follow clubs if any — none. So can play anything.
+    // 7D is trump (rank 13). Does 7D beat AC? Trump beats fail → yes. So winningLocal = [7D].
+    // Wait — we wanted NO winning trump. Replace 7D with something non-trump. Picker hand: [AS, 7H, 8S].
+    // No trump, no clubs → winningLocal = [] (none beat AC — AS is spades not clubs/trump).
+    // takeover=null, highTrump=null. Fall to schmear → AS.
+    const view = makeTrumpEfficiencyView({
+      userId: 'p1', picker: 'p1', partner: 'p2',
+      hand: [c('A','S'), c('7','H'), c('8','S')],
+      trick: [
+        { userId: 'p3', card: c('8','C') },
+        { userId: 'p2', card: c('A','C') },
+        { userId: 'p4', card: c('K','C') },
+      ],
+    })
+    expect(decidePlay(view, 'p1')).toBe('AS')
   })
 })
