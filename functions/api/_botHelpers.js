@@ -3,7 +3,7 @@
 
 import {
   currentPicker, currentPlayer,
-  pick, blitz, pass, discard,
+  pick, blitz, pass, bury,
   callAce, callAceUnknown, callTen, callKing, goAlone,
   playCard, crack, recrack,
   setupLeaster, awardLeasterBlind, resolveLeaster,
@@ -12,7 +12,7 @@ import {
 } from '../../shared/gameEngine.js'
 
 import {
-  decidePick, decideBlitz, decideDiscard, decideCall, decidePlay,
+  decidePick, decideBlitz, decideBury, decideCall, decidePlay,
 } from '../../shared/botStrategy.js'
 
 async function appendAction(DB, gameId, handNumber, type, userId, payload) {
@@ -159,7 +159,7 @@ async function createPlayBots(DB, count) {
 // ─── processBotTurns ─────────────────────────────────────────────────────────
 // Advances the game state through consecutive bot turns with two modes:
 //
-//   Non-playing phases (picking, discarding, calling): loop freely — these
+//   Non-playing phases (picking, burying, calling): loop freely — these
 //   resolve instantly because there's nothing visible to animate.
 //
 //   Playing phase: execute exactly ONE card play then stop. The frontend
@@ -254,7 +254,7 @@ export async function processBotTurns(state, gameId, DB, game, { allowTrick1Lead
 function getNextActor(state) {
   switch (state.phase) {
     case 'picking':    return currentPicker(state)
-    case 'discarding': return state.picker
+    case 'burying':    return state.picker
     case 'calling':    return state.picker
     case 'playing':    return currentPlayer(state)
     default:           return null
@@ -275,9 +275,9 @@ function applyBotDecision(state, userId, view) {
       return { state: pass(state, userId), actionType: 'pass', payload: null }
     }
 
-    case 'discarding': {
-      const cardIds = decideDiscard(view, userId)
-      return { state: discard(state, userId, cardIds), actionType: 'discard', payload: { cardIds } }
+    case 'burying': {
+      const cardIds = decideBury(view, userId)
+      return { state: bury(state, userId, cardIds), actionType: 'bury', payload: { cardIds } }
     }
 
     case 'calling': {

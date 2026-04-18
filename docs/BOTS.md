@@ -28,12 +28,12 @@ Only considered when a potential blitz is available. The bot declares blitz if i
 
 ---
 
-## Discard Decision (`decideDiscard`)
+## Bury Decision (`decideBury`)
 
 After picking up the blind, the bot buries 2 cards using this priority:
 
 1. **Void a suit**: If burying 2 non-trump cards can void a non-trump suit and the pair is worth more than 10 card points combined, do that (respecting must-hold restrictions).
-2. **Otherwise**: Sort non-trump cards to the front (trump is never discarded if avoidable), then by card points descending. Bury the top 2 candidates.
+2. **Otherwise**: Sort non-trump cards to the front (trump is never buried if avoidable), then by card points descending. Bury the top 2 candidates.
 
 **Must-hold restriction**: If the bot holds all three fail aces, it cannot bury any of them (they must stay in hand for the "ace" call rules). If it also holds all three fail tens, neither aces nor tens can be buried.
 
@@ -76,7 +76,7 @@ Play the **lowest-value card** always, to avoid winning tricks.
 4. If no trump and not the partner: lead the **highest-value fail card**.
 
 #### Opponent bot leading
-1. **Cash a fail ace** if the picker team has **zero** trump remaining (all 14 trump accounted for in own hand, discard, and played tricks). The fail ace must not be the called card (in practice an opponent never holds the called card, but the code is explicit).
+1. **Cash a fail ace** if the picker team has **zero** trump remaining (all 14 trump accounted for in own hand, buried, and played tricks). The fail ace must not be the called card (in practice an opponent never holds the called card, but the code is explicit).
 2. **Lead called suit** (lowest card of that suit) if the partner has not yet been revealed and the bot holds at least one fail card of the called suit. This forces the partner to play their called card, revealing their identity.
 3. Otherwise, lead the **lowest non-trump card** to avoid burning trump.
 4. If no non-trump cards remain, lead the lowest card overall.
@@ -114,5 +114,5 @@ These pure functions support the strategy above but make no decisions themselves
 | `handScore` | Combined pick-quality score: `schwanzerPts × 4 + buriablePoints` |
 | `beats` | Returns true if a challenger card beats the current winner given led suit |
 | `currentWinner` | Returns the play object currently winning a trick |
-| `bestVoidDiscard` | Finds the best 2-card discard that voids a non-trump suit with ≥11 combined card points |
+| `bestVoidBury` | Finds the best 2-card bury that voids a non-trump suit with ≥11 combined card points |
 | `teammateWinning` | Returns true if the current trick leader is on the same team as the bot |

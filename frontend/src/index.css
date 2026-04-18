@@ -296,7 +296,7 @@ body {
 }
 
 /* ── Action panel ────────────────────────────────────────── */
-.action-panel.action-panel-discard-overlay {
+.action-panel.action-panel-bury-overlay {
   grid-area: center;
   z-index: 10;
   background: #1a3d25;
@@ -419,8 +419,8 @@ body {
   accent-color: #7c3aed;
 }
 
-/* Discard selection hint */
-.discard-hint {
+/* Bury selection hint */
+.bury-hint {
   color: #aaa;
   font-size: 0.8rem;
   margin-top: 4px;

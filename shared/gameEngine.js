@@ -103,7 +103,7 @@ export function dealHand(playerIds, dealerSeat, handNumber, doublerMultiplier) {
   }
 
   return {
-    phase: 'picking',          // picking | discarding | calling | playing | scoring | complete
+    phase: 'picking',          // picking | burying | calling | playing | scoring | complete
     handNumber,
     dealerSeat,
     doublerMultiplier,
@@ -117,12 +117,12 @@ export function dealHand(playerIds, dealerSeat, handNumber, doublerMultiplier) {
     calledSuit: null,          // 'C'|'H'|'S' — unifying field across all call types
     callMode: null,            // null | 'ace' | 'ten' | 'king'
     underCard: null,           // { id, suit, rank, ownerId, played } — server-side full info
-    pickerMustHold: [],        // card ids the picker may not bury during discard
+    pickerMustHold: [],        // card ids the picker may not bury during the burying phase
     pickerForcedPlays: [],     // card ids the picker must play when called suit is led
     partnerRevealed: false,
     goingAlone: false,
     blind,
-    discard: [],               // picker's 2 discarded cards
+    buried: [],                // picker's 2 buried cards
     hands,                     // { userId: [cards] }
     tricks: [],                // completed tricks: [{ leader, plays: [{userId, card}], winner }]
     currentTrick: [],          // in-progress: [{userId, card}]
@@ -148,7 +148,7 @@ export function pick(state, userId) {
   // Give picker the blind
   newState.hands[userId] = [...newState.hands[userId], ...newState.blind]
   newState.blind = []
-  newState.phase = 'discarding'
+  newState.phase = 'burying'
   newState.log.push(`${userId} picked.`)
 
   return newState
@@ -170,7 +170,7 @@ export function blitz(state, userId) {
   // Give picker the blind
   newState.hands[userId] = [...newState.hands[userId], ...newState.blind]
   newState.blind = []
-  newState.phase = 'discarding'
+  newState.phase = 'burying'
   newState.log.push(`${userId} ${potentialBlitz.type === 'black' ? 'Black' : 'Red'} Blitzed!`)
 
   return newState
@@ -196,16 +196,16 @@ export function currentPicker(state) {
   return state.pickOrder[state.pickIndex]
 }
 
-// ─── Discard phase ───────────────────────────────────────────────────────────
-export function discard(state, userId, cardIds) {
-  assertPhase(state, 'discarding')
-  if (state.picker !== userId) throw new Error('Only the picker can discard.')
-  if (!Array.isArray(cardIds) || cardIds.length !== 2) throw new Error('Must discard exactly 2 cards.')
+// ─── Burying phase ───────────────────────────────────────────────────────────
+export function bury(state, userId, cardIds) {
+  assertPhase(state, 'burying')
+  if (state.picker !== userId) throw new Error('Only the picker can bury.')
+  if (!Array.isArray(cardIds) || cardIds.length !== 2) throw new Error('Must bury exactly 2 cards.')
 
   const newState = deepClone(state)
   const hand = newState.hands[userId]
 
-  // Determine calling mode based on the picker's 8-card hand BEFORE discard
+  // Determine calling mode based on the picker's 8-card hand BEFORE burying
   const failAces = ['AC', 'AH', 'AS']
   const failTens = ['10C', '10H', '10S']
   const holdsAllAces = failAces.every(id => hand.some(c => c.id === id))
@@ -221,21 +221,21 @@ export function discard(state, userId, cardIds) {
     callMode = 'ten'
   }
 
-  // Reject discards that bury cards the picker must keep for the partner call
+  // Reject burying cards the picker must keep for the partner call
   for (const cid of cardIds) {
     if (mustHold.includes(cid)) {
       throw new Error(`Cannot bury ${cid} — must keep for partner call.`)
     }
   }
 
-  const discarded = []
+  const buried = []
   for (const cid of cardIds) {
     const idx = hand.findIndex(c => c.id === cid)
     if (idx === -1) throw new Error(`Card ${cid} not in hand.`)
-    discarded.push(hand.splice(idx, 1)[0])
+    buried.push(hand.splice(idx, 1)[0])
   }
 
-  newState.discard = discarded
+  newState.buried = buried
   newState.pickerMustHold = mustHold
   newState.callMode = callMode
   newState.phase = 'calling'
@@ -262,7 +262,7 @@ export function callAce(state, userId, suit) {
   if (state.hands[userId].some(c => c.id === aceId)) {
     throw new Error(`Picker holds the ${aceId} — cannot call it.`)
   }
-  if (state.discard.some(c => c.id === aceId)) {
+  if (state.buried.some(c => c.id === aceId)) {
     throw new Error(`Picker buried the ${aceId} — cannot call it.`)
   }
 
@@ -315,7 +315,7 @@ export function callAceUnknown(state, userId, suit, underCardId) {
   if (state.hands[userId].some(c => c.id === aceId)) {
     throw new Error(`Picker holds the ${aceId} — cannot call it.`)
   }
-  if (state.discard.some(c => c.id === aceId)) {
+  if (state.buried.some(c => c.id === aceId)) {
     throw new Error(`Picker buried the ${aceId} — cannot call it.`)
   }
 
@@ -330,7 +330,7 @@ export function callAceUnknown(state, userId, suit, underCardId) {
   const hasNormalCall = ['C', 'H', 'S'].some(s => {
     const a = `A${s}`
     if (state.hands[userId].some(c => c.id === a)) return false
-    if (state.discard.some(c => c.id === a)) return false
+    if (state.buried.some(c => c.id === a)) return false
     return state.hands[userId].some(c => c.suit === s && !isTrump(c))
   })
   if (hasNormalCall) {
@@ -365,7 +365,7 @@ export function callTen(state, userId, suit) {
   if (state.hands[userId].some(c => c.id === tenId)) {
     throw new Error(`Picker holds the ${tenId} — cannot call it.`)
   }
-  if (state.discard.some(c => c.id === tenId)) {
+  if (state.buried.some(c => c.id === tenId)) {
     throw new Error(`Picker buried the ${tenId} — cannot call it.`)
   }
 
@@ -393,7 +393,7 @@ export function callKing(state, userId, suit) {
   if (state.hands[userId].some(c => c.id === kingId)) {
     throw new Error(`Picker holds the ${kingId} — cannot call it.`)
   }
-  if (state.discard.some(c => c.id === kingId)) {
+  if (state.buried.some(c => c.id === kingId)) {
     throw new Error(`Picker buried the ${kingId} — cannot call it.`)
   }
 
@@ -690,7 +690,7 @@ function beats(challenger, current, ledSuit) {
 
 // ─── Scoring ─────────────────────────────────────────────────────────────────
 export function computeScores(state) {
-  const { tricks, picker, partner, goingAlone, discard, doublerMultiplier } = state
+  const { tricks, picker, partner, goingAlone, buried, doublerMultiplier } = state
 
   // Gather all trick winners' point piles
   const pointsByPlayer = {}
@@ -703,8 +703,8 @@ export function computeScores(state) {
     pointsByPlayer[trick.winner] = (pointsByPlayer[trick.winner] ?? 0) + pts
   }
 
-  // Add buried discard points to picker's pile
-  for (const c of discard) {
+  // Add buried card points to picker's pile
+  for (const c of buried) {
     pointsByPlayer[picker] = (pointsByPlayer[picker] ?? 0) + cardPoints(c)
   }
 
@@ -793,7 +793,7 @@ export function resolveLeaster(state) {
     tricksByPlayer[trick.winner] = (tricksByPlayer[trick.winner] ?? 0) + 1
   }
 
-  // Add points from blind (blind is exposed in leaster — no discard)
+  // Add points from blind (blind is exposed in leaster — no burying)
   // In leasters, the blind is placed with whoever wins trick 1
   // We handle blind awarding in the action handler
 
@@ -884,9 +884,9 @@ export function getPlayerView(state, userId) {
   }
 
   // Picker can see blind during picking (they just picked it up — this is after picking)
-  // Discard is visible to the picker (they buried it); hidden to everyone else.
+  // Buried cards are visible to the picker; hidden to everyone else.
   if (userId !== view.picker) {
-    view.discard = view.discard.map(() => ({ id: 'HIDDEN', hidden: true }))
+    view.buried = view.buried.map(() => ({ id: 'HIDDEN', hidden: true }))
   }
 
   // Under card: picker (who placed it) can see its identity; other players cannot.

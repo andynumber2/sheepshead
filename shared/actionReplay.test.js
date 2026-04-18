@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { replayActions } from './actionReplay.js'
-import { dealHand, pick, discard, pass, setupLeaster, awardLeasterBlind, playCard, currentPlayer } from './gameEngine.js'
+import { dealHand, pick, bury, pass, setupLeaster, awardLeasterBlind, playCard, currentPlayer } from './gameEngine.js'
 
 describe('replayActions', () => {
   it('throws if no actions provided', () => {
@@ -30,32 +30,32 @@ describe('replayActions', () => {
       { type: 'pick', user_id: Number(pickerId), payload_json: null },
     ]
     const result = replayActions(actions)
-    expect(result.phase).toBe('discarding')
+    expect(result.phase).toBe('burying')
     expect(result.picker).toBe(pickerId)
   })
 
-  it('produces the same state as direct engine calls through pick and discard', () => {
+  it('produces the same state as direct engine calls through pick and bury', () => {
     const playerIds = ['1', '2', '3', '4', '5']
     const initial = dealHand(playerIds, 0, 1, 1)
     const pickerId = initial.pickOrder[0]
 
     // Direct engine path
     let direct = pick(initial, pickerId)
-    const cardIdsToDiscard = direct.hands[pickerId].slice(0, 2).map(c => c.id)
-    direct = discard(direct, pickerId, cardIdsToDiscard)
+    const cardIdsToBury = direct.hands[pickerId].slice(0, 2).map(c => c.id)
+    direct = bury(direct, pickerId, cardIdsToBury)
 
     // Replay path
     const actions = [
       { type: 'deal',    user_id: null,             payload_json: JSON.stringify(initial) },
       { type: 'pick',    user_id: Number(pickerId), payload_json: null },
-      { type: 'discard', user_id: Number(pickerId), payload_json: JSON.stringify({ cardIds: cardIdsToDiscard }) },
+      { type: 'bury',    user_id: Number(pickerId), payload_json: JSON.stringify({ cardIds: cardIdsToBury }) },
     ]
     const replayed = replayActions(actions)
 
     expect(replayed.phase).toBe('calling')
     expect(replayed.picker).toBe(pickerId)
     expect(replayed.hands[pickerId]).toHaveLength(6)
-    expect(replayed.discard).toEqual(direct.discard)
+    expect(replayed.buried).toEqual(direct.buried)
   })
 
   it('throws on unknown action type', () => {

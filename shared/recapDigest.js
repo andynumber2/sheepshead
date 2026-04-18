@@ -22,13 +22,13 @@ export function buildHandDigest(actions, players, scoreEventsByUser) {
 
   const variant = detectVariant(actions, finalState)
 
-  // Primary path: the discard action's cardIds is the production source of truth.
-  // Fallback reads finalState.discard for synthetic state-only fixtures that skip
-  // the discard action — inert in production since a normal hand always has one.
-  const discardAction = actions.find(a => a.type === 'discard')
-  const pickerDiscards = discardAction
-    ? JSON.parse(discardAction.payload_json).cardIds
-    : (finalState.discard ?? []).map(c => c.id)
+  // Primary path: the bury action's cardIds is the production source of truth.
+  // Fallback reads finalState.buried for synthetic state-only fixtures that skip
+  // the bury action — inert in production since a normal hand always has one.
+  const buryAction = actions.find(a => a.type === 'bury')
+  const pickerBuried = buryAction
+    ? JSON.parse(buryAction.payload_json).cardIds
+    : (finalState.buried ?? []).map(c => c.id)
 
   const calledCard =
     finalState.calledAce?.aceId ??
@@ -74,8 +74,8 @@ export function buildHandDigest(actions, players, scoreEventsByUser) {
     const pts = t.plays.reduce((s, p) => s + cardPoints(p.card), 0)
     cardPointsByUser[t.winner] = (cardPointsByUser[t.winner] ?? 0) + pts
   }
-  if (finalState.picker && finalState.discard) {
-    for (const c of finalState.discard) {
+  if (finalState.picker && finalState.buried) {
+    for (const c of finalState.buried) {
       cardPointsByUser[finalState.picker] += cardPoints(c)
     }
   }
@@ -101,7 +101,7 @@ export function buildHandDigest(actions, players, scoreEventsByUser) {
       ? { userId: finalState.partner, revealedOnTrick: partnerRevealedOnTrick }
       : null,
     calledCard,
-    pickerDiscards: variant === 'normal' ? pickerDiscards : null,
+    pickerBuried: variant === 'normal' ? pickerBuried : null,
     tricks,
     scores,
   }

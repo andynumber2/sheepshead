@@ -82,11 +82,11 @@ export default function DetailedReplayPage({ gameId, handNumber, startSeq, onNav
   const seatTopRight = players.find(p => p.seat === 3)
   const seatRight = players.find(p => p.seat === 4)
 
-  // The picker's play-phase hand is (dealt + blind) − pickerDiscards, not the raw dealt array.
-  const pickerPlayHand = pickerId && digest.blind && digest.pickerDiscards
+  // The picker's play-phase hand is (dealt + blind) − pickerBuried, not the raw dealt array.
+  const pickerPlayHand = pickerId && digest.blind && digest.pickerBuried
     ? (() => {
-        const discards = new Set(digest.pickerDiscards)
-        return [...(digest.dealt[pickerId] ?? []), ...digest.blind].filter(c => !discards.has(c))
+        const buried = new Set(digest.pickerBuried)
+        return [...(digest.dealt[pickerId] ?? []), ...digest.blind].filter(c => !buried.has(c))
       })()
     : null
   const dealtOf = uid => (uid === pickerId && pickerPlayHand) ? pickerPlayHand : (digest.dealt[uid] ?? [])
@@ -181,7 +181,7 @@ function describePlay(action, players) {
     case 'call_ace':  return `${uname} called ace`
     case 'call_ten':  return `${uname} called ten`
     case 'call_king': return `${uname} called king`
-    case 'discard':   return `${uname} discarded`
+    case 'bury':      return `${uname} buried`
     case 'play_card': return `${uname} played`
     default:          return action.type
   }
