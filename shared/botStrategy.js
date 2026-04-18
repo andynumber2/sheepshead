@@ -6,7 +6,7 @@
 import {
   isTrump, cardPoints, effectiveSuit, trumpRank, suitRank, schwanzerCardPoints,
 } from './gameEngine.js'
-import { currentWinner, beats, handScore, bestVoidBury, teammateWinning, trumpRemainingElsewhere } from './botInference.js'
+import { currentWinner, beats, handScore, bestVoidBury, teammateWinning, trumpRemainingElsewhere, isGuaranteedWinner } from './botInference.js'
 
 // ─── Legal card helper ────────────────────────────────────────────────────────
 // Mirrors getLegalCardIds from the frontend; computes which cards can be played.
@@ -361,14 +361,35 @@ export function decidePlay(view, userId) {
       // Scenario 2: Fail trick, bot is void, playing trump to contest the lead
       if (userId === picker) return highestTrump(winning).id
 
-      // Partner: play highest trump only when there is another trump to lead back
+      // Partner (void in led fail suit). playedIds already defined above.
       const myTrumpCount = realCards.filter(c => isTrump(c)).length
-      if (myTrumpCount > 1) return highestTrump(winning).id
+      const pickerStillToPlay = picker !== userId && !playedIds.has(picker)
 
-      // Partner with exactly 1 trump: play it unless the picker has the trick locked
-      const pickerCurrentlyWinning = currentWinner(currentTrick)?.userId === picker
-      if (pickerCurrentlyWinning && opponentsRemaining === 0) return lowestCard(realCards).id
-      return highestTrump(winning).id
+      if (pickerStillToPlay) {
+        // Picker hasn't played; picker likely has trump (picker-strength prior).
+        if (myTrumpCount >= 2) {
+          // Lead-back insurance: contest aggressively.
+          return highestTrump(winning).id
+        }
+        // Exactly 1 trump: only spend it if guaranteed to win the trick.
+        const myOnlyTrump = realCards.find(c => isTrump(c))
+        if (myOnlyTrump && isGuaranteedWinner(myOnlyTrump, view, userId)) {
+          return myOnlyTrump.id
+        }
+        return lowestCard(realCards).id
+      }
+
+      // Picker has played. Check if picker has the trick locked.
+      const winnerPlay = currentWinner(currentTrick)
+      const pickerCurrentlyWinning = winnerPlay?.userId === picker
+      const pickerCardLocked = pickerCurrentlyWinning && (
+        opponentsRemaining === 0 ||
+        isGuaranteedWinner(winnerPlay.card, view, userId)
+      )
+      if (pickerCardLocked) return lowestCard(realCards).id
+
+      if (myTrumpCount > 1) return highestTrump(winning).id
+      return highestTrump(winning).id  // 1 trump, picker already played — play it
     }
 
     // Can't win; play lowest

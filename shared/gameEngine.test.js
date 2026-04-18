@@ -2326,11 +2326,11 @@ describe('decidePlay trump efficiency — fail trick, bot void (Scenario 2)', ()
     expect(decidePlay(view, 'p2')).toBe('AD')
   })
 
-  it('partner with 1 trump plays that trump when picker is not winning the trick', () => {
+  it('partner with 1 trump defers to picker still to play when trump not guaranteed', () => {
     // Clubs led. Partner (p2) void in clubs. p3(AC), p4(KC). Current winner: p3(AC, opponent).
     // Partner hand: JD (only trump), 8H, KS. myTrumpCount=1.
-    // Picker (p1) not in trick. pickerCurrentlyWinning=false → play the trump.
-    // Both old and new code return JD here; this test guards against regression.
+    // Picker (p1) still to play. JD is not a guaranteed winner (higher trumps outstanding).
+    // Picker-still-to-play + 1 trump + trump not guaranteed → play low (8H is lowest non-trump).
     const view = makeTrumpEfficiencyView({
       userId: 'p2', picker: 'p1', partner: 'p2',
       hand: [c('J','D'), c('8','H'), c('K','S')],
@@ -2339,7 +2339,7 @@ describe('decidePlay trump efficiency — fail trick, bot void (Scenario 2)', ()
         { userId: 'p4', card: c('K','C') },
       ],
     })
-    expect(decidePlay(view, 'p2')).toBe('JD')
+    expect(decidePlay(view, 'p2')).toBe('8H')
   })
 
   it('partner with 1 trump plays low when picker has the trick locked', () => {
@@ -2575,5 +2575,37 @@ describe('cheapestGuaranteedWin', () => {
       trick: [],
     })
     expect(cheapestGuaranteedWin([], view, 'p1')).toBe(null)
+  })
+})
+
+describe('decidePlay — partner defers to picker still-to-play', () => {
+  it('partner with 1 trump plays low when picker still to play AND not guaranteed', () => {
+    // Clubs led. Partner (p2) void in clubs.
+    // Current trick: p3(AC — opponent currently winning). p4, p1(picker), p5 still to play.
+    // Partner hand: JD (only trump), KS (4pts), 7H (0pts).
+    // JD is rank 7 — higher trump (QC,QS,QH,QD,JC,JS,JH = 7 cards) all unseen → not guaranteed.
+    // Rule: picker still to play + 1 trump + not guaranteed → play low.
+    const view = makeTrumpEfficiencyView({
+      userId: 'p2', picker: 'p1', partner: 'p2',
+      hand: [c('J','D'), c('K','S'), c('7','H')],
+      trick: [
+        { userId: 'p3', card: c('A','C') },
+      ],
+    })
+    expect(decidePlay(view, 'p2')).toBe('7H')  // lowest non-trump
+  })
+
+  it('partner with 1 trump plays the trump when picker still to play AND trump is guaranteed', () => {
+    // Setup: partner's only trump is QC (rank 0, trivially guaranteed).
+    // Clubs led. Partner (p2) void in clubs. p3(AC), picker+others still to play.
+    // Rule: guaranteed → take the trick.
+    const view = makeTrumpEfficiencyView({
+      userId: 'p2', picker: 'p1', partner: 'p2',
+      hand: [c('Q','C'), c('K','S'), c('7','H')],
+      trick: [
+        { userId: 'p3', card: c('A','C') },
+      ],
+    })
+    expect(decidePlay(view, 'p2')).toBe('QC')
   })
 })
