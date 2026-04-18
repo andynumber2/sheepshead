@@ -378,7 +378,19 @@ export function decidePlay(view, userId) {
     })
     if (winning.length > 0) {
       const nonTrumpWins = winning.filter(c => !isTrump(c))
-      if (nonTrumpWins.length > 0) return lowestCard(nonTrumpWins).id
+      if (nonTrumpWins.length > 0) {
+        const playedIdsNT = new Set(currentTrick.map(p => p.userId))
+        const allIdsNT = Object.keys(view.hands)
+        const opponentsRemainingNT = allIdsNT.filter(id =>
+          !playedIdsNT.has(id) && id !== userId && id !== picker && id !== partner
+        ).length
+        const safeFromTrumpIn = opponentsRemainingNT === 0 ||
+          trumpRemainingElsewhere(view, userId) === 0
+        if (safeFromTrumpIn) {
+          return highestValueCard(nonTrumpWins).id
+        }
+        return lowestCard(nonTrumpWins).id
+      }
 
       // Trump wins only — compute how many opposing players have yet to play
       const playedIds = new Set(currentTrick.map(p => p.userId))

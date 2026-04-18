@@ -2783,3 +2783,50 @@ describe('decidePlay — opponent-team schmear guard (#121)', () => {
     expect(decidePlay(view, 'p4')).toBe('AS')
   })
 })
+
+describe('decidePlay — non-trump-win point maximization', () => {
+  it('plays highest-point non-trump win when trumpRemainingElsewhere is 0', () => {
+    // Hearts led. Picker (p1) following; has AH (11pts) and 10H (10pts). Both beat what's played
+    // in fail-suit rank order (A > 10 > 9 > 8). p5 still to play.
+    // Put all 14 trump in completed tricks so trumpRemainingElsewhere = 0.
+    const allTrump = [
+      c('Q','C'), c('Q','S'), c('Q','H'), c('Q','D'),
+      c('J','C'), c('J','S'), c('J','H'), c('J','D'),
+      c('A','D'), c('10','D'), c('K','D'),
+      c('9','D'), c('8','D'), c('7','D'),
+    ]
+    const baseView = makeTrumpEfficiencyView({
+      userId: 'p1', picker: 'p1', partner: 'p2',
+      hand: [c('A','H'), c('10','H'), c('8','C')],
+      trick: [
+        { userId: 'p3', card: c('9','H') },
+        { userId: 'p4', card: c('8','H') },
+      ],
+    })
+    const tricks = [
+      allTrump.slice(0, 5).map((card, i) => ({ userId: `p${i+1}`, card })),
+      allTrump.slice(5, 10).map((card, i) => ({ userId: `p${i+1}`, card })),
+      allTrump.slice(10, 14).map((card, i) => ({ userId: `p${i+1}`, card })).concat([
+        { userId: 'p5', card: c('7','C') },
+      ]),
+    ]
+    const view = withTricks(baseView, tricks)
+    // trumpRemainingElsewhere = 14 - 0 (in hand) - 14 (played) - 0 (buried) = 0.
+    // nonTrumpWins = [AH, 10H]. New behavior: highest-point = AH (11pts).
+    expect(decidePlay(view, 'p1')).toBe('AH')
+  })
+
+  it('plays lowest non-trump win when opponents could still trump in', () => {
+    // Standard case: trump remaining elsewhere > 0 → preserve old behavior (play low).
+    const view = makeTrumpEfficiencyView({
+      userId: 'p1', picker: 'p1', partner: 'p2',
+      hand: [c('A','H'), c('10','H'), c('8','C')],
+      trick: [
+        { userId: 'p3', card: c('9','H') },
+        { userId: 'p4', card: c('8','H') },
+      ],
+    })
+    // trumpRemainingElsewhere > 0 → lowestCard(nonTrumpWins) = 10H (10pts < 11pts).
+    expect(decidePlay(view, 'p1')).toBe('10H')
+  })
+})
