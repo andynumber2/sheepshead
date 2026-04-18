@@ -134,6 +134,59 @@ export function bestVoidBury(hand) {
   return bestPair
 }
 
+// ─── Guaranteed-winner inference ──────────────────────────────────────────────
+
+// Returns true iff every trump that outranks `card` is visible to userId:
+//   - in userId's own hand
+//   - played in completed tricks (non-hidden)
+//   - played in the current trick (non-hidden)
+//   - in the visible bury (non-hidden; picker-only)
+// Unseen higher trump is always treated as a potential opponent holding.
+// Non-trump cards are never "guaranteed" — callers combine with trumpRemainingElsewhere.
+export function isGuaranteedWinner(card, view, userId) {
+  if (!isTrump(card)) return false
+  const myRank = trumpRank(card)
+  if (myRank === 0) return true  // highest trump (Queen of Clubs)
+
+  const seenRanks = new Set()
+  const noteIfHigherTrump = (c) => {
+    if (!c || c.hidden) return
+    if (!isTrump(c)) return
+    seenRanks.add(trumpRank(c))
+  }
+
+  for (const c of (view.hands[userId] ?? [])) noteIfHigherTrump(c)
+  for (const trick of (view.tricks ?? [])) {
+    for (const play of trick.plays) noteIfHigherTrump(play.card)
+  }
+  for (const play of (view.currentTrick ?? [])) noteIfHigherTrump(play.card)
+  for (const c of (view.buried ?? [])) noteIfHigherTrump(c)
+
+  // Every rank strictly lower than myRank must be seen somewhere.
+  for (let r = 0; r < myRank; r++) {
+    if (!seenRanks.has(r)) return false
+  }
+  return true
+}
+
+// Returns the card in `candidates` with the lowest point value for which
+// isGuaranteedWinner returns true. Tiebreak by trump rank (weaker/higher-index first,
+// matching cheapestWinningTrump conventions). Returns null if no card qualifies.
+export function cheapestGuaranteedWin(candidates, view, userId) {
+  const eligible = candidates.filter(card => isGuaranteedWinner(card, view, userId))
+  if (eligible.length === 0) return null
+  return eligible.reduce((best, c) => {
+    const bestPts = cardPoints(best)
+    const cPts = cardPoints(c)
+    if (cPts !== bestPts) return cPts < bestPts ? c : best
+    // Tie on points: prefer weaker trump (higher rank index = weaker).
+    const bestTrump = isTrump(best)
+    const cTrump = isTrump(c)
+    if (cTrump && bestTrump) return trumpRank(c) > trumpRank(best) ? c : best
+    return best
+  })
+}
+
 // ─── Schmear detection ────────────────────────────────────────────────────────
 
 // Returns true if the player currently winning the trick is on the same team as userId.

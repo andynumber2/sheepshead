@@ -83,20 +83,31 @@ Play the **lowest-value card** always, to avoid winning tricks.
 
 ### Following a Trick
 
+A recurring concept below is a **guaranteed winner**: a trump card the bot holds such that every higher-rank trump has already been seen (in own hand, completed tricks, current trick, or visible bury). Any unseen higher trump is treated conservatively as still in an opponent's hand. Non-trump cards are never "guaranteed."
+
 #### Picker-team bot following
-1. **Schmear**: If a teammate is currently winning the trick, dump the highest-value non-trump card on it. If only trump are available, play the lowest card instead (don't burn trump to schmear).
-2. **Win the trick efficiently**:
-   - Prefer the lowest non-trump winning card.
+1. **Schmear** (teammate is currently winning):
+   - First check whether the teammate's win is **safe**: either no non-picker-team opponents remain to play, or the teammate's winning card is itself a guaranteed winner.
+   - **Safe**: dump the highest-value non-trump card. If only trump are available, play the lowest card (don't burn trump to schmear).
+   - **Not safe, bot is the partner**: schmear anyway. The partner trusts the picker's implied trump strength to clean up any overtake.
+   - **Not safe, bot is the picker**: try to secure the trick instead:
+     1. If the hand contains a guaranteed-winning card among the cards that would win the trick, play the lowest-point such card.
+     2. Else play the highest winning trump as risk reduction.
+     3. Else fall back to a normal schmear.
+2. **Win the trick efficiently** (no teammate winning, bot can win):
+   - Prefer non-trump winners. Default is the lowest-point non-trump winner, but if the bot is safe from being trumped in (no opponents remaining, OR no trump left elsewhere), play the **highest-point** non-trump winner instead — squeeze the trick for everything it's worth.
    - If only trump can win:
-     - **Trump-led trick**: if no opponents remain to play, use the cheapest winning trump. Otherwise use the highest trump.
-     - **Fail-led trick** (bot is void, playing trump):
-       - Picker: always play highest trump.
-       - Partner with >1 trump: play highest trump.
-       - Partner with exactly 1 trump: play it unless the picker already has the trick locked (picker winning and no opponents left).
+     - **Trump-led trick**: if no opponents remain to play, use the cheapest winning trump. Otherwise, if a guaranteed-winning trump is in the winning set, play the lowest-point one; else play the highest trump.
+     - **Fail-led trick, bot is the picker** (void in led suit): lowest-point guaranteed-winning trump if any; else highest trump.
+     - **Fail-led trick, bot is the partner** (void in led suit): behaviour splits on whether the picker has already played this trick.
+       - **Picker still to play**: with 2+ trump, play the highest winning trump (lead-back insurance — trust picker to cover). With exactly 1 trump, spend it only if it's a guaranteed winner; otherwise play low and defer to the picker.
+       - **Picker has already played** (and isn't winning — the schmear branch above handles that case): with 2+ trump, play the lowest-point guaranteed winner if any, else the highest winning trump. With 1 trump, play it.
 3. **Can't win**: play the lowest card.
 
 #### Opponent bot following
-1. **Schmear**: If a confirmed teammate is winning the trick (partner identity must be known), dump the highest-value non-trump card. If only trump available, play the lowest card.
+1. **Schmear** (a confirmed teammate — partner identity must be known — is currently winning):
+   - **Safe** (no picker or partner remains to play, or the teammate's winning card is itself a guaranteed winner): dump the highest-value non-trump. If only trump available, play the lowest card.
+   - **Not safe**: if the bot can take the trick with a guaranteed-winning card, play the lowest-point such card. Otherwise schmear anyway — no speculative trump burn when a guaranteed takeover isn't available.
 2. **Trump in on called suit**: If the called suit was led and the picker team is currently winning the trick, play the lowest available trump to contest.
 3. **Otherwise**: play the lowest card.
 
@@ -116,3 +127,5 @@ These pure functions support the strategy above but make no decisions themselves
 | `currentWinner` | Returns the play object currently winning a trick |
 | `bestVoidBury` | Finds the best 2-card bury that voids a non-trump suit with ≥11 combined card points |
 | `teammateWinning` | Returns true if the current trick leader is on the same team as the bot |
+| `isGuaranteedWinner` | For a trump card, returns true iff every higher-rank trump has been seen (own hand, played tricks, current trick, visible bury). Unseen higher trump is treated as opponent-held. Non-trump cards are never guaranteed. |
+| `cheapestGuaranteedWin` | From a set of candidate cards, returns the lowest-point card that satisfies `isGuaranteedWinner` (tiebreak: weaker trump first). Returns null if none qualify. |
