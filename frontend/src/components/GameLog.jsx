@@ -25,7 +25,7 @@ function LogLine({ text, gameId }) {
   const href = `#/recap/${gameId}/${handNumber}`
   return (
     <p>
-      --- <a href={href} style={{ color: '#58a6ff' }}>Hand {handNumber}</a> complete ---
+      --- <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: '#58a6ff' }}>Hand {handNumber}</a> complete ---
     </p>
   )
 }
