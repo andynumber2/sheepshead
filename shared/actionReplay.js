@@ -1,6 +1,6 @@
 import {
   pick, blitz, pass, bury,
-  callAce, callAceUnknown, callTen, callKing, goAlone,
+  callAce, callAceUnder, callTen, callKing, goAlone,
   playCard, crack, recrack,
   setupLeaster, awardLeasterBlind,
 } from './gameEngine.js'
@@ -30,7 +30,7 @@ export function replayActions(actions) {
       case 'setup_leaster':    state = setupLeaster(state); break
       case 'bury':             state = bury(state, uid, payload.cardIds); break
       case 'call_ace':         state = callAce(state, uid, payload.suit); break
-      case 'call_ace_unknown': state = callAceUnknown(state, uid, payload.suit, payload.underCardId); break
+      case 'call_ace_under':   state = callAceUnder(state, uid, payload.suit, payload.underCardId); break
       case 'call_ten':         state = callTen(state, uid, payload.suit); break
       case 'call_king':        state = callKing(state, uid, payload.suit); break
       case 'go_alone':         state = goAlone(state, uid); break

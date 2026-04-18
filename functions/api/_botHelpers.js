@@ -4,7 +4,7 @@
 import {
   currentPicker, currentPlayer,
   pick, blitz, pass, bury,
-  callAce, callAceUnknown, callTen, callKing, goAlone,
+  callAce, callAceUnder, callTen, callKing, goAlone,
   playCard, crack, recrack,
   setupLeaster, awardLeasterBlind, resolveLeaster,
   resolveSchwanzer,
@@ -285,8 +285,8 @@ function applyBotDecision(state, userId, view) {
       switch (decision.type) {
         case 'ace':
           return { state: callAce(state, userId, decision.suit), actionType: 'call_ace', payload: { suit: decision.suit } }
-        case 'ace_unknown':
-          return { state: callAceUnknown(state, userId, decision.suit, decision.underCardId), actionType: 'call_ace_unknown', payload: { suit: decision.suit, underCardId: decision.underCardId } }
+        case 'ace_under':
+          return { state: callAceUnder(state, userId, decision.suit, decision.underCardId), actionType: 'call_ace_under', payload: { suit: decision.suit, underCardId: decision.underCardId } }
         case 'ten':
           return { state: callTen(state, userId, decision.suit), actionType: 'call_ten', payload: { suit: decision.suit } }
         case 'king':

@@ -184,21 +184,21 @@ export function decideCall(view, userId) {
       return { type: 'ace', suit: ranked[0].suit }
     }
 
-    // Try ace-unknown call: suits where picker doesn't hold/bury the ace and has NO fail cards
-    const unknownSuits = suits.filter(suit => {
+    // Try ace-under call: suits where picker doesn't hold/bury the ace and has NO fail cards
+    const underSuits = suits.filter(suit => {
       const aceId = `A${suit}`
       return !hand.some(c => c.id === aceId)
         && !buried.some(c => c.id === aceId)
         && !hand.some(c => c.suit === suit && !isTrump(c))
     })
 
-    if (unknownSuits.length > 0) {
-      const suit = unknownSuits[0]
+    if (underSuits.length > 0) {
+      const suit = underSuits[0]
       // Pick lowest-value non-trump card as under card; fall back to lowest trump
       const underCard =
         hand.filter(c => !isTrump(c)).sort((a, b) => cardPoints(a) - cardPoints(b))[0]
         ?? [...hand].sort((a, b) => cardPoints(a) - cardPoints(b))[0]
-      return { type: 'ace_unknown', suit, underCardId: underCard.id }
+      return { type: 'ace_under', suit, underCardId: underCard.id }
     }
 
     return { type: 'alone' }

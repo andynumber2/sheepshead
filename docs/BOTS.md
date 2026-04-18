@@ -46,7 +46,7 @@ The bot goes alone if it has **6 or more trump cards** AND **2 or more queens**.
 
 ### Ace Call (`callMode === 'ace'`)
 1. **Normal ace call**: Find suits where the bot does not hold or have buried the ace, and does hold at least one fail card of that suit. Among qualifying suits, pick the one with the fewest fail cards (most likely the opponent holds the ace). Call that suit's ace.
-2. **Ace-unknown call**: If no normal ace call is possible, look for suits where the bot holds neither the ace nor any fail cards of that suit. Pick an under card (cheapest non-trump; fall back to cheapest trump) and declare an ace-unknown call.
+2. **Ace-under call**: If no normal ace call is possible, look for suits where the bot holds neither the ace nor any fail cards of that suit. Pick an under card (cheapest non-trump; fall back to cheapest trump) and declare an ace-under call.
 3. **Fallback**: Go alone.
 
 ### Ten Call (`callMode === 'ten'`)

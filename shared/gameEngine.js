@@ -111,7 +111,7 @@ export function dealHand(playerIds, dealerSeat, handNumber, doublerMultiplier) {
     pickIndex: 0,              // index into pickOrder of whose turn it is to pick/pass
     picker: null,              // userId of picker
     partner: null,             // userId of partner (set when ace is called)
-    calledAce: null,           // { suit, aceId, unknown? } — set for ace and ace-unknown calls
+    calledAce: null,           // { suit, aceId, under? } — set for ace and ace-under calls
     calledTen: null,           // { suit, tenId } — set when picker holds all 3 fail aces
     calledKing: null,          // { suit, kingId } — set when picker holds all 3 fail aces and tens
     calledSuit: null,          // 'C'|'H'|'S' — unifying field across all call types
@@ -267,10 +267,10 @@ export function callAce(state, userId, suit) {
   }
 
   // Picker must hold at least one fail card of the called suit (called-suit holding rule).
-  // If they don't, they must use call_ace_unknown with an under card instead.
+  // If they don't, they must use call_ace_under with an under card instead.
   const failOfSuit = state.hands[userId].filter(c => c.suit === suit && !isTrump(c))
   if (failOfSuit.length === 0) {
-    throw new Error(`Cannot call A${suit} normally — picker holds no fail card of that suit. Use call_ace_unknown.`)
+    throw new Error(`Cannot call A${suit} normally — picker holds no fail card of that suit. Use call_ace_under.`)
   }
 
   const newState = deepClone(state)
@@ -305,10 +305,10 @@ export function goAlone(state, userId) {
 
 // Situation B: picker calls an ace of a suit in which they hold no fail card,
 // placing one card from their hand face-down on the table as the "under card."
-export function callAceUnknown(state, userId, suit, underCardId) {
+export function callAceUnder(state, userId, suit, underCardId) {
   assertPhase(state, 'calling')
   if (state.picker !== userId) throw new Error('Only the picker calls the ace.')
-  if (state.callMode !== 'ace') throw new Error(`Picker must call a ${state.callMode}, not an unknown ace.`)
+  if (state.callMode !== 'ace') throw new Error(`Picker must call a ${state.callMode}, not an under ace.`)
   if (!['C', 'H', 'S'].includes(suit)) throw new Error('Must call a non-trump suit ace.')
 
   const aceId = `A${suit}`
@@ -321,7 +321,7 @@ export function callAceUnknown(state, userId, suit, underCardId) {
 
   const failOfSuit = state.hands[userId].filter(c => c.suit === suit && !isTrump(c))
   if (failOfSuit.length > 0) {
-    throw new Error(`Cannot call A${suit} unknown — picker holds fail card(s) of that suit. Use call_ace.`)
+    throw new Error(`Cannot call A${suit} under — picker holds fail card(s) of that suit. Use call_ace.`)
   }
 
   // Under card calls are only legal when the picker has no normal call available.
@@ -334,7 +334,7 @@ export function callAceUnknown(state, userId, suit, underCardId) {
     return state.hands[userId].some(c => c.suit === s && !isTrump(c))
   })
   if (hasNormalCall) {
-    throw new Error('Cannot call an unknown ace when a normal ace call is available.')
+    throw new Error('Cannot call an under ace when a normal ace call is available.')
   }
 
   const cardIdx = state.hands[userId].findIndex(c => c.id === underCardId)
@@ -343,12 +343,12 @@ export function callAceUnknown(state, userId, suit, underCardId) {
   const newState = deepClone(state)
   const card = newState.hands[userId].splice(cardIdx, 1)[0]
   newState.underCard = { id: card.id, suit: card.suit, rank: card.rank, ownerId: userId, played: false }
-  newState.calledAce = { suit, aceId, unknown: true }
+  newState.calledAce = { suit, aceId, under: true }
   newState.calledSuit = suit
   newState.partner = findHolder(newState.hands, aceId, userId)
   newState.phase = 'playing'
   newState.currentLeader = newState.pickOrder[0]
-  newState.log.push(`${userId} called A${suit} Unknown and placed an under card.`)
+  newState.log.push(`${userId} called A${suit} Under and placed an under card.`)
   return newState
 }
 

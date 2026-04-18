@@ -1,6 +1,6 @@
 import { json, err, requireUser, AuthError } from '../../_helpers.js'
 import {
-  pick, blitz, pass, bury, callAce, callAceUnknown, callTen, callKing, goAlone, playCard,
+  pick, blitz, pass, bury, callAce, callAceUnder, callTen, callKing, goAlone, playCard,
   crack, recrack,
   setupLeaster, awardLeasterBlind, resolveLeaster,
   resolveSchwanzer,
@@ -125,9 +125,9 @@ export async function onRequestPost({ request, env, params }) {
         await appendAction(env.DB, gameId, state.handNumber, 'call_ace', userId, { suit: payload?.suit })
         break
 
-      case 'call_ace_unknown':
-        state = callAceUnknown(state, userId, payload?.suit, payload?.underCardId)
-        await appendAction(env.DB, gameId, state.handNumber, 'call_ace_unknown', userId, { suit: payload?.suit, underCardId: payload?.underCardId })
+      case 'call_ace_under':
+        state = callAceUnder(state, userId, payload?.suit, payload?.underCardId)
+        await appendAction(env.DB, gameId, state.handNumber, 'call_ace_under', userId, { suit: payload?.suit, underCardId: payload?.underCardId })
         break
 
       case 'call_ten':
