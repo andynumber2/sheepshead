@@ -107,13 +107,35 @@ function getLegalCardIds(state, userId, hand) {
 
   // Called card cannot be played unless the called suit is led
   // (except when it's the player's only remaining card)
-  const playableCards = (
+  let playableCards = (
     calledCardId &&
     ledSuit !== calledSuit &&
     handCards.some(c => c.id !== calledCardId)
   )
     ? handCards.filter(c => c.id !== calledCardId)
     : handCards
+
+  // Picker called-suit holding rule: must keep ≥1 called-suit card (plus any
+  // pickerForcedPlays) in hand until the called suit is led.
+  if (
+    userId === picker &&
+    calledSuit &&
+    !partnerRevealed &&
+    ledSuit !== calledSuit &&
+    playableCards.length > 1
+  ) {
+    const filtered = playableCards.filter(card => {
+      if (pickerForcedPlays.includes(card.id)) return false
+      if (effectiveSuit(card) === calledSuit) {
+        const remaining = playableCards.filter(
+          c => c.id !== card.id && effectiveSuit(c) === calledSuit
+        ).length
+        if (remaining === 0) return false
+      }
+      return true
+    })
+    if (filtered.length > 0) playableCards = filtered
+  }
 
   const hasSuit = playableCards.some(c => effectiveSuit(c) === ledSuit)
   return hasSuit
