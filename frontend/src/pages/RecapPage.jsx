@@ -35,7 +35,7 @@ export default function RecapPage({ gameId, handNumber, onNavigate }) {
         <div className="sub">Game #{digest.gameId}{dateStr && ` · played ${dateStr}`}</div>
       </div>
       <MetaStrip digest={digest} />
-      <BlindStrip blind={digest.blind} pickerDiscards={digest.pickerDiscards} />
+      <BlindStrip blind={digest.blind} pickerBuried={digest.pickerBuried} />
       <TrickTable digest={digest} onCardClick={onCardClick} />
       <div className="recap-legend">
         <span>Green outline = trick winner · Yellow outline = led the trick · Click a card to open the step-by-step replay at that point</span>

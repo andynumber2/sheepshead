@@ -29,19 +29,19 @@ Total points in the deck: 120.
 
 ### 1. Picking
 
-Two blind cards are dealt face-down. Starting left of the dealer, each player may **pick** (take the blind and become the picker) or **pass**. If all five players pass, what happens depends on the game's no-pick variant: the hand is played as a **Leaster**, the stakes double (**Doublers**), or the hand is scored immediately as a **Schwanzer**.
+The **blind** is the 2 cards set aside from the deal face-down, available for the picker to take into their hand. Starting left of the dealer, each player may **pick** (take the blind and become the picker) or **pass**. If all five players pass, what happens depends on the game's no-pick variant: the hand is played as a **Leaster**, the stakes double (**Doublers**), or the hand is scored immediately as a **Schwanzer**.
 
 **Blitzing**
 
-A player holding both black queens (Queen of Clubs + Queen of Spades) or both red queens (Queen of Hearts + Queen of Diamonds) may **blitz** when it is their turn to pick. Blitzing forces the player to pick (they take the blind and proceed to discarding), and doubles the hand's final payout (×2 on top of all other multipliers).
+A player holding both black queens (Queen of Clubs + Queen of Spades) or both red queens (Queen of Hearts + Queen of Diamonds) may **blitz** when it is their turn to pick. Blitzing forces the player to pick (they take the blind and proceed to burying), and doubles the hand's final payout (×2 on top of all other multipliers).
 
-### 2. Discarding
+### 2. Burying
 
-The picker adds the 2 blind cards to their hand (8 total) and buries 2 cards face-down. The buried cards count toward the picker's point pile at scoring. The picker may not bury cards required for the partner call (see below).
+The picker adds the 2 blind cards to their hand (8 total) and **buries** 2 cards face-down. Burying is the act of setting those 2 cards aside; they are not discarded — they count toward the picker's point pile at scoring. The picker may not bury cards required for the partner call (see below).
 
 ### 3. Calling (Partner Selection)
 
-After discarding, the picker calls a partner using one of three modes determined by their hand, or goes alone.
+After burying, the picker calls a partner using one of three modes determined by their hand, or goes alone.
 
 **Call Mode: Ace** (default)
 

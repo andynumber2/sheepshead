@@ -8,7 +8,7 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
     ? { background: 'rgba(124,58,237,0.3)', border: '1px solid rgba(124,58,237,0.5)' }
     : {}
   const turnLabel = actingForName ? `Acting for ${actingForName}` : 'Your turn'
-  const [selectedDiscards, setSelectedDiscards] = useState([])
+  const [selectedBuried, setSelectedBuried] = useState([])
   const [unknownSelectedSuit, setUnknownSelectedSuit] = useState(null)
   const [selectedUnderCard, setSelectedUnderCard] = useState(null)
   const [confirmingAlone, setConfirmingAlone] = useState(false)
@@ -53,7 +53,7 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
     setError(null)
     try {
       await onAction(type, payload)
-      setSelectedDiscards([])
+      setSelectedBuried([])
     } catch (e) {
       setError(e.message)
     }
@@ -97,13 +97,13 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
     )
   }
 
-  // ── Discarding phase ──────────────────────────────────────
-  if (phase === 'discarding') {
+  // ── Burying phase ─────────────────────────────────────────
+  if (phase === 'burying') {
     if (picker !== myUserId) {
-      return <div className="action-panel"><p>Waiting for picker to discard…</p></div>
+      return <div className="action-panel"><p>Waiting for picker to bury…</p></div>
     }
-    const toggleDiscard = (card) => {
-      setSelectedDiscards(prev => {
+    const toggleBury = (card) => {
+      setSelectedBuried(prev => {
         if (prev.find(c => c.id === card.id)) return prev.filter(c => c.id !== card.id)
         if (prev.length >= 2) return prev
         return [...prev, card]
@@ -111,20 +111,20 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
     }
     return (
       <div className="action-panel" style={botStyle}>
-        <h4>Select 2 cards to discard</h4>
-        <p className="discard-hint">({selectedDiscards.length}/2 selected)</p>
+        <h4>Select 2 cards to bury</h4>
+        <p className="bury-hint">({selectedBuried.length}/2 selected)</p>
         <Hand
           cards={myHand}
           playableIds={myHand.map(c => c.id)}
-          selectedIds={selectedDiscards.map(c => c.id)}
-          onCardClick={toggleDiscard}
+          selectedIds={selectedBuried.map(c => c.id)}
+          onCardClick={toggleBury}
         />
         <button
-          disabled={selectedDiscards.length !== 2 || loading}
-          onClick={() => act('discard', { cardIds: selectedDiscards.map(c => c.id) })}
+          disabled={selectedBuried.length !== 2 || loading}
+          onClick={() => act('bury', { cardIds: selectedBuried.map(c => c.id) })}
           style={{ marginTop: 8 }}
         >
-          Confirm Discard
+          Confirm Bury
         </button>
         {error && <p style={{ color: '#f87171', marginTop: 6 }}>{error}</p>}
       </div>
@@ -141,7 +141,7 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
     const heldIds = new Set(myHand.map(c => c.id))
     // Cards the picker buried — cannot call any of these since the "partner" would be
     // nobody (the card is in the blind, never played).
-    const buriedIds = new Set((state.discard ?? []).filter(c => !c.hidden).map(c => c.id))
+    const buriedIds = new Set((state.buried ?? []).filter(c => !c.hidden).map(c => c.id))
 
     // ── King mode: picker holds all 3 fail aces and all 3 fail tens.
     //    Calls the King of any fail suit they don't hold (mathematically all 3).

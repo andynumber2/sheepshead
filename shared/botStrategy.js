@@ -6,7 +6,7 @@
 import {
   isTrump, cardPoints, effectiveSuit, trumpRank, suitRank, schwanzerCardPoints,
 } from './gameEngine.js'
-import { currentWinner, beats, handScore, bestVoidDiscard, teammateWinning, trumpRemainingElsewhere } from './botInference.js'
+import { currentWinner, beats, handScore, bestVoidBury, teammateWinning, trumpRemainingElsewhere } from './botInference.js'
 
 // ─── Legal card helper ────────────────────────────────────────────────────────
 // Mirrors getLegalCardIds from the frontend; computes which cards can be played.
@@ -124,14 +124,14 @@ export function decideBlitz(view, userId) {
   return schwanzerPts >= 7
 }
 
-// ─── decideDiscard ────────────────────────────────────────────────────────────
-export function decideDiscard(view, userId) {
+// ─── decideBury ───────────────────────────────────────────────────────────────
+export function decideBury(view, userId) {
   const hand = view.hands[userId]  // 8 cards after picking up blind
 
-  const voidCards = bestVoidDiscard(hand)
+  const voidCards = bestVoidBury(hand)
   if (voidCards) return voidCards
 
-  // Replicate mustHold logic from gameEngine.discard to avoid illegal discards
+  // Replicate mustHold logic from gameEngine.bury to avoid illegal buries
   const failAces = ['AC', 'AH', 'AS']
   const failTens = ['10C', '10H', '10S']
   const holdsAllAces = failAces.every(id => hand.some(c => c.id === id))
@@ -156,7 +156,7 @@ export function decideDiscard(view, userId) {
 
 // ─── decideCall ───────────────────────────────────────────────────────────────
 export function decideCall(view, userId) {
-  const { callMode, hands, discard: discardCards } = view
+  const { callMode, hands, buried: buriedCards } = view
   const hand = hands[userId]
 
   // Go alone with a dominant trump hand
@@ -164,7 +164,7 @@ export function decideCall(view, userId) {
   const queenCount = hand.filter(c => c.rank === 'Q').length
   if (trumpCount >= 6 && queenCount >= 2) return { type: 'alone' }
 
-  const buried = (discardCards ?? []).filter(c => !c.hidden)
+  const buried = (buriedCards ?? []).filter(c => !c.hidden)
   const suits = ['C', 'H', 'S']
 
   if (callMode === 'ace') {

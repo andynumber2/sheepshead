@@ -27,8 +27,8 @@ export function countTrumpPlayed(view, _userId) {
 // A result ≤ 2 means opponents are likely trump-exhausted.
 export function trumpRemainingElsewhere(view, userId) {
   const myTrump = (view.hands[userId] ?? []).filter(c => !c.hidden && isTrump(c)).length
-  const discardTrump = (view.discard ?? []).filter(c => !c.hidden && isTrump(c)).length
-  return 14 - myTrump - countTrumpPlayed(view, userId) - discardTrump
+  const buriedTrump = (view.buried ?? []).filter(c => !c.hidden && isTrump(c)).length
+  return 14 - myTrump - countTrumpPlayed(view, userId) - buriedTrump
 }
 
 // ─── Hand evaluation ──────────────────────────────────────────────────────────
@@ -87,8 +87,8 @@ export function currentWinner(trick) {
 // For a 1-card suit: pairs the suit card with the highest-point eligible card from any
 // other suit (chosen for point value, not secondary voiding).
 // Among qualifying pairs, returns the highest-total pair.
-// Respects mustHold restrictions (same logic as decideDiscard).
-export function bestVoidDiscard(hand) {
+// Respects mustHold restrictions (same logic as decideBury).
+export function bestVoidBury(hand) {
   const failAces = ['AC', 'AH', 'AS']
   const failTens = ['10C', '10H', '10S']
   const holdsAllAces = failAces.every(id => hand.some(c => c.id === id))

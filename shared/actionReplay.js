@@ -1,5 +1,5 @@
 import {
-  pick, blitz, pass, discard,
+  pick, blitz, pass, bury,
   callAce, callAceUnknown, callTen, callKing, goAlone,
   playCard, crack, recrack,
   setupLeaster, awardLeasterBlind,
@@ -28,7 +28,7 @@ export function replayActions(actions) {
       case 'blitz':            state = blitz(state, uid); break
       case 'pass':             state = pass(state, uid); break
       case 'setup_leaster':    state = setupLeaster(state); break
-      case 'discard':          state = discard(state, uid, payload.cardIds); break
+      case 'bury':             state = bury(state, uid, payload.cardIds); break
       case 'call_ace':         state = callAce(state, uid, payload.suit); break
       case 'call_ace_unknown': state = callAceUnknown(state, uid, payload.suit, payload.underCardId); break
       case 'call_ten':         state = callTen(state, uid, payload.suit); break

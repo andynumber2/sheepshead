@@ -58,7 +58,7 @@ describe('buildHandDigest — Normal variant', () => {
     initial.partner = '2'
     initial.calledAce = { suit: 'C', aceId: 'AC' }
     initial.callMode = 'ace'
-    initial.discard = [{ id: 'X1', suit: 'C', rank: '7', points: 0 }, { id: 'X2', suit: 'D', rank: '8', points: 0 }]
+    initial.buried = [{ id: 'X1', suit: 'C', rank: '7', points: 0 }, { id: 'X2', suit: 'D', rank: '8', points: 0 }]
     initial.tricks = Array.from({ length: 6 }, () => ({
       leader: '1',
       plays: [
@@ -81,7 +81,7 @@ describe('buildHandDigest — Normal variant', () => {
     expect(digest.picker.userId).toBe('1')
     expect(digest.partner.userId).toBe('2')
     expect(digest.calledCard).toBe('AC')
-    expect(digest.pickerDiscards).toEqual(['X1', 'X2'])
+    expect(digest.pickerBuried).toEqual(['X1', 'X2'])
     expect(digest.scores).toContainEqual({ userId: '1', cardPoints: expect.any(Number), scoreDelta: -2 })
   })
 })
@@ -101,7 +101,7 @@ describe('buildHandDigest — Schwanzer variant', () => {
     expect(digest.tricks).toEqual([])
     expect(digest.picker).toBeNull()
     expect(digest.blind).toBeNull()
-    expect(digest.pickerDiscards).toBeNull()
+    expect(digest.pickerBuried).toBeNull()
     expect(digest.dealt['1']).toHaveLength(6)
     expect(digest.scores.find(s => s.userId === '4').scoreDelta).toBe(-4)
   })
@@ -128,6 +128,6 @@ describe('buildHandDigest — Leaster variant', () => {
     expect(digest.partner).toBeNull()
     expect(digest.calledCard).toBeNull()
     expect(digest.blind).toBeNull()
-    expect(digest.pickerDiscards).toBeNull()
+    expect(digest.pickerBuried).toBeNull()
   })
 })

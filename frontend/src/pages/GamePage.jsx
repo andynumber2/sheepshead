@@ -46,7 +46,7 @@ function currentTurnPlayer(state) {
   if (!state) return null
   const { phase, pickOrder, pickIndex, currentTrick, currentLeader } = state
   if (phase === 'picking')                            return pickOrder?.[pickIndex] ?? null
-  if (phase === 'discarding' || phase === 'calling')  return state.picker
+  if (phase === 'burying' || phase === 'calling')  return state.picker
   if (phase === 'playing') {
     const played    = (currentTrick ?? []).map(p => p.userId)
     const leaderIdx = pickOrder.indexOf(currentLeader)
@@ -563,7 +563,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
 
   const isMyPlayingTurn = state.phase === 'playing' && turnUserId === effectiveUserId
   const legalIds = isMyPlayingTurn ? getLegalCardIds(state, effectiveUserId, activeHand) : []
-  const isPickerOverlay = (state.phase === 'discarding' || state.phase === 'calling') && state.picker === effectiveUserId
+  const isPickerOverlay = (state.phase === 'burying' || state.phase === 'calling') && state.picker === effectiveUserId
 
   return (
     <div className="game-table">
@@ -665,7 +665,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
 
       {/* ── Action panel (hidden on your real playing turn — cards in seat instead) ── */}
       {!(isMyPlayingTurn && !isActingForBot) && (
-        <div className={`action-panel${isPickerOverlay ? ' action-panel-discard-overlay' : ''}`}>
+        <div className={`action-panel${isPickerOverlay ? ' action-panel-bury-overlay' : ''}`}>
           <ActionPanel
             state={state}
             myUserId={effectiveUserId}

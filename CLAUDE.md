@@ -89,6 +89,7 @@ When reading instructions or discussing this project, check for terminology inco
 ### Game Flow
 - **Game** — A construct inside which hands are played by players.
 - **Blind** — The 2 cards set aside from the deal, available for the picker to take into their hand.
+- **Bury** — The act of the picker placing 2 cards face-down after picking up the blind. Buried cards count toward the picker's point pile at scoring; they are not discarded. The picker may not bury cards required for the partner call.
 - **Hand** — A single round of play within a game, from deal through scoring. Each hand begins with 6 cards dealt to each player plus a 2-card blind, proceeds through a picking phase, and ends with scores awarded. How a hand resolves depends on the picking phase outcome:
   - **Normal hand** — a picker is found, calls a partner (or goes alone), and 6 tricks are played
   - **Leaster** — no one picks; 6 tricks are played, but the player with the fewest card points wins

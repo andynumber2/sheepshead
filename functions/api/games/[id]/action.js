@@ -1,6 +1,6 @@
 import { json, err, requireUser, AuthError } from '../../_helpers.js'
 import {
-  pick, blitz, pass, discard, callAce, callAceUnknown, callTen, callKing, goAlone, playCard,
+  pick, blitz, pass, bury, callAce, callAceUnknown, callTen, callKing, goAlone, playCard,
   crack, recrack,
   setupLeaster, awardLeasterBlind, resolveLeaster,
   resolveSchwanzer,
@@ -115,9 +115,9 @@ export async function onRequestPost({ request, env, params }) {
         break
       }
 
-      case 'discard':
-        state = discard(state, userId, payload?.cardIds)
-        await appendAction(env.DB, gameId, state.handNumber, 'discard', userId, { cardIds: payload?.cardIds })
+      case 'bury':
+        state = bury(state, userId, payload?.cardIds)
+        await appendAction(env.DB, gameId, state.handNumber, 'bury', userId, { cardIds: payload?.cardIds })
         break
 
       case 'call_ace':

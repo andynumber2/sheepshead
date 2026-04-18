@@ -8,7 +8,7 @@ function CardStatic({ id }) {
   return <div className={`recap-card-static${isRed(id) ? ' red' : ''}`}>{id.replace(/([AKQJ]|10)([CDHS])/, '$1$2')}</div>
 }
 
-export default function BlindStrip({ blind, pickerDiscards }) {
+export default function BlindStrip({ blind, pickerBuried }) {
   if (!blind) return null
   return (
     <div className="recap-blind">
@@ -16,10 +16,10 @@ export default function BlindStrip({ blind, pickerDiscards }) {
         <div className="label">Blind (picked up)</div>
         <div className="cards">{blind.map(id => <CardStatic key={id} id={id} />)}</div>
       </div>
-      {pickerDiscards && pickerDiscards.length > 0 && (
+      {pickerBuried && pickerBuried.length > 0 && (
         <div className="group right">
-          <div className="label">Picker discarded</div>
-          <div className="cards">{pickerDiscards.map(id => <CardStatic key={id} id={id} />)}</div>
+          <div className="label">Picker buried</div>
+          <div className="cards">{pickerBuried.map(id => <CardStatic key={id} id={id} />)}</div>
         </div>
       )}
     </div>

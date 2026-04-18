@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { decidePick, decideDiscard, decideCall, decidePlay } from './botStrategy.js'
+import { decidePick, decideBury, decideCall, decidePlay } from './botStrategy.js'
 import {
   isTrump, trumpRank, suitRank, effectiveSuit, cardPoints,
   schwanzerCardPoints, resolveSchwanzer,
   dealHand, pick, pass, blitz,
-  discard, callAce, goAlone, callTen, callKing,
+  bury, callAce, goAlone, callTen, callKing,
   callAceUnknown, crack, recrack,
   playCard, computeScores, resolveLeaster,
   setupLeaster, awardLeasterBlind, getPlayerView,
@@ -13,7 +13,7 @@ import {
   countTrumpPlayed, trumpRemainingElsewhere,
   buriablePoints, handScore,
   beats, currentWinner, teammateWinning,
-  bestVoidDiscard,
+  bestVoidBury,
 } from './botInference.js'
 
 const c = (rank, suit) => ({ id: `${rank}${suit}`, rank, suit })
@@ -266,10 +266,10 @@ describe('pick / pass / blitz', () => {
   }
 
   describe('pick', () => {
-    it('transitions to discarding phase', () => {
+    it('transitions to burying phase', () => {
       const state = makePickingState()
       const next = pick(state, state.pickOrder[0])
-      expect(next.phase).toBe('discarding')
+      expect(next.phase).toBe('burying')
     })
 
     it('gives the picker 8 cards (hand + blind)', () => {
@@ -318,7 +318,7 @@ describe('pick / pass / blitz', () => {
   })
 
   describe('blitz', () => {
-    it('transitions to discarding phase', () => {
+    it('transitions to burying phase', () => {
       const state = makePickingState()
       const firstPicker = state.pickOrder[0]
       const stateWithBlitz = {
@@ -326,7 +326,7 @@ describe('pick / pass / blitz', () => {
         potentialBlitzes: [{ userId: firstPicker, type: 'black' }],
       }
       const next = blitz(stateWithBlitz, firstPicker)
-      expect(next.phase).toBe('discarding')
+      expect(next.phase).toBe('burying')
     })
 
     it('records the blitz in state.blitzes', () => {
@@ -347,52 +347,52 @@ describe('pick / pass / blitz', () => {
   })
 })
 
-describe('discard', () => {
-  function makeDiscardingState() {
+describe('bury', () => {
+  function makeBuryingState() {
     const state = dealHand(['p1','p2','p3','p4','p5'], 0, 1, 1)
     return pick(state, state.pickOrder[0])
-    // picker now has 8 cards; phase = 'discarding'
+    // picker now has 8 cards; phase = 'burying'
   }
 
   it('transitions to calling phase', () => {
-    const state = makeDiscardingState()
+    const state = makeBuryingState()
     const cardIds = state.hands[state.picker].slice(-2).map(cd => cd.id)
-    const next = discard(state, state.picker, cardIds)
+    const next = bury(state, state.picker, cardIds)
     expect(next.phase).toBe('calling')
   })
 
   it('picker ends with 6 cards', () => {
-    const state = makeDiscardingState()
+    const state = makeBuryingState()
     const cardIds = state.hands[state.picker].slice(-2).map(cd => cd.id)
-    const next = discard(state, state.picker, cardIds)
+    const next = bury(state, state.picker, cardIds)
     expect(next.hands[next.picker]).toHaveLength(6)
   })
 
-  it('stores the 2 discarded cards in state.discard', () => {
-    const state = makeDiscardingState()
+  it('stores the 2 buried cards in state.buried', () => {
+    const state = makeBuryingState()
     const cardIds = state.hands[state.picker].slice(-2).map(cd => cd.id)
-    const next = discard(state, state.picker, cardIds)
-    expect(next.discard).toHaveLength(2)
-    expect(next.discard.map(cd => cd.id)).toEqual(expect.arrayContaining(cardIds))
+    const next = bury(state, state.picker, cardIds)
+    expect(next.buried).toHaveLength(2)
+    expect(next.buried.map(cd => cd.id)).toEqual(expect.arrayContaining(cardIds))
   })
 
-  it('throws when not exactly 2 cards are discarded', () => {
-    const state = makeDiscardingState()
+  it('throws when not exactly 2 cards are buried', () => {
+    const state = makeBuryingState()
     const oneCard = [state.hands[state.picker][0].id]
-    expect(() => discard(state, state.picker, oneCard)).toThrow('Must discard exactly 2 cards.')
+    expect(() => bury(state, state.picker, oneCard)).toThrow('Must bury exactly 2 cards.')
   })
 
-  it('throws if a non-picker tries to discard', () => {
-    const state = makeDiscardingState()
+  it('throws if a non-picker tries to bury', () => {
+    const state = makeBuryingState()
     const nonPicker = state.pickOrder.find(p => p !== state.picker)
     const cardIds = state.hands[state.picker].slice(-2).map(cd => cd.id)
-    expect(() => discard(state, nonPicker, cardIds)).toThrow('Only the picker can discard.')
+    expect(() => bury(state, nonPicker, cardIds)).toThrow('Only the picker can bury.')
   })
 
   it('throws when trying to bury a card the picker must keep for the partner call', () => {
     // Picker holds all 3 fail aces → callMode becomes 'ten', mustHold = [AC, AH, AS]
     const state = {
-      phase: 'discarding',
+      phase: 'burying',
       picker: 'p1',
       pickOrder: ['p1','p2','p3','p4','p5'],
       blind: [],
@@ -402,7 +402,7 @@ describe('discard', () => {
         p2: [], p3: [], p4: [], p5: [],
       },
     }
-    expect(() => discard(state, 'p1', ['AC', 'QC'])).toThrow('Cannot bury AC')
+    expect(() => bury(state, 'p1', ['AC', 'QC'])).toThrow('Cannot bury AC')
   })
 })
 
@@ -422,7 +422,7 @@ describe('partner calling', () => {
         p4: [c('7','H'), c('10','C'), c('K','D'), c('9','D'), c('8','D'), c('7','D')],
         p5: [c('Q','S'), c('Q','H'), c('J','S'), c('J','H'), c('10','D'), c('10','S')],
       },
-      discard: [c('Q','D'), c('J','D')],
+      buried: [c('Q','D'), c('J','D')],
       log: [],
     }
   }
@@ -482,7 +482,7 @@ describe('partner calling', () => {
           p4: [c('7','H'), c('8','C'), c('A','D'), c('9','D'), c('8','D'), c('7','D')],
           p5: [c('Q','H'), c('Q','D'), c('J','H'), c('J','D'), c('10','D'), c('10','H')],
         },
-        discard: [c('10','S'), c('K','C')],
+        buried: [c('10','S'), c('K','C')],
         log: [],
       }
       const next = callTen(state, 'p1', 'C')
@@ -507,7 +507,7 @@ describe('partner calling', () => {
           p4: [c('7','H'), c('8','C'), c('A','D'), c('9','D'), c('8','D'), c('7','D')],
           p5: [c('Q','C'), c('Q','H'), c('J','C'), c('J','H'), c('10','D'), c('Q','D')],
         },
-        discard: [c('J','D'), c('K','D')],
+        buried: [c('J','D'), c('K','D')],
         log: [],
       }
       const next = callKing(state, 'p1', 'C')
@@ -538,7 +538,7 @@ describe('playCard', () => {
       doublerMultiplier: 1,
       handCrackMultiplier: 1,
       blitzes: [],
-      discard: [],
+      buried: [],
       tricks: [],
       currentTrick: [
         { userId: 'p1', card: c('K','H') },
@@ -582,7 +582,7 @@ describe('playCard', () => {
       doublerMultiplier: 1,
       handCrackMultiplier: 1,
       blitzes: [],
-      discard: [],
+      buried: [],
       tricks: [],
       currentTrick: [
         { userId: 'p1', card: c('K','H') },
@@ -634,7 +634,7 @@ describe('playCard', () => {
       doublerMultiplier: 1,
       handCrackMultiplier: 1,
       blitzes: [],
-      discard: [],
+      buried: [],
       tricks: [],
       currentTrick: [],
       currentLeader: 'p1',
@@ -677,7 +677,7 @@ describe('playCard', () => {
       doublerMultiplier: 1,
       handCrackMultiplier: 1,
       blitzes: [],
-      discard: [],
+      buried: [],
       tricks: [],
       currentTrick: [],
       currentLeader: 'p1',
@@ -717,7 +717,7 @@ describe('playCard', () => {
       doublerMultiplier: 1,
       handCrackMultiplier: 1,
       blitzes: [],
-      discard: [],
+      buried: [],
       tricks: [],
       currentTrick: [],
       currentLeader: 'p1',
@@ -769,7 +769,7 @@ describe('playCard', () => {
       doublerMultiplier: 1,
       handCrackMultiplier: 1,
       blitzes: [],
-      discard: [],
+      buried: [],
       tricks: tricksComplete,
       currentTrick: [
         { userId: 'p1', card: c('A','C') },
@@ -816,7 +816,7 @@ describe('computeScores', () => {
       doublerMultiplier: 1,
       handCrackMultiplier: 1,
       blitzes: [],
-      discard: [],
+      buried: [],
       log: [],
       hands: { p1:[], p2:[], p3:[], p4:[], p5:[] },
       tricks,
@@ -879,8 +879,8 @@ describe('computeScores', () => {
     expect(scores.p3).toBe(-2)
   })
 
-  it('discard points count toward the picker\'s total', () => {
-    // p1 wins 1 trick with 39 pts + discard has 2 aces (22 pts) = 61 → wins
+  it('buried points count toward the picker\'s total', () => {
+    // p1 wins 1 trick with 39 pts + buried has 2 aces (22 pts) = 61 → wins
     const tricks = [
       makeTrick('p1', [fk('A'), fk('10'), fk('K'), fk('10'), fk('K')]),  // 11+10+4+10+4 = 39
       makeTrick('p3', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
@@ -889,8 +889,8 @@ describe('computeScores', () => {
       makeTrick('p3', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
       makeTrick('p3', [fk('7'), fk('7'), fk('7'), fk('7'), fk('7')]),
     ]
-    // discard: [A, A] = 22 pts → picker total = 39+22 = 61 → wins
-    const state = baseState(tricks, { discard: [fk('A'), fk('A')] })
+    // buried: [A, A] = 22 pts → picker total = 39+22 = 61 → wins
+    const state = baseState(tricks, { buried: [fk('A'), fk('A')] })
     const scores = computeScores(state)
     expect(scores.p1).toBe(2)   // picker wins
   })
@@ -1126,7 +1126,7 @@ describe('callAceUnknown', () => {
         p4: [c('7','H'), c('10','C'), c('K','D'), c('9','D'), c('8','D'), c('7','D')],
         p5: [c('J','H'), c('J','D'), c('10','D'), c('A','D'), c('8','C'), c('9','C')],
       },
-      discard: [c('K','C'), c('8','S')],  // AC not buried
+      buried: [c('K','C'), c('8','S')],  // AC not buried
       log: [],
     }
   }
@@ -1141,7 +1141,7 @@ describe('callAceUnknown', () => {
 
   it('throws when a normal ace call is available for another suit', () => {
     const state = makeUnknownCallingState()
-    // Add a fail heart (KH) — p1 doesn't hold AH, AH not in discard → normal call available for H
+    // Add a fail heart (KH) — p1 doesn't hold AH, AH not buried → normal call available for H
     state.hands.p1 = [c('Q','C'), c('Q','S'), c('Q','H'), c('Q','D'), c('J','C'), c('K','H')]
     expect(() => callAceUnknown(state, 'p1', 'C', 'QS')).toThrow('normal ace call is available')
   })
@@ -1249,7 +1249,7 @@ describe('getPlayerView', () => {
       partnerRevealed: false,
       goingAlone: false,
       blind: [],
-      discard: [c('Q','D'), c('J','D')],
+      buried: [c('Q','D'), c('J','D')],
       underCard: null,
       tricks: [],
       currentTrick: [],
@@ -1272,12 +1272,12 @@ describe('getPlayerView', () => {
     expect(view.hands.p3.every(card => card.hidden === true)).toBe(true)
   })
 
-  it('picker can see the discard; opponents see hidden placeholders', () => {
+  it('picker can see buried cards; opponents see hidden placeholders', () => {
     const pickerView = getPlayerView(makeViewState(), 'p1')
-    expect(pickerView.discard.every(card => card.hidden !== true)).toBe(true)
+    expect(pickerView.buried.every(card => card.hidden !== true)).toBe(true)
 
     const oppView = getPlayerView(makeViewState(), 'p3')
-    expect(oppView.discard.every(card => card.hidden === true)).toBe(true)
+    expect(oppView.buried.every(card => card.hidden === true)).toBe(true)
   })
 
   it('partner identity is hidden from opponents when partnerRevealed is false', () => {
@@ -1387,14 +1387,14 @@ describe('trumpRemainingElsewhere', () => {
     expect(trumpRemainingElsewhere(view, 'p1')).toBe(0)
   })
 
-  it('subtracts trump visible in picker discard', () => {
-    // Picker (p1) buried QS (trump) in discard. Own hand: QC. No tricks played.
-    // Remaining = 14 - 1 (QC in hand) - 0 (played) - 1 (QS in discard) = 12
+  it('subtracts trump visible in picker buried', () => {
+    // Picker (p1) buried QS (trump). Own hand: QC. No tricks played.
+    // Remaining = 14 - 1 (QC in hand) - 0 (played) - 1 (QS buried) = 12
     const view = {
       tricks: [],
       currentTrick: [],
       hands: { p1: [c('Q','C'), c('A','H'), c('K','S'), c('9','C'), c('8','S'), c('7','H')] },
-      discard: [c('Q','S'), c('K','H')],  // picker sees their own real discard
+      buried: [c('Q','S'), c('K','H')],  // picker sees their own real buried cards
     }
     expect(trumpRemainingElsewhere(view, 'p1')).toBe(12)
   })
@@ -1567,11 +1567,11 @@ describe('teammateWinning', () => {
   })
 })
 
-describe('bestVoidDiscard', () => {
+describe('bestVoidBury', () => {
   it('returns 2-card IDs that void a suit when burial total >= 11', () => {
     // AC(11) + KC(4) in clubs = 15 pts >= 11 → void clubs
     const hand = [c('Q','C'), c('J','S'), c('A','D'), c('A','C'), c('K','C'), c('9','H'), c('8','S'), c('7','S')]
-    const result = bestVoidDiscard(hand)
+    const result = bestVoidBury(hand)
     expect(result).not.toBeNull()
     expect(result).toHaveLength(2)
     expect(result).toContain('AC')
@@ -1581,13 +1581,13 @@ describe('bestVoidDiscard', () => {
   it('returns null when no suit can be voided with >= 11 pts', () => {
     // Clubs: 7C + 8C = 0+0 = 0 pts, Hearts: 9H only (1 card), Spades: 7S + 8S = 0 pts
     const hand = [c('Q','C'), c('J','S'), c('A','D'), c('10','D'), c('7','C'), c('8','C'), c('9','H'), c('7','S')]
-    expect(bestVoidDiscard(hand)).toBeNull()
+    expect(bestVoidBury(hand)).toBeNull()
   })
 
   it('handles 1-card suit: pairs with highest-point filler from another suit', () => {
     // Spades: only KS (4 pts). Filler: AH (11 pts). Total = 15 → qualifies
     const hand = [c('Q','C'), c('J','C'), c('A','D'), c('10','D'), c('K','S'), c('A','H'), c('8','C'), c('7','C')]
-    const result = bestVoidDiscard(hand)
+    const result = bestVoidBury(hand)
     expect(result).not.toBeNull()
     expect(result).toContain('KS')
     expect(result).toContain('AH')
@@ -1596,7 +1596,7 @@ describe('bestVoidDiscard', () => {
   it('returns null for suit with 3+ cards (burying 2 does not void it)', () => {
     // Clubs: AC+KC+9C (3 cards), Hearts: AH+KH+9H (3 cards), Spades: AS+KS+9S (3 cards)
     const hand = [c('Q','C'), c('A','C'), c('K','C'), c('A','H'), c('K','H'), c('A','S'), c('K','S'), c('9','C')]
-    expect(bestVoidDiscard(hand)).toBeNull()
+    expect(bestVoidBury(hand)).toBeNull()
   })
 
   it('excludes mustHold cards — cannot bury fail ace when holding all 3', () => {
@@ -1606,7 +1606,7 @@ describe('bestVoidDiscard', () => {
     // Eligible non-trump non-mustHold: KS only (1 card, 4 pts). Need filler from other suit.
     // No other eligible non-trump → null
     const hand = [c('A','C'), c('A','H'), c('A','S'), c('Q','C'), c('J','C'), c('K','S'), c('9','D'), c('8','D')]
-    expect(bestVoidDiscard(hand)).toBeNull()
+    expect(bestVoidBury(hand)).toBeNull()
   })
 
   it('excludes both fail aces AND fail tens when holding all 6', () => {
@@ -1617,7 +1617,7 @@ describe('bestVoidDiscard', () => {
       c('10','C'), c('10','H'), c('10','S'),
       c('K','S'), c('Q','C'),
     ]
-    expect(bestVoidDiscard(hand)).toBeNull()
+    expect(bestVoidBury(hand)).toBeNull()
   })
 })
 
@@ -1641,11 +1641,11 @@ describe('decidePick', () => {
   })
 })
 
-describe('decideDiscard', () => {
+describe('decideBury', () => {
   it('buries void pair when suit can be voided with >= 11 pts', () => {
     // AC(11) + KC(4) in clubs = 15 pts → void clubs
     const hand = [c('Q','C'), c('J','S'), c('A','D'), c('A','C'), c('K','C'), c('9','H'), c('8','S'), c('7','S')]
-    const result = decideDiscard({ hands: { p1: hand }, discard: [] }, 'p1')
+    const result = decideBury({ hands: { p1: hand }, buried: [] }, 'p1')
     expect(result).toHaveLength(2)
     expect(result).toContain('AC')
     expect(result).toContain('KC')
@@ -1655,7 +1655,7 @@ describe('decideDiscard', () => {
     // Hearts: 10H + 9H = 10 pts (< 11). Spades: 8S + 7S = 0 pts. No qualifying void.
     // Greedy buries highest-point non-trump: AC(11) + 10H(10)
     const hand = [c('Q','C'), c('J','S'), c('A','D'), c('A','C'), c('10','H'), c('9','H'), c('8','S'), c('7','S')]
-    const result = decideDiscard({ hands: { p1: hand }, discard: [] }, 'p1')
+    const result = decideBury({ hands: { p1: hand }, buried: [] }, 'p1')
     expect(result).toContain('AC')
     expect(result).toContain('10H')
   })
@@ -1665,21 +1665,21 @@ describe('decideCall go-alone', () => {
   it('goes alone with 6 trump and 2 queens', () => {
     // QC, QS (2 queens), JC, JH, AD, 10D = 6 trump
     const hand = [c('Q','C'), c('Q','S'), c('J','C'), c('J','H'), c('A','D'), c('10','D')]
-    const view = { callMode: 'ace', hands: { p1: hand }, discard: [] }
+    const view = { callMode: 'ace', hands: { p1: hand }, buried: [] }
     expect(decideCall(view, 'p1').type).toBe('alone')
   })
 
   it('does not go alone with only 1 queen even with 6 trump', () => {
     // QC (1 queen), JC, JS, JH, JD, AD = 6 trump
     const hand = [c('Q','C'), c('J','C'), c('J','S'), c('J','H'), c('J','D'), c('A','D')]
-    const view = { callMode: 'ace', hands: { p1: hand }, discard: [] }
+    const view = { callMode: 'ace', hands: { p1: hand }, buried: [] }
     expect(decideCall(view, 'p1').type).not.toBe('alone')
   })
 
   it('does not go alone with 2 queens but only 5 trump', () => {
     // QC, QS (2 queens), JC, AD, 10D = 5 trump; AH is fail
     const hand = [c('Q','C'), c('Q','S'), c('J','C'), c('A','D'), c('10','D'), c('A','H')]
-    const view = { callMode: 'ace', hands: { p1: hand }, discard: [] }
+    const view = { callMode: 'ace', hands: { p1: hand }, buried: [] }
     expect(decideCall(view, 'p1').type).not.toBe('alone')
   })
 })
@@ -1781,7 +1781,7 @@ describe('decidePlay trump counting', () => {
       partnerRevealed: false,
       pickerForcedPlays: [],
       underCard: null,
-      discard: [],
+      buried: [],
     }
   }
 
@@ -1904,7 +1904,7 @@ describe('decidePlay opponent leading called suit', () => {
       partnerRevealed,
       pickerForcedPlays: [],
       underCard: null,
-      discard: [],
+      buried: [],
     }
   }
 
@@ -2086,7 +2086,7 @@ describe('decidePlay trump efficiency — trump trick (Scenario 1)', () => {
     // 0 opponents remain (p3,p4,p5 all played; p2=partner played).
     // Picker (p1) hand: 10D(rank9), 9D(rank11). Both beat 8D(rank12).
     //   10D: trumpRank(10D)=9 < 12 ✓   9D: trumpRank(9D)=11 < 12 ✓
-    // Old lowestCard: 9D=0pts < 10D=10pts → picks 9D. Bug: discards 10pts from pile.
+    // Old lowestCard: 9D=0pts < 10D=10pts → picks 9D. Bug: loses 10pts from pile.
     // New: tier1=[10D] → return 10D.
     const view = makeTrumpEfficiencyView({
       userId: 'p1', picker: 'p1', partner: 'p2',
