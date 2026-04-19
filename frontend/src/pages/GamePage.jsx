@@ -7,9 +7,9 @@ import ActionPanel from '../components/ActionPanel.jsx'
 import GameLog from '../components/GameLog.jsx'
 import ScoreBoard from '../components/ScoreBoard.jsx'
 import GameOptionsPanel from '../components/GameOptionsPanel.jsx'
+import SettingsSummary from '../components/SettingsSummary.jsx'
 
-const SUIT_SYMBOLS   = { C: '♣', D: '♦', H: '♥', S: '♠' }
-const VARIANT_LABELS = { leasters: 'Leasters', doublers: 'Doublers', schwanzers: 'Schwanzers' }
+const SUIT_SYMBOLS = { C: '♣', D: '♦', H: '♥', S: '♠' }
 
 // ── Seat layout (you at bottom, 4 opponents around the arc) ──────────────────
 // 5-seat positions: bottom, left, top-left, top-right, right
@@ -392,6 +392,12 @@ export default function GamePage({ gameId, user, onNavigate }) {
     } = {},
   } = gameData
 
+  const currentSettings = {
+    no_pick_variant: currentVariant ?? noPickVariant,
+    reveal_partner:  revealPartner  ?? gameData.settings?.reveal_partner  ?? true,
+    double_on_bump:  dobEnabled     ?? gameData.settings?.double_on_bump  ?? true,
+  }
+
   // ── Game ended ──────────────────────────────────────────────────────────────
   if (status === 'complete') {
     return (
@@ -425,11 +431,10 @@ export default function GamePage({ gameId, user, onNavigate }) {
             <div style={{ marginTop: 8 }}>
               <div style={{ fontSize: '0.72rem', color: '#888', marginBottom: 3 }}>Game options</div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                <span style={{ color: '#ccc', fontSize: '0.85rem' }}>
-                  {VARIANT_LABELS[currentVariant ?? noPickVariant]} ·{' '}
-                  Partner: {(revealPartner ?? gameData.settings?.reveal_partner ?? true) ? 'shown' : 'hidden'}
-                  {(dobEnabled ?? gameData.settings?.double_on_bump ?? true) ? ' · DOB' : ''}
-                </span>
+                <SettingsSummary
+                  settings={currentSettings}
+                  style={{ color: '#ccc', fontSize: '0.85rem' }}
+                />
                 <button className="outline" style={{ fontSize: '0.8rem', padding: '2px 10px' }}
                   onClick={() => setShowOptions(true)}>
                   ⚙ Edit
@@ -440,15 +445,19 @@ export default function GamePage({ gameId, user, onNavigate }) {
               mode="update"
               gameId={gameId}
               open={showOptions}
-              values={{ no_pick_variant: currentVariant ?? noPickVariant, reveal_partner: revealPartner ?? gameData.settings?.reveal_partner ?? true, double_on_bump: dobEnabled ?? gameData.settings?.double_on_bump ?? true }}
+              values={currentSettings}
               onUpdated={handleSettingsUpdate}
               onClose={() => setShowOptions(false)}
             />
           </>
         ) : (
-          <p style={{ color: '#aaa', fontSize: '0.85rem', marginTop: 8 }}>
-            No-pick variant: <strong>{VARIANT_LABELS[noPickVariant]}</strong>
-          </p>
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: '0.72rem', color: '#888', marginBottom: 3 }}>Game options</div>
+            <SettingsSummary
+              settings={currentSettings}
+              style={{ color: '#aaa', fontSize: '0.85rem' }}
+            />
+          </div>
         )}
 
         <p style={{ marginTop: 16 }}>Waiting for players… ({players.length}/5)</p>
@@ -614,30 +623,36 @@ export default function GamePage({ gameId, user, onNavigate }) {
       {/* ── Right panel: last trick + game options + leave game ── */}
       <div className="last-trick-area">
         <LastTrickArea lastTrick={lastTrick} seats={seats} />
-        {isGameAdmin && (
-          <div style={{ width: '100%', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>
-            <div style={{ fontSize: '0.68rem', color: '#666', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Game options</div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-              <span style={{ color: '#aaa', fontSize: '0.78rem' }}>
-                {VARIANT_LABELS[currentVariant ?? noPickVariant]} ·{' '}
-                Partner: {(revealPartner ?? gameData.settings?.reveal_partner ?? true) ? 'shown' : 'hidden'}
-                {(dobEnabled ?? gameData.settings?.double_on_bump ?? true) ? ' · DOB' : ''}
-              </span>
-              <button className="outline" style={{ fontSize: '0.78rem', padding: '2px 8px' }}
-                onClick={() => setShowOptions(true)}>
-                ⚙ Edit
-              </button>
-            </div>
-            <GameOptionsPanel
-              mode="update"
-              gameId={gameId}
-              open={showOptions}
-              values={{ no_pick_variant: currentVariant ?? noPickVariant, reveal_partner: revealPartner ?? gameData.settings?.reveal_partner ?? true, double_on_bump: dobEnabled ?? gameData.settings?.double_on_bump ?? true }}
-              onUpdated={handleSettingsUpdate}
-              onClose={() => setShowOptions(false)}
+        <div style={{ width: '100%', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>
+          <div style={{ fontSize: '0.68rem', color: '#666', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Game options</div>
+          {isGameAdmin ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <SettingsSummary
+                  settings={currentSettings}
+                  style={{ color: '#aaa', fontSize: '0.78rem' }}
+                />
+                <button className="outline" style={{ fontSize: '0.78rem', padding: '2px 8px' }}
+                  onClick={() => setShowOptions(true)}>
+                  ⚙ Edit
+                </button>
+              </div>
+              <GameOptionsPanel
+                mode="update"
+                gameId={gameId}
+                open={showOptions}
+                values={currentSettings}
+                onUpdated={handleSettingsUpdate}
+                onClose={() => setShowOptions(false)}
+              />
+            </>
+          ) : (
+            <SettingsSummary
+              settings={currentSettings}
+              style={{ color: '#aaa', fontSize: '0.78rem' }}
             />
-          </div>
-        )}
+          )}
+        </div>
         <div style={{ marginTop: 'auto', width: '100%', display: 'flex', justifyContent: 'flex-end', paddingTop: 8 }}>
           <button className="outline contrast" style={{ fontSize: '0.8rem' }}
             onClick={handleLeave} aria-busy={leaving} disabled={leaving}>
