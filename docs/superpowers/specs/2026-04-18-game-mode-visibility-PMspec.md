@@ -23,13 +23,15 @@ Every setting is listed, whether it changed or not. The "Next Hand" prefix makes
 
 ## How it behaves
 
-**One log line per editing session, not per click.** The admin might flip two or three settings in a row inside the modal. Rather than spamming the play history with a line per toggle, a single summary line appears when the admin closes the modal.
+**Nothing saves until the admin presses Done.** The settings modal becomes a staging area. The admin can toggle options freely; nothing is persisted and no other player sees anything until they commit with Done. This is a change from today's behavior, where each individual toggle saved immediately.
 
-**No log line if nothing actually changed.** If the admin opens the settings modal, looks around, and closes it without changing anything, no log entry is created. If they change a setting and then revert it to the original before closing, also no log entry. The log only speaks up when the resulting settings differ from what the admin started with.
+**Done commits, Escape cancels.** Pressing Done saves all the admin's changes in one go and emits the log line. Pressing Escape, or clicking outside the modal, discards the edits entirely — no save, no log line, no visible change to anyone else. The modal behaves like most modern "edit" dialogs: you commit or you cancel.
+
+**One log line per editing session.** Whatever mix of changes the admin made inside the modal, committing them produces exactly one log line summarizing the resulting settings. No spam, no line per toggle.
+
+**No log line if nothing actually changed.** If the admin opens the modal, presses Done without changing anything — or changes a setting and reverts it to the original before pressing Done — no log entry is created. The log only speaks up when the committed settings differ from what the admin started with.
 
 **Waiting screen is quiet.** The log isn't visible before a game starts, so no log line is emitted during the waiting screen phase. Non-admin players still see the summary display there — that's how they learn the starting settings.
-
-**Any way of closing the modal counts.** The log line is emitted whether the admin clicks the Done button, presses Escape, or clicks outside the modal. From the player's perspective, the admin "finished editing," and the announcement goes out.
 
 ## Why this design is forward-compatible
 
@@ -37,7 +39,7 @@ The app will grow over time — new game settings will be added, and a mobile ap
 
 **New settings are cheap to add.** The summary line is built in one place on the server from the current settings. When a new setting is added, updating that one formatter automatically updates: the in-game display for all players, the log line wording, and the wording on both the waiting screen and active-play views.
 
-**Mobile-friendly.** The backend exposes a simple signal the client can send — effectively "the admin just finished editing, announce it" — rather than locking in a particular UX flow. The web app uses a pattern where each toggle saves immediately and the announcement is sent at modal close. A mobile app could just as easily save everything in one go and attach the announcement to that single save. Either style works without backend changes.
+**Mobile-friendly.** Web and any future mobile app share the same flow: edit freely in the modal, commit all changes in one go on Done, cancel on Escape/backdrop. The backend accepts a single save per editing session with an "announce it" flag attached, which keeps the implementation identical across platforms.
 
 ## Out of scope
 

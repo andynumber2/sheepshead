@@ -40,10 +40,7 @@ Out of scope:
 - If the game is in `waiting` status, the log append is skipped (no `game_state` row exists). Setting updates still persist normally.
 - Validation: `log_change` must be a boolean if provided.
 
-This shape works equally well for:
-
-- Web auto-save-per-toggle, where a final `{ log_change: true }` PATCH with no setting fields flushes the log line.
-- Mobile batch-save, where a single PATCH carries all settings plus `log_change: true`.
+All clients — web and mobile — commit changes on modal-close as a single batched PATCH carrying whatever fields changed plus `log_change: true`.
 
 ### Settings summary formatter
 
@@ -62,15 +59,18 @@ Every setting is rendered whether it changed or not. When a new setting is added
 
 The formatter lives in `shared/` (e.g., `shared/settingsSummary.js`) so both the server endpoint and the frontend import it. This guarantees admin view, non-admin view, and log line all stay in lockstep.
 
-### Client: modal close-time flush
+### Client: deferred save on Done
 
-`GameOptionsPanel` (update mode only) tracks the settings snapshot taken when the modal opens. On close — whether via the Done button, Escape key, or backdrop click, all of which route through `onClose` — the panel compares the snapshot to the current values. If any differ, it issues one final call:
+`GameOptionsPanel` (update mode) uses a deferred-save flow — no network I/O happens as the admin toggles controls. Local state only.
 
-```js
-api.games.updateSettings(gameId, { log_change: true })
-```
+- **On open:** capture `initialValues` (snapshot of settings at the moment the modal opens). Local form state is seeded from props.
+- **As admin toggles:** local state updates; nothing is persisted.
+- **On Done:** if the current local values differ from `initialValues`, issue one PATCH carrying the changed fields plus `log_change: true`, e.g. `PATCH { no_pick_variant: 'leasters', double_on_bump: false, log_change: true }`. If no values changed, no PATCH is sent.
+- **On Escape or backdrop click (cancel):** the modal closes without persisting anything. No PATCH is sent. Local state is discarded.
 
-No setting fields are included; the server uses the already-persisted values. If the snapshot matches current values, no call is made.
+Done and Cancel must be separate code paths. The native `<dialog>` `close` event fires for both; the implementation distinguishes them by tracking whether the close was initiated by the Done button or by Escape/backdrop (e.g., a `committedRef` set by the Done handler before closing).
+
+This replaces the current per-toggle auto-save behavior. No "Saving…" / "✓ Saved" indicators are needed on individual controls; a single save indicator (or error state) applies to the Done action as a whole.
 
 ### Client: non-admin display
 
@@ -93,27 +93,32 @@ The admin branch keeps its ⚙ Edit button alongside the same summary component.
 |---|---|
 | `functions/api/games/[id]/settings.js` | Accept `log_change` field; after persisting settings, if `log_change === true` and game status is `active`, append `Next Hand: <summary>` to `state.log` and write back. |
 | `shared/settingsSummary.js` (new) | `formatSettingsSummary(settings)` — single source of truth for the summary body, imported by both server and frontend. |
-| `frontend/src/components/GameOptionsPanel.jsx` | On modal open, capture `initialValues`. In `onClose` path, if current values differ from `initialValues` and `mode === 'update'`, send a final `updateSettings(gameId, { log_change: true })`. |
+| `frontend/src/components/GameOptionsPanel.jsx` | Rework `update` mode to defer saves. Capture `initialValues` on open. Done button: if local values differ, PATCH changed fields plus `log_change: true`. Escape/backdrop: close without saving. Remove per-toggle auto-save and per-toggle Saving/Saved indicators. |
 | `frontend/src/pages/GamePage.jsx` | Replace the two inline admin summary blocks with a small shared `<SettingsSummary>` component/helper; render it for non-admin players in both waiting and active-play views without the Edit button. |
 
 `frontend/src/lib/api.js` needs no signature change — `updateSettings` already forwards the JSON body.
 
 ## Data Flow — admin editing session
 
-1. Admin clicks ⚙ Edit → modal opens; snapshot `{ variant, reveal, dob }` saved.
-2. Admin toggles `no_pick_variant` → `PATCH { no_pick_variant: 'leasters' }` → server persists, no log.
-3. Admin toggles `double_on_bump` → `PATCH { double_on_bump: false }` → server persists, no log.
-4. Admin clicks Done → modal `onClose` fires → snapshot differs → client sends `PATCH { log_change: true }` → server appends `Next Hand: Leasters · Partner: shown` to `state.log`.
-5. All clients see the log update on their next poll.
+1. Admin clicks ⚙ Edit → modal opens; `initialValues` captured; local form state seeded.
+2. Admin toggles `no_pick_variant` → local state updates; no network.
+3. Admin toggles `double_on_bump` → local state updates; no network.
+4. Admin clicks Done → values differ from `initialValues` → client sends one `PATCH { no_pick_variant: 'leasters', double_on_bump: false, log_change: true }` → server persists and appends `Next Hand: Leasters · Partner: shown` to `state.log`.
+5. All clients see the settings + log update on their next poll.
+
+Alternative path — cancel:
+
+- Admin clicks ⚙ Edit, toggles some settings, presses Escape (or clicks the backdrop) → modal closes, no PATCH, no persistence, no log. Next time the admin opens the modal, it reflects the last-saved server state.
 
 ## Edge Cases
 
-- **No-op guard — nothing changed.** Admin opens modal, presses Done → snapshots match → no flush PATCH sent → no log entry.
-- **Net-zero change.** Admin toggles a setting and reverts it to the original before closing → snapshots match → no log entry. (Intermediate PATCHes already persisted to the DB, but the final value equals the original so nothing to announce.)
-- **Modal closes via Escape or backdrop.** Same `onClose` path, same behavior as Done.
+- **No-op guard — nothing changed.** Admin opens modal, presses Done → values match `initialValues` → no PATCH sent → no log entry.
+- **Net-zero change.** Admin toggles a setting and reverts it to the original before pressing Done → values match `initialValues` → no PATCH sent. (Nothing was ever persisted, so no revert logic is needed.)
+- **Escape or backdrop click (cancel).** Modal closes; no PATCH; no log entry. Any local edits are discarded.
 - **Mid-hand change.** Settings still take effect next hand (unchanged from today). The `Next Hand:` prefix communicates this to all players.
 - **Waiting screen.** Log append is skipped server-side even if the client sends `log_change: true`, because no `game_state` row exists yet. Setting persistence still works. Non-admins still see the summary on the waiting screen via the new shared component; log entries are irrelevant there since the log isn't rendered.
-- **Multiple admins rapid-firing.** Only one admin can hold the modal open at a time per session, but if two admin sessions overlap, each emits its own log line on close. This matches the natural semantics.
+- **Save error on Done.** If the PATCH fails, the modal should surface the error and stay open so the admin can retry. Local state is not discarded on failure.
+- **Multiple admins.** If two admin sessions overlap, each emits its own log line when its admin presses Done. Whichever PATCH lands second wins (last-write-wins, matches today).
 
 ## Testing
 
@@ -125,19 +130,19 @@ The admin branch keeps its ⚙ Edit button alongside the same summary component.
 
 Extend existing settings endpoint tests (or add new ones if none exist):
 
-- PATCH with `log_change: true` during active game → `state.log` gets the `Next Hand: …` line.
+- PATCH with settings fields + `log_change: true` during active game → settings persist and `state.log` gets the `Next Hand: …` line.
 - PATCH with `log_change: true` during waiting game → no log change; setting updates still persist.
 - PATCH with `log_change: false` or absent → no log change even if settings change.
-- PATCH with `log_change: true` and no setting fields → still emits the log line using the current persisted settings.
+- PATCH with only `log_change: true` (no setting fields) → still emits the log line using the current persisted settings (supports mobile clients that may choose this shape).
 - PATCH with invalid `log_change` type → 400 with appropriate error.
 
 ### Manual verification
 
 - Non-admin sees the summary on the waiting screen and the active-play right panel; no Edit button.
-- Admin edits settings + presses Done → one `Next Hand: …` line appears in Play History for all players.
-- Admin opens modal + presses Done without changing → no line appears.
-- Admin changes and reverts before Done → no line appears.
-- Admin presses Escape — same behavior as Done.
+- Admin edits settings + presses Done → one `Next Hand: …` line appears in Play History for all players; settings take effect on the next hand.
+- Admin opens modal + presses Done without changing → no line appears; no network call.
+- Admin changes and reverts before Done → no line appears; no network call.
+- Admin edits settings + presses Escape (or clicks backdrop) → nothing saved; no log line; reopening the modal shows the previously-saved values.
 
 ## Future Settings
 
