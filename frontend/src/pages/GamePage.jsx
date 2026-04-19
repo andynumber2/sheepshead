@@ -394,7 +394,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
 
   const currentSettings = {
     no_pick_variant: currentVariant ?? noPickVariant,
-    reveal_partner:  revealPartner  ?? gameData.settings?.reveal_partner  ?? true,
+    reveal_partner:  revealPartner  ?? gameData.settings?.reveal_partner  ?? false,
     double_on_bump:  dobEnabled     ?? gameData.settings?.double_on_bump  ?? true,
   }
 
@@ -502,11 +502,11 @@ export default function GamePage({ gameId, user, onNavigate }) {
 
   const dealerUserId  = state.pickOrder ? state.pickOrder[4] : null
   const pickerUserId  = state.picker
-  const partnerUserId  = (state.partnerRevealed && (state.reveal_partner ?? true)) ? state.partner : null
+  const partnerUserId  = (state.partnerRevealed && (state.reveal_partner ?? false)) ? state.partner : null
 
   // Called ace display
   const calledAce       = state.calledAce
-  const showPartnerName = state.partnerRevealed && (state.reveal_partner ?? true)
+  const showPartnerName = state.partnerRevealed && (state.reveal_partner ?? false)
   const partnerPlayer   = showPartnerName && state.partner
     ? players.find(p => String(p.user_id) === String(state.partner))
     : null

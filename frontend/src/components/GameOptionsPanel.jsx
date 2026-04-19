@@ -33,8 +33,8 @@ export default function GameOptionsPanel({ mode, gameId, open, values, onChange,
   // the initial snapshot.
   useEffect(() => {
     if (open) {
-      const v = values?.no_pick_variant ?? 'leasters'
-      const r = values?.reveal_partner  ?? true
+      const v = values?.no_pick_variant ?? 'doublers'
+      const r = values?.reveal_partner  ?? false
       const d = values?.double_on_bump  ?? true
       setVariant(v)
       setReveal(r)
