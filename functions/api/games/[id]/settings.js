@@ -1,4 +1,5 @@
 import { json, err, requireUser, AuthError } from '../../_helpers.js'
+import { formatSettingsSummary } from '../../../../shared/settingsSummary.js'
 
 export async function onRequestPatch({ request, env, params }) {
   try {
@@ -14,7 +15,7 @@ export async function onRequestPatch({ request, env, params }) {
     let body
     try { body = await request.json() } catch { return err('Invalid JSON.') }
 
-    const { no_pick_variant, reveal_partner, double_on_bump } = body ?? {}
+    const { no_pick_variant, reveal_partner, double_on_bump, log_change } = body ?? {}
 
     if (no_pick_variant !== undefined && !['leasters', 'doublers', 'schwanzers'].includes(no_pick_variant)) {
       return err('no_pick_variant must be "leasters", "doublers", or "schwanzers".')
@@ -24,6 +25,9 @@ export async function onRequestPatch({ request, env, params }) {
     }
     if (double_on_bump !== undefined && typeof double_on_bump !== 'boolean') {
       return err('double_on_bump must be a boolean.')
+    }
+    if (log_change !== undefined && typeof log_change !== 'boolean') {
+      return err('log_change must be a boolean.')
     }
 
     // Build json_set args for the fields that were provided
@@ -44,16 +48,34 @@ export async function onRequestPatch({ request, env, params }) {
       bindings.push(double_on_bump ? 'true' : 'false')
     }
 
-    if (bindings.length === 0) return err('No settings to update.')
+    if (bindings.length === 0 && log_change !== true) {
+      return err('No settings to update.')
+    }
 
-    bindings.push(gameId)
-    await env.DB.prepare(
-      `UPDATE games SET settings_json = ${jsonSetExpr}, updated_at = datetime('now') WHERE id = ?`
-    ).bind(...bindings).run()
+    if (bindings.length > 0) {
+      bindings.push(gameId)
+      await env.DB.prepare(
+        `UPDATE games SET settings_json = ${jsonSetExpr}, updated_at = datetime('now') WHERE id = ?`
+      ).bind(...bindings).run()
+    }
 
     const updated = await env.DB.prepare('SELECT settings_json FROM games WHERE id = ?').bind(gameId).first()
     const raw = JSON.parse(updated.settings_json)
     const settings = { ...raw, reveal_partner: !!raw.reveal_partner, double_on_bump: !!raw.double_on_bump, is_test_mode: !!raw.is_test_mode }
+
+    if (log_change === true) {
+      const stateRow = await env.DB.prepare(
+        'SELECT state_json FROM game_state WHERE game_id = ?'
+      ).bind(gameId).first()
+      if (stateRow) {
+        const state = JSON.parse(stateRow.state_json)
+        const line = `Next Hand: ${formatSettingsSummary(settings)}`
+        state.log = [...(state.log ?? []), line]
+        await env.DB.prepare(
+          "UPDATE game_state SET state_json = ?, updated_at = datetime('now') WHERE game_id = ?"
+        ).bind(JSON.stringify(state), gameId).run()
+      }
+    }
 
     return json({ ok: true, settings })
   } catch (e) {

@@ -6,25 +6,42 @@ const VARIANT_LABELS = { leasters: 'Leasters', doublers: 'Doublers', schwanzers:
 /**
  * Reusable game options modal.
  *
- * mode="create"  — no API calls; calls onChange({ no_pick_variant, reveal_partner }) on each change.
- * mode="update"  — auto-saves via PATCH /api/games/:gameId/settings on each change; calls onUpdated(result).
+ * mode="create"  — no API calls; calls onChange({ no_pick_variant, reveal_partner, double_on_bump }) on each change.
+ * mode="update"  — deferred save: local state only until the admin presses Done, which sends
+ *                  one PATCH carrying the changed fields plus log_change: true. Escape or
+ *                  backdrop click cancels and discards local edits.
  *
  * The parent controls open/close via the `open` prop and `onClose` callback.
  */
 export default function GameOptionsPanel({ mode, gameId, open, values, onChange, onUpdated, onClose }) {
-  const dialogRef  = useRef(null)
+  const dialogRef = useRef(null)
+  // True when the in-flight close was initiated by the Done button. Lets us
+  // distinguish a commit (Done) from a cancel (Escape/backdrop), since the
+  // native <dialog> onClose event fires for both.
+  const committedRef = useRef(false)
+  // Snapshot of the settings at the moment the modal opened. Used in update
+  // mode to decide which fields actually changed when Done is pressed.
+  const initialRef = useRef(null)
+
   const [variant, setVariant] = useState(values?.no_pick_variant ?? 'doublers')
   const [reveal,  setReveal]  = useState(values?.reveal_partner  ?? false)
   const [dob,     setDob]     = useState(values?.double_on_bump  ?? true)
   const [saving,  setSaving]  = useState(false)
-  const [saved,   setSaved]   = useState(false)
+  const [error,   setError]   = useState(null)
 
-  // Re-sync form from parent values each time the panel opens
+  // Re-sync form from parent values each time the panel opens, and capture
+  // the initial snapshot.
   useEffect(() => {
     if (open) {
-      setVariant(values?.no_pick_variant ?? 'leasters')
-      setReveal(values?.reveal_partner  ?? true)
-      setDob(values?.double_on_bump ?? true)
+      const v = values?.no_pick_variant ?? 'doublers'
+      const r = values?.reveal_partner  ?? false
+      const d = values?.double_on_bump  ?? true
+      setVariant(v)
+      setReveal(r)
+      setDob(d)
+      setError(null)
+      committedRef.current = false
+      initialRef.current = { no_pick_variant: v, reveal_partner: r, double_on_bump: d }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -40,50 +57,76 @@ export default function GameOptionsPanel({ mode, gameId, open, values, onChange,
     }
   }, [open])
 
-  async function handleVariantChange(v) {
+  function handleVariantChange(v) {
     setVariant(v)
     if (mode === 'create') {
       onChange?.({ no_pick_variant: v, reveal_partner: reveal, double_on_bump: dob })
-    } else {
-      await save({ no_pick_variant: v })
     }
   }
 
-  async function handleRevealChange(v) {
+  function handleRevealChange(v) {
     setReveal(v)
     if (mode === 'create') {
       onChange?.({ no_pick_variant: variant, reveal_partner: v, double_on_bump: dob })
-    } else {
-      await save({ reveal_partner: v })
     }
   }
 
-  async function handleDobChange(v) {
+  function handleDobChange(v) {
     setDob(v)
     if (mode === 'create') {
       onChange?.({ no_pick_variant: variant, reveal_partner: reveal, double_on_bump: v })
-    } else {
-      await save({ double_on_bump: v })
     }
   }
 
-  async function save(patch) {
+  async function handleDone() {
+    if (mode !== 'update') {
+      onClose?.()
+      return
+    }
+    const initial = initialRef.current
+    const changed = {}
+    if (variant !== initial.no_pick_variant) changed.no_pick_variant = variant
+    if (reveal  !== initial.reveal_partner)  changed.reveal_partner  = reveal
+    if (dob     !== initial.double_on_bump)  changed.double_on_bump  = dob
+
+    if (Object.keys(changed).length === 0) {
+      // Nothing changed — close without any network call.
+      committedRef.current = true
+      onClose?.()
+      return
+    }
+
     setSaving(true)
-    setSaved(false)
+    setError(null)
     try {
-      const result = await api.games.updateSettings(gameId, patch)
-      setSaved(true)
+      const result = await api.games.updateSettings(gameId, { ...changed, log_change: true })
       onUpdated?.(result)
-      setTimeout(() => setSaved(false), 2000)
-    } catch { /* revert handled by parent re-poll */ }
-    finally { setSaving(false) }
+      committedRef.current = true
+      onClose?.()
+    } catch (e) {
+      setError(e?.message ?? 'Failed to save.')
+      // Stay open so the admin can retry. Local state is preserved.
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Fires for any dialog close — Done, Escape, backdrop click. We only
+  // propagate to the parent here; the commit path is in handleDone.
+  function handleDialogClose() {
+    if (!committedRef.current) {
+      // Cancel path: discard local edits by simply closing. The next open
+      // will reseed from `values` (parent state).
+    }
+    committedRef.current = false
+    onClose?.()
   }
 
   return (
     <dialog
       ref={dialogRef}
       className="game-options-dialog"
-      onClose={onClose}
+      onClose={handleDialogClose}
     >
       <strong style={{ fontSize: '0.95rem' }}>⚙ Game options</strong>
       {mode === 'update' && (
@@ -153,11 +196,12 @@ export default function GameOptionsPanel({ mode, gameId, open, values, onChange,
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ fontSize: '0.82rem' }}>
           {mode === 'update' && saving && <span style={{ color: '#aaa' }}>Saving…</span>}
-          {mode === 'update' && saved  && <span style={{ color: '#4ade80' }}>✓ Saved</span>}
+          {mode === 'update' && error  && <span style={{ color: '#f87171' }}>{error}</span>}
         </div>
         <button
           type="button"
-          onClick={onClose}
+          onClick={handleDone}
+          disabled={saving}
           style={{ fontSize: '0.85rem', padding: '4px 16px' }}
         >
           Done
