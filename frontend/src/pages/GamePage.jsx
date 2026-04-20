@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { effectiveSuit } from '@shared/gameEngine.js'
+import { computeBotSuggestion } from '@shared/botSuggestion.js'
 import { api } from '../lib/api.js'
 import PlayerSeat from '../components/PlayerSeat.jsx'
 import TrickArea, { LastTrickArea } from '../components/TrickArea.jsx'
@@ -153,6 +154,22 @@ export default function GamePage({ gameId, user, onNavigate }) {
   const [revealPartner, setRevealPartner]   = useState(null)
   const [dobEnabled, setDobEnabled]         = useState(null)
   const [showOptions, setShowOptions]       = useState(false)
+  const [showBotSuggestion, setShowBotSuggestion] = useState(() => {
+    try {
+      return localStorage.getItem('sheepshead:showBotSuggestion') === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  const handleBotSuggestionChange = (next) => {
+    setShowBotSuggestion(next)
+    try {
+      localStorage.setItem('sheepshead:showBotSuggestion', next ? 'true' : 'false')
+    } catch {
+      // localStorage unavailable — in-memory state still updates.
+    }
+  }
   const pollingRef = useRef(null)
   // Tracks the auto-play timer for the last trick. We key by
   // `${turnUserId}:${trickLen}` so each "pending play" only schedules once,
@@ -370,6 +387,26 @@ export default function GamePage({ gameId, user, onNavigate }) {
     }
   }
 
+  // Must live above any early returns to preserve Rules of Hooks — hook count
+  // must be identical across loading, waiting, and active renders.
+  const memoState = gameData?.state ?? null
+  const memoIsTestMode = !!gameData?.settings?.is_test_mode
+  const botSuggestion = useMemo(() => {
+    if (!showBotSuggestion) return null
+    if (!memoState) return null
+    const turnUid = currentTurnPlayer(memoState)
+    if (!turnUid) return null
+    const isActingForBot = memoIsTestMode && user.is_admin && String(turnUid) !== String(user.id)
+    const effectiveUid = isActingForBot ? String(turnUid) : String(user.id)
+    if (String(turnUid) !== effectiveUid) return null
+    try {
+      return computeBotSuggestion(memoState, effectiveUid)
+    } catch (err) {
+      console.warn('[botSuggestion] computation failed:', err)
+      return null
+    }
+  }, [showBotSuggestion, memoState, memoIsTestMode, user.id, user.is_admin])
+
   // ── Loading / error ─────────────────────────────────────────────────────────
   if (error) return (
     <div style={{ padding: 32, color: '#fff' }}>
@@ -426,40 +463,30 @@ export default function GamePage({ gameId, user, onNavigate }) {
           )}
         </div>
 
-        {/* Game creator controls settings */}
-        {isGameAdmin ? (
-          <>
-            <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: '0.72rem', color: '#888', marginBottom: 3 }}>Game options</div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                <SettingsSummary
-                  settings={currentSettings}
-                  style={{ color: '#ccc', fontSize: '0.85rem' }}
-                />
-                <button className="outline" style={{ fontSize: '0.8rem', padding: '2px 10px' }}
-                  onClick={() => setShowOptions(true)}>
-                  ⚙ Edit
-                </button>
-              </div>
-            </div>
-            <GameOptionsPanel
-              mode="update"
-              gameId={gameId}
-              open={showOptions}
-              values={currentSettings}
-              onUpdated={handleSettingsUpdate}
-              onClose={() => setShowOptions(false)}
-            />
-          </>
-        ) : (
-          <div style={{ marginTop: 8 }}>
-            <div style={{ fontSize: '0.72rem', color: '#888', marginBottom: 3 }}>Game options</div>
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: '0.72rem', color: '#888', marginBottom: 3 }}>Game options</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
             <SettingsSummary
               settings={currentSettings}
-              style={{ color: '#aaa', fontSize: '0.85rem' }}
+              style={{ color: '#ccc', fontSize: '0.85rem' }}
             />
+            <button className="outline" style={{ fontSize: '0.8rem', padding: '2px 10px' }}
+              onClick={() => setShowOptions(true)}>
+              ⚙ Options
+            </button>
           </div>
-        )}
+        </div>
+        <GameOptionsPanel
+          mode="update"
+          gameId={gameId}
+          open={showOptions}
+          values={currentSettings}
+          onUpdated={handleSettingsUpdate}
+          onClose={() => setShowOptions(false)}
+          role={isGameAdmin ? 'admin' : 'player'}
+          botSuggestionEnabled={showBotSuggestion}
+          onBotSuggestionChange={handleBotSuggestionChange}
+        />
 
         <p style={{ marginTop: 16 }}>Waiting for players… ({players.length}/5)</p>
         <ul>{players.map(p => (
@@ -605,6 +632,17 @@ export default function GamePage({ gameId, user, onNavigate }) {
   const legalIds = isMyPlayingTurn ? getLegalCardIds(state, effectiveUserId, activeHand) : []
   const isPickerOverlay = (state.phase === 'burying' || state.phase === 'calling') && state.picker === effectiveUserId
 
+  const suggestedIdsForHand = botSuggestion && botSuggestion.kind === 'play'
+    ? botSuggestion.ids
+    : null
+
+  const suggestedIdsForActionPanel = botSuggestion &&
+    (botSuggestion.kind === 'call' || botSuggestion.kind === 'bury')
+      ? botSuggestion.ids
+      : null
+
+  const suggestedActionForPanel = botSuggestion?.actionLabel ?? null
+
   return (
     <div className="game-table">
 
@@ -634,33 +672,27 @@ export default function GamePage({ gameId, user, onNavigate }) {
         <LastTrickArea lastTrick={lastTrick} seats={seats} />
         <div style={{ width: '100%', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>
           <div style={{ fontSize: '0.68rem', color: '#666', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Game options</div>
-          {isGameAdmin ? (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                <SettingsSummary
-                  settings={currentSettings}
-                  style={{ color: '#aaa', fontSize: '0.78rem' }}
-                />
-                <button className="outline" style={{ fontSize: '0.78rem', padding: '2px 8px' }}
-                  onClick={() => setShowOptions(true)}>
-                  ⚙ Edit
-                </button>
-              </div>
-              <GameOptionsPanel
-                mode="update"
-                gameId={gameId}
-                open={showOptions}
-                values={currentSettings}
-                onUpdated={handleSettingsUpdate}
-                onClose={() => setShowOptions(false)}
-              />
-            </>
-          ) : (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
             <SettingsSummary
               settings={currentSettings}
               style={{ color: '#aaa', fontSize: '0.78rem' }}
             />
-          )}
+            <button className="outline" style={{ fontSize: '0.78rem', padding: '2px 8px' }}
+              onClick={() => setShowOptions(true)}>
+              ⚙ Options
+            </button>
+          </div>
+          <GameOptionsPanel
+            mode="update"
+            gameId={gameId}
+            open={showOptions}
+            values={currentSettings}
+            onUpdated={handleSettingsUpdate}
+            onClose={() => setShowOptions(false)}
+            role={isGameAdmin ? 'admin' : 'player'}
+            botSuggestionEnabled={showBotSuggestion}
+            onBotSuggestionChange={handleBotSuggestionChange}
+          />
         </div>
         <div style={{ marginTop: 'auto', width: '100%', display: 'flex', justifyContent: 'flex-end', paddingTop: 8 }}>
           <button className="outline contrast" style={{ fontSize: '0.8rem' }}
@@ -703,6 +735,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
           showFaceUp={true}
           noOverlap={true}
           playableIds={isMyPlayingTurn ? legalIds : undefined}
+          suggestedIds={suggestedIdsForHand}
           onCardClick={isMyPlayingTurn
             ? (card) => { if (legalIds.includes(card.id)) handleAction('play_card', { cardId: card.id }, isActingForBot ? turnUserId : null) }
             : undefined}
@@ -719,6 +752,8 @@ export default function GamePage({ gameId, user, onNavigate }) {
             onAction={(type, payload) => handleAction(type, payload, isActingForBot ? turnUserId : null)}
             loading={actionLoading}
             actingForName={isActingForBot ? (actingForPlayer?.username ?? turnUserId) : null}
+            suggestedAction={suggestedActionForPanel}
+            suggestedIds={suggestedIdsForActionPanel}
           />
         </div>
       )}

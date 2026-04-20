@@ -6,12 +6,13 @@ function cardImageSrc(cardId) {
   return `/cards/${cardId}.png`
 }
 
-export default function Card({ card, playable = false, selected = false, onClick }) {
+export default function Card({ card, playable = false, selected = false, suggested = false, onClick }) {
   if (!card || card.hidden) {
     const hiddenClasses = [
       'card', 'card-img', 'hidden',
-      playable ? 'playable' : '',
-      selected ? 'selected' : '',
+      playable  ? 'playable'       : '',
+      selected  ? 'selected'       : '',
+      suggested ? 'card-suggested' : '',
     ].filter(Boolean).join(' ')
     return (
       <div
@@ -31,9 +32,10 @@ export default function Card({ card, playable = false, selected = false, onClick
   const classes = [
     'card',
     'card-img',
-    trump    ? 'trump'    : '',
-    playable ? 'playable' : '',
-    selected ? 'selected' : '',
+    trump     ? 'trump'          : '',
+    playable  ? 'playable'       : '',
+    selected  ? 'selected'       : '',
+    suggested ? 'card-suggested' : '',
   ].filter(Boolean).join(' ')
 
   return (

@@ -153,7 +153,7 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
                   style={{ fontSize: '0.8rem', padding: '2px 10px' }}
                   onClick={() => setShowOptions(true)}
                 >
-                  ⚙ Edit
+                  ⚙ Options
                 </button>
               </div>
             </div>

@@ -17,6 +17,7 @@ export default function PlayerSeat({
   hand,
   showFaceUp,
   playableIds,
+  suggestedIds,
   onCardClick,
   noOverlap,
   onCrack,
@@ -65,12 +66,13 @@ export default function PlayerSeat({
           {sortHand(hand.filter(c => !c.hidden)).concat(hand.filter(c => c.hidden)).map((card, i) => {
             const faceUp = showFaceUp && !card.hidden
             const playable = playableIds?.includes(card.id)
+            const suggested = suggestedIds?.includes(card.id)
             return (
               <img
                 key={i}
                 src={faceUp ? `/cards/${card.id}.png` : CARD_BACK_SRC}
                 alt={faceUp ? card.id : 'card'}
-                className={`mini-card${playable ? ' mini-card-playable' : ''}`}
+                className={`mini-card${playable ? ' mini-card-playable' : ''}${suggested ? ' card-suggested' : ''}`}
                 onClick={playable ? () => onCardClick?.(card) : undefined}
               />
             )
