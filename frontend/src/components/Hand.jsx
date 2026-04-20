@@ -18,20 +18,22 @@ export function sortHand(cards) {
   })
 }
 
-export default function Hand({ cards = [], playableIds = null, selectedIds = [], onCardClick }) {
+export default function Hand({ cards = [], playableIds = null, selectedIds = [], suggestedIds = null, onCardClick }) {
   const sorted = sortHand(cards)
 
   return (
     <div className="hand">
       {sorted.map(card => {
-        const playable = playableIds === null ? false : playableIds.includes(card.id)
-        const selected = selectedIds.includes(card.id)
+        const playable  = playableIds === null ? false : playableIds.includes(card.id)
+        const selected  = selectedIds.includes(card.id)
+        const suggested = suggestedIds !== null && suggestedIds.includes(card.id)
         return (
           <Card
             key={card.id}
             card={card}
             playable={playable}
             selected={selected}
+            suggested={suggested}
             onClick={() => onCardClick?.(card)}
           />
         )
