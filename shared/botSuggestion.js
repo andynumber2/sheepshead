@@ -35,8 +35,11 @@ export function computeBotSuggestion(view, userId) {
         case 'king':
           actionLabel = `king:${decision.suit}`
           break
-        default:
+        case 'alone':
           actionLabel = 'go_alone'
+          break
+        default:
+          throw new Error(`Unknown call decision type: ${decision.type}`)
       }
       const ids = decision.type === 'ace_under' && decision.underCardId
         ? [decision.underCardId]

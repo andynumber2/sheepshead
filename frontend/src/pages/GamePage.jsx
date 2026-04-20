@@ -389,23 +389,23 @@ export default function GamePage({ gameId, user, onNavigate }) {
 
   // Must live above any early returns to preserve Rules of Hooks — hook count
   // must be identical across loading, waiting, and active renders.
+  const memoState = gameData?.state ?? null
+  const memoIsTestMode = !!gameData?.settings?.is_test_mode
   const botSuggestion = useMemo(() => {
     if (!showBotSuggestion) return null
-    const st = gameData?.state
-    if (!st) return null
-    const turnUid = currentTurnPlayer(st)
+    if (!memoState) return null
+    const turnUid = currentTurnPlayer(memoState)
     if (!turnUid) return null
-    const isTestMode = !!gameData.settings?.is_test_mode
-    const isActingForBot = isTestMode && user.is_admin && String(turnUid) !== String(user.id)
+    const isActingForBot = memoIsTestMode && user.is_admin && String(turnUid) !== String(user.id)
     const effectiveUid = isActingForBot ? String(turnUid) : String(user.id)
     if (String(turnUid) !== effectiveUid) return null
     try {
-      return computeBotSuggestion(st, effectiveUid)
+      return computeBotSuggestion(memoState, effectiveUid)
     } catch (err) {
       console.warn('[botSuggestion] computation failed:', err)
       return null
     }
-  }, [showBotSuggestion, gameData, user.id, user.is_admin])
+  }, [showBotSuggestion, memoState, memoIsTestMode, user.id, user.is_admin])
 
   // ── Loading / error ─────────────────────────────────────────────────────────
   if (error) return (
