@@ -3,7 +3,8 @@ import Hand from './Hand.jsx'
 
 const SUIT_SYMBOLS = { C: '♣', H: '♥', S: '♠' }
 
-export default function ActionPanel({ state, myUserId, myHand, onAction, loading, actingForName }) {
+export default function ActionPanel({ state, myUserId, myHand, onAction, loading, actingForName, suggestedAction = null, suggestedIds = null }) {
+  const suggestedClass = (label) => (suggestedAction === label ? 'btn-suggested' : '')
   const botStyle = actingForName
     ? { background: 'rgba(124,58,237,0.3)', border: '1px solid rgba(124,58,237,0.5)' }
     : {}
@@ -39,7 +40,7 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
         </>
       ) : (
         <button
-          className="secondary"
+          className={`secondary ${suggestedClass('go_alone')}`}
           onClick={() => setConfirmingAlone(true)}
           disabled={loading}
         >
@@ -84,13 +85,13 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
         {doublerMultiplier > 1 && <p style={{ color: '#f59e0b' }}>⚠ Stakes are ×{doublerMultiplier}</p>}
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 8 }}>
           {playerBlitz?.type === 'black' && (
-            <button onClick={() => act('blitz')} disabled={loading}>Black Blitz?</button>
+            <button className={suggestedClass('blitz')} onClick={() => act('blitz')} disabled={loading}>Black Blitz?</button>
           )}
           {playerBlitz?.type === 'red' && (
-            <button onClick={() => act('blitz')} disabled={loading}>Red Blitz?</button>
+            <button className={suggestedClass('blitz')} onClick={() => act('blitz')} disabled={loading}>Red Blitz?</button>
           )}
-          <button onClick={() => act('pick')} disabled={loading}>Pick the Blind?</button>
-          <button className="secondary" onClick={() => act('pass')} disabled={loading}>Pass</button>
+          <button className={suggestedClass('pick')} onClick={() => act('pick')} disabled={loading}>Pick the Blind?</button>
+          <button className={`secondary ${suggestedClass('pass')}`} onClick={() => act('pass')} disabled={loading}>Pass</button>
         </div>
         {error && <p style={{ color: '#f87171', marginTop: 6 }}>{error}</p>}
       </div>
@@ -117,6 +118,7 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
           cards={myHand}
           playableIds={myHand.map(c => c.id)}
           selectedIds={selectedBuried.map(c => c.id)}
+          suggestedIds={suggestedIds}
           onCardClick={toggleBury}
         />
         <button
@@ -158,7 +160,7 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
             {callableSuits.map(suit => (
               <button
                 key={suit}
-                className={`suit-btn ${suit === 'H' ? 'red' : 'black'}`}
+                className={`suit-btn ${suit === 'H' ? 'red' : 'black'} ${suggestedClass(`king:${suit}`)}`}
                 onClick={() => act('call_king', { suit })}
                 disabled={loading}
                 title={`Call K${suit}`}
@@ -188,7 +190,7 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
             {callableSuits.map(suit => (
               <button
                 key={suit}
-                className={`suit-btn ${suit === 'H' ? 'red' : 'black'}`}
+                className={`suit-btn ${suit === 'H' ? 'red' : 'black'} ${suggestedClass(`ten:${suit}`)}`}
                 onClick={() => act('call_ten', { suit })}
                 disabled={loading}
                 title={`Call 10${suit}`}
@@ -223,6 +225,7 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
             cards={myHand}
             playableIds={myHand.map(c => c.id)}
             selectedIds={selectedUnderCard ? [selectedUnderCard] : []}
+            suggestedIds={suggestedIds}
             onCardClick={(card) => setSelectedUnderCard(card.id)}
           />
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 8 }}>
@@ -254,7 +257,7 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
           {normalSuits.map(suit => (
             <button
               key={suit}
-              className={`suit-btn ${suit === 'H' ? 'red' : 'black'}`}
+              className={`suit-btn ${suit === 'H' ? 'red' : 'black'} ${suggestedClass(`ace:${suit}`)}`}
               onClick={() => act('call_ace', { suit })}
               disabled={loading}
               title={`Call A${suit}`}
@@ -273,7 +276,7 @@ export default function ActionPanel({ state, myUserId, myHand, onAction, loading
               {underSuits.map(suit => (
                 <button
                   key={suit}
-                  className={`suit-btn ${suit === 'H' ? 'red' : 'black'}`}
+                  className={`suit-btn ${suit === 'H' ? 'red' : 'black'} ${suggestedClass(`ace:${suit}`)}`}
                   onClick={() => setUnderSelectedSuit(suit)}
                   disabled={loading}
                   title={`Call A${suit} Under`}
