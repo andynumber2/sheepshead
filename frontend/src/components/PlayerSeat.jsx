@@ -9,6 +9,7 @@ export default function PlayerSeat({
   isGoingAlone,
   isPartner,
   isYou,
+  isGameAdmin,
   isActiveTurn,
   blitzType,
   dayScore,
@@ -37,6 +38,7 @@ export default function PlayerSeat({
         {player.username}
         {player.bot_type === 'play' && <span className="badge badge-bot">BOT</span>}
         {isYou     && <span className="badge badge-you">you</span>}
+        {isGameAdmin && <span className="badge badge-game-admin" aria-label="Game admin" />}
         {isDealer  && <span className="badge badge-dealer">D</span>}
         {isPicker && !isGoingAlone && <span className="badge badge-picker">picker</span>}
         {isGoingAlone && <span className="badge badge-alone">alone</span>}
