@@ -469,3 +469,14 @@ dialog.game-options-dialog[open] {
 dialog.game-options-dialog::backdrop {
   background: rgba(0, 0, 0, 0.6);
 }
+
+/* Bot suggestion highlight — issue #123 */
+.card-suggested {
+  outline: 3px solid #ef4444;
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+
+.btn-suggested {
+  box-shadow: 0 0 0 2px #ef4444;
+}
