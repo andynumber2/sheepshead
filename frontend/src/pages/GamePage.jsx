@@ -623,6 +623,18 @@ export default function GamePage({ gameId, user, onNavigate }) {
     }
   }, [showBotSuggestion, turnUserId, effectiveUserId, state])
 
+  const suggestedIdsForHand = botSuggestion &&
+    (botSuggestion.kind === 'play' || botSuggestion.kind === 'bury')
+      ? botSuggestion.ids
+      : null
+
+  const suggestedIdsForActionPanel = botSuggestion &&
+    (botSuggestion.kind === 'call' || botSuggestion.kind === 'bury')
+      ? botSuggestion.ids
+      : null
+
+  const suggestedActionForPanel = botSuggestion?.actionLabel ?? null
+
   return (
     <div className="game-table">
 
@@ -652,33 +664,27 @@ export default function GamePage({ gameId, user, onNavigate }) {
         <LastTrickArea lastTrick={lastTrick} seats={seats} />
         <div style={{ width: '100%', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>
           <div style={{ fontSize: '0.68rem', color: '#666', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Game options</div>
-          {isGameAdmin ? (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                <SettingsSummary
-                  settings={currentSettings}
-                  style={{ color: '#aaa', fontSize: '0.78rem' }}
-                />
-                <button className="outline" style={{ fontSize: '0.78rem', padding: '2px 8px' }}
-                  onClick={() => setShowOptions(true)}>
-                  ⚙ Edit
-                </button>
-              </div>
-              <GameOptionsPanel
-                mode="update"
-                gameId={gameId}
-                open={showOptions}
-                values={currentSettings}
-                onUpdated={handleSettingsUpdate}
-                onClose={() => setShowOptions(false)}
-              />
-            </>
-          ) : (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
             <SettingsSummary
               settings={currentSettings}
               style={{ color: '#aaa', fontSize: '0.78rem' }}
             />
-          )}
+            <button className="outline" style={{ fontSize: '0.78rem', padding: '2px 8px' }}
+              onClick={() => setShowOptions(true)}>
+              ⚙ Options
+            </button>
+          </div>
+          <GameOptionsPanel
+            mode="update"
+            gameId={gameId}
+            open={showOptions}
+            values={currentSettings}
+            onUpdated={handleSettingsUpdate}
+            onClose={() => setShowOptions(false)}
+            role={isGameAdmin ? 'admin' : 'player'}
+            botSuggestionEnabled={showBotSuggestion}
+            onBotSuggestionChange={handleBotSuggestionChange}
+          />
         </div>
         <div style={{ marginTop: 'auto', width: '100%', display: 'flex', justifyContent: 'flex-end', paddingTop: 8 }}>
           <button className="outline contrast" style={{ fontSize: '0.8rem' }}
@@ -721,6 +727,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
           showFaceUp={true}
           noOverlap={true}
           playableIds={isMyPlayingTurn ? legalIds : undefined}
+          suggestedIds={suggestedIdsForHand}
           onCardClick={isMyPlayingTurn
             ? (card) => { if (legalIds.includes(card.id)) handleAction('play_card', { cardId: card.id }, isActingForBot ? turnUserId : null) }
             : undefined}
@@ -737,6 +744,8 @@ export default function GamePage({ gameId, user, onNavigate }) {
             onAction={(type, payload) => handleAction(type, payload, isActingForBot ? turnUserId : null)}
             loading={actionLoading}
             actingForName={isActingForBot ? (actingForPlayer?.username ?? turnUserId) : null}
+            suggestedAction={suggestedActionForPanel}
+            suggestedIds={suggestedIdsForActionPanel}
           />
         </div>
       )}
