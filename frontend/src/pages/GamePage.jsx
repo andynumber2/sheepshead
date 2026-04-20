@@ -443,40 +443,30 @@ export default function GamePage({ gameId, user, onNavigate }) {
           )}
         </div>
 
-        {/* Game creator controls settings */}
-        {isGameAdmin ? (
-          <>
-            <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: '0.72rem', color: '#888', marginBottom: 3 }}>Game options</div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                <SettingsSummary
-                  settings={currentSettings}
-                  style={{ color: '#ccc', fontSize: '0.85rem' }}
-                />
-                <button className="outline" style={{ fontSize: '0.8rem', padding: '2px 10px' }}
-                  onClick={() => setShowOptions(true)}>
-                  ⚙ Edit
-                </button>
-              </div>
-            </div>
-            <GameOptionsPanel
-              mode="update"
-              gameId={gameId}
-              open={showOptions}
-              values={currentSettings}
-              onUpdated={handleSettingsUpdate}
-              onClose={() => setShowOptions(false)}
-            />
-          </>
-        ) : (
-          <div style={{ marginTop: 8 }}>
-            <div style={{ fontSize: '0.72rem', color: '#888', marginBottom: 3 }}>Game options</div>
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: '0.72rem', color: '#888', marginBottom: 3 }}>Game options</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
             <SettingsSummary
               settings={currentSettings}
-              style={{ color: '#aaa', fontSize: '0.85rem' }}
+              style={{ color: '#ccc', fontSize: '0.85rem' }}
             />
+            <button className="outline" style={{ fontSize: '0.8rem', padding: '2px 10px' }}
+              onClick={() => setShowOptions(true)}>
+              ⚙ Options
+            </button>
           </div>
-        )}
+        </div>
+        <GameOptionsPanel
+          mode="update"
+          gameId={gameId}
+          open={showOptions}
+          values={currentSettings}
+          onUpdated={handleSettingsUpdate}
+          onClose={() => setShowOptions(false)}
+          role={isGameAdmin ? 'admin' : 'player'}
+          botSuggestionEnabled={showBotSuggestion}
+          onBotSuggestionChange={handleBotSuggestionChange}
+        />
 
         <p style={{ marginTop: 16 }}>Waiting for players… ({players.length}/5)</p>
         <ul>{players.map(p => (
