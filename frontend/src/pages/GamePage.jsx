@@ -387,6 +387,26 @@ export default function GamePage({ gameId, user, onNavigate }) {
     }
   }
 
+  // Must live above any early returns to preserve Rules of Hooks — hook count
+  // must be identical across loading, waiting, and active renders.
+  const botSuggestion = useMemo(() => {
+    if (!showBotSuggestion) return null
+    const st = gameData?.state
+    if (!st) return null
+    const turnUid = currentTurnPlayer(st)
+    if (!turnUid) return null
+    const isTestMode = !!gameData.settings?.is_test_mode
+    const isActingForBot = isTestMode && user.is_admin && String(turnUid) !== String(user.id)
+    const effectiveUid = isActingForBot ? String(turnUid) : String(user.id)
+    if (String(turnUid) !== effectiveUid) return null
+    try {
+      return computeBotSuggestion(st, effectiveUid)
+    } catch (err) {
+      console.warn('[botSuggestion] computation failed:', err)
+      return null
+    }
+  }, [showBotSuggestion, gameData, user.id, user.is_admin])
+
   // ── Loading / error ─────────────────────────────────────────────────────────
   if (error) return (
     <div style={{ padding: 32, color: '#fff' }}>
@@ -611,17 +631,6 @@ export default function GamePage({ gameId, user, onNavigate }) {
   const isMyPlayingTurn = state.phase === 'playing' && turnUserId === effectiveUserId
   const legalIds = isMyPlayingTurn ? getLegalCardIds(state, effectiveUserId, activeHand) : []
   const isPickerOverlay = (state.phase === 'burying' || state.phase === 'calling') && state.picker === effectiveUserId
-
-  const botSuggestion = useMemo(() => {
-    if (!showBotSuggestion) return null
-    if (!turnUserId || turnUserId !== effectiveUserId) return null
-    try {
-      return computeBotSuggestion(state, effectiveUserId)
-    } catch (err) {
-      console.warn('[botSuggestion] computation failed:', err)
-      return null
-    }
-  }, [showBotSuggestion, turnUserId, effectiveUserId, state])
 
   const suggestedIdsForHand = botSuggestion &&
     (botSuggestion.kind === 'play' || botSuggestion.kind === 'bury')
