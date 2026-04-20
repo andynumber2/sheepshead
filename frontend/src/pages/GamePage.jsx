@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { effectiveSuit } from '@shared/gameEngine.js'
+import { computeBotSuggestion } from '@shared/botSuggestion.js'
 import { api } from '../lib/api.js'
 import PlayerSeat from '../components/PlayerSeat.jsx'
 import TrickArea, { LastTrickArea } from '../components/TrickArea.jsx'
@@ -620,6 +621,17 @@ export default function GamePage({ gameId, user, onNavigate }) {
   const isMyPlayingTurn = state.phase === 'playing' && turnUserId === effectiveUserId
   const legalIds = isMyPlayingTurn ? getLegalCardIds(state, effectiveUserId, activeHand) : []
   const isPickerOverlay = (state.phase === 'burying' || state.phase === 'calling') && state.picker === effectiveUserId
+
+  const botSuggestion = useMemo(() => {
+    if (!showBotSuggestion) return null
+    if (!turnUserId || turnUserId !== effectiveUserId) return null
+    try {
+      return computeBotSuggestion(state, effectiveUserId)
+    } catch (err) {
+      console.warn('[botSuggestion] computation failed:', err)
+      return null
+    }
+  }, [showBotSuggestion, turnUserId, effectiveUserId, state])
 
   return (
     <div className="game-table">
