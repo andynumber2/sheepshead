@@ -632,10 +632,9 @@ export default function GamePage({ gameId, user, onNavigate }) {
   const legalIds = isMyPlayingTurn ? getLegalCardIds(state, effectiveUserId, activeHand) : []
   const isPickerOverlay = (state.phase === 'burying' || state.phase === 'calling') && state.picker === effectiveUserId
 
-  const suggestedIdsForHand = botSuggestion &&
-    (botSuggestion.kind === 'play' || botSuggestion.kind === 'bury')
-      ? botSuggestion.ids
-      : null
+  const suggestedIdsForHand = botSuggestion && botSuggestion.kind === 'play'
+    ? botSuggestion.ids
+    : null
 
   const suggestedIdsForActionPanel = botSuggestion &&
     (botSuggestion.kind === 'call' || botSuggestion.kind === 'bury')
