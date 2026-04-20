@@ -200,14 +200,16 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <strong>{game.name}</strong>
-                {game.is_admin && (
-                  <span className="badge badge-dealer" style={{ marginLeft: 6 }}>your game</span>
-                )}
                 {game.settings?.is_test_mode && (
                   <span className="badge" style={{ background: '#7c3aed', color: '#fff', marginLeft: 6 }}>test</span>
                 )}
                 <span style={{ marginLeft: 6, fontSize: '0.75rem', color: '#888' }}>
                   by {game.created_by_username}
+                  <span
+                    className="badge badge-game-admin"
+                    aria-label="Game admin"
+                    style={{ marginLeft: 4 }}
+                  />
                 </span>
                 <br />
                 <small>
