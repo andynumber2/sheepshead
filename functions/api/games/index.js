@@ -41,6 +41,7 @@ async function listGames({ request, env }) {
       player_count:         g.player_count,
       is_member:            g.is_member === 1,
       is_admin:             g.created_by === user.user_id,
+      admin_user_id:        g.created_by,
       settings,
     }
   }))

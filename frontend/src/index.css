@@ -195,6 +195,18 @@ body {
 .badge-blitz-black  { background: #1f2937; color: #fff; border: 1px solid #6b7280; }
 .badge-blitz-red    { background: #dc2626; color: #fff; }
 
+/* Game admin badge — glyph defined here in ONE place so it can be changed
+   without editing JSX. JSX renders an empty <span class="badge badge-game-admin" />. */
+.badge-game-admin {
+  background: #eab308;
+  color: #000;
+  display: inline-block;
+  font-size: 0.65rem;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.badge-game-admin::before { content: '★'; }
+
 .player-scores {
   font-size: 0.7rem;
   color: #aaa;

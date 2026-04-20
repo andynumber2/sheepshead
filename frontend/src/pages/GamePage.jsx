@@ -385,7 +385,8 @@ export default function GamePage({ gameId, user, onNavigate }) {
     players,
     state,
     status,
-    is_admin:    isGameAdmin,
+    is_admin:      isGameAdmin,
+    admin_user_id: adminUserId,
     settings: {
       is_test_mode:    isTestMode,
       no_pick_variant: noPickVariant,
@@ -461,7 +462,14 @@ export default function GamePage({ gameId, user, onNavigate }) {
         )}
 
         <p style={{ marginTop: 16 }}>Waiting for players… ({players.length}/5)</p>
-        <ul>{players.map(p => <li key={p.user_id}>{p.username}</li>)}</ul>
+        <ul>{players.map(p => (
+          <li key={p.user_id}>
+            {p.username}
+            {String(p.user_id) === String(adminUserId) && (
+              <span className="badge badge-game-admin" aria-label="Game admin" style={{ marginLeft: 6 }} />
+            )}
+          </li>
+        ))}</ul>
         <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
           {isGameAdmin && !isTestMode && players.length < 5 && (
             <button className="secondary" onClick={handleFillWithBots}>
@@ -567,6 +575,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
       isGoingAlone:  uid === pickerUserId && !!state.goingAlone,
       isPartner:     uid === partnerUserId,
       isYou:         uid === myUserId,
+      isGameAdmin:   String(adminUserId) === uid,
       isActiveTurn:  uid === turnUserId,
       blitzType:     uid === pickerUserId ? blitz?.type : undefined,
       cardCount:     hand.length,

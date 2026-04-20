@@ -50,11 +50,14 @@ export async function onRequestGet({ request, env, params }) {
     const scoreMap    = Object.fromEntries(scoreRows.map(r => [r.user_id, r]))
     const lifetimeMap = Object.fromEntries(lifetimeRows.map(r => [r.user_id, r.lifetime_score]))
 
+    const adminUserId = game.created_by
+
     const playersWithScores = players.map(p => ({
       ...p,
       score:          scoreMap[p.user_id]?.game_score  ?? 0,
       day_score:      scoreMap[p.user_id]?.day_score    ?? 0,
       lifetime_score: lifetimeMap[p.user_id]            ?? 0,
+      is_game_admin:  p.user_id === adminUserId,
     }))
 
     let stateView = null
@@ -72,13 +75,14 @@ export async function onRequestGet({ request, env, params }) {
     }
 
     return json({
-      id:       game.id,
-      name:     game.name,
-      status:   game.status,
-      is_admin: game.created_by === user.user_id,
+      id:             game.id,
+      name:           game.name,
+      status:         game.status,
+      is_admin:       game.created_by === user.user_id,
+      admin_user_id:  adminUserId,
       settings,
-      players:  playersWithScores,
-      state:    stateView,
+      players:        playersWithScores,
+      state:          stateView,
     })
   } catch (e) {
     if (e instanceof AuthError) return err(e.message, 401)
