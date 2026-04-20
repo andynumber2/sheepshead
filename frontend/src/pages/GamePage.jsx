@@ -153,6 +153,22 @@ export default function GamePage({ gameId, user, onNavigate }) {
   const [revealPartner, setRevealPartner]   = useState(null)
   const [dobEnabled, setDobEnabled]         = useState(null)
   const [showOptions, setShowOptions]       = useState(false)
+  const [showBotSuggestion, setShowBotSuggestion] = useState(() => {
+    try {
+      return localStorage.getItem('sheepshead:showBotSuggestion') === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  const handleBotSuggestionChange = (next) => {
+    setShowBotSuggestion(next)
+    try {
+      localStorage.setItem('sheepshead:showBotSuggestion', next ? 'true' : 'false')
+    } catch {
+      // localStorage unavailable — in-memory state still updates.
+    }
+  }
   const pollingRef = useRef(null)
   // Tracks the auto-play timer for the last trick. We key by
   // `${turnUserId}:${trickLen}` so each "pending play" only schedules once,
