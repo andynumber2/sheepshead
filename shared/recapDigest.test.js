@@ -131,3 +131,55 @@ describe('buildHandDigest — Leaster variant', () => {
     expect(digest.pickerBuried).toBeNull()
   })
 })
+
+// Regression coverage for #143: a human player who left a game used to vanish
+// from the recap because the endpoint sourced its `players` array from the live
+// game_players roster (which DELETEs on leave). The fix routes that read through
+// the per-hand hand_players snapshot, so the endpoint now always supplies the
+// full historical roster. This repo has no D1 / Pages Functions integration
+// harness, so the SQL swap itself can't be exercised here — these tests pin the
+// contract the endpoint now must satisfy: given the historical roster, the
+// digest must include every participant with correct per-user attribution.
+describe('buildHandDigest — #143 historical roster contract', () => {
+  it('attributes every trick play to its user when the full roster is supplied', () => {
+    const initial = dealHand(['1', '2', '3', '4', '5'], 0, 1, 1)
+    initial.picker = '1'
+    initial.partner = '2'
+    initial.calledAce = { suit: 'C', aceId: 'AC' }
+    initial.callMode = 'ace'
+    initial.buried = [
+      { id: 'X1', suit: 'C', rank: '7', points: 0 },
+      { id: 'X2', suit: 'D', rank: '8', points: 0 },
+    ]
+    initial.tricks = [
+      {
+        leader: '1',
+        plays: [
+          { userId: '1', card: { id: 'T1', suit: 'C', rank: '9', points: 0 } },
+          { userId: '2', card: { id: 'T2', suit: 'C', rank: '10', points: 10 } },
+          { userId: '3', card: { id: 'T3', suit: 'C', rank: 'K', points: 4 } },
+          { userId: '4', card: { id: 'T4', suit: 'C', rank: '8', points: 0 } },
+          { userId: '5', card: { id: 'T5', suit: 'C', rank: 'A', points: 11 } },
+        ],
+        winner: '5',
+      },
+    ]
+    initial.phase = 'complete'
+    const actions = [dealAction(initial)]
+    const digest = buildHandDigest(actions, PLAYERS, { 1: -2, 2: -1, 3: 1, 4: 1, 5: 1 })
+
+    expect(digest.players).toEqual(PLAYERS)
+    expect(digest.scores).toHaveLength(5)
+    for (const p of PLAYERS) {
+      const entry = digest.scores.find(s => s.userId === p.userId)
+      expect(entry, `missing score entry for ${p.username}`).toBeDefined()
+      expect(Number.isFinite(entry.cardPoints)).toBe(true)
+    }
+    // User '1' picked and buried — must receive the buried cards' points.
+    const picker = digest.scores.find(s => s.userId === '1')
+    expect(picker.cardPoints).toBe(0)
+    // User '5' won the trick (25 card points).
+    const winner = digest.scores.find(s => s.userId === '5')
+    expect(winner.cardPoints).toBe(25)
+  })
+})
