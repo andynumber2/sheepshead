@@ -20,10 +20,10 @@ export async function onRequestGet({ env, params }) {
   ).bind(gameId, handNumber).all()
 
   const { results: playerRows } = await env.DB.prepare(
-    `SELECT gp.user_id, gp.seat, u.username, u.is_bot
-     FROM game_players gp JOIN users u ON u.id = gp.user_id
-     WHERE gp.game_id = ? ORDER BY gp.seat ASC`
-  ).bind(gameId).all()
+    `SELECT hp.user_id, hp.seat, u.username, u.is_bot
+     FROM hand_players hp JOIN users u ON u.id = hp.user_id
+     WHERE hp.game_id = ? AND hp.hand_number = ? ORDER BY hp.seat ASC`
+  ).bind(gameId, handNumber).all()
   const players = playerRows.map(r => ({
     userId: String(r.user_id),
     username: r.username,
