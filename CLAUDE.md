@@ -45,6 +45,20 @@ npx wrangler d1 execute sheepshead-db --local --command "SELECT name FROM sqlite
 npx wrangler d1 execute sheepshead-db --local --command "PRAGMA table_info(games);"
 ```
 
+### Deleting a problem game
+
+Use when a stuck/corrupted game needs to be cleared from the local DB. Most child tables cascade from `games`, but `score_events` does NOT have `ON DELETE CASCADE` — always delete from it first. Only target non-complete games so finished history is preserved.
+
+```bash
+# Delete a single game by id (replace 4)
+npx wrangler d1 execute sheepshead-db --local --command "DELETE FROM score_events WHERE game_id = 4; DELETE FROM games WHERE id = 4;"
+
+# Delete all in-progress games (status != 'complete')
+npx wrangler d1 execute sheepshead-db --local --command "DELETE FROM score_events WHERE game_id IN (SELECT id FROM games WHERE status != 'complete'); DELETE FROM games WHERE status != 'complete';"
+```
+
+Cascade handles `game_players`, `game_state`, `hands`, `hand_actions`, `hand_players`. For remote, swap `--local` for `--remote` — confirm with the user before running against production.
+
 ## Architecture
 
 - **`frontend/`** — React 18 SPA built with Vite. Dev server runs on port 3000 and proxies `/api/*` to the Wrangler local server on port 8788.
