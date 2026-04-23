@@ -135,6 +135,10 @@ async function createGame({ request, env }) {
       env.DB.prepare(
         'INSERT INTO hand_actions (game_id, hand_number, seq, type, user_id, payload_json) VALUES (?, 1, 0, ?, NULL, ?)'
       ).bind(gameId, 'deal', JSON.stringify(stateToStore)),
+      env.DB.prepare(
+        `INSERT INTO hand_players (game_id, hand_number, seat, user_id)
+         SELECT ?, ?, seat, user_id FROM game_players WHERE game_id = ?`
+      ).bind(gameId, 1, gameId),
     ])
 
     return json({ id: gameId, name, settings, started: true }, 201)

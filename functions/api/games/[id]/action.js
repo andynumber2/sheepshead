@@ -108,6 +108,10 @@ export async function onRequestPost({ request, env, params }) {
               env.DB.prepare("UPDATE games SET settings_json = json_set(settings_json, '$.doubler_multiplier', ?), updated_at = datetime('now') WHERE id = ?").bind(newMultiplier, gameId),
               env.DB.prepare('INSERT INTO hands (game_id, hand_number) VALUES (?, ?)').bind(gameId, nextHandNumber),
               env.DB.prepare('INSERT INTO hand_actions (game_id, hand_number, seq, type, user_id, payload_json) VALUES (?, ?, 0, ?, NULL, ?)').bind(gameId, nextHandNumber, 'deal', JSON.stringify(newStateToStore)),
+              env.DB.prepare(
+                `INSERT INTO hand_players (game_id, hand_number, seat, user_id)
+                 SELECT ?, ?, seat, user_id FROM game_players WHERE game_id = ?`
+              ).bind(gameId, nextHandNumber, gameId),
             ])
             state = newState
           }

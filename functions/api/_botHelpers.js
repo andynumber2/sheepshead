@@ -93,7 +93,12 @@ export async function finishHand(DB, gameId, state) {
     'INSERT INTO hand_actions (game_id, hand_number, seq, type, user_id, payload_json) VALUES (?, ?, 0, ?, NULL, ?)'
   ).bind(gameId, nextHandNumber, 'deal', JSON.stringify(nextState))
 
-  await DB.batch([...scoreStmts, ...upsertStmts, completeHandStmt, gameUpdateStmt, nextHandStmt, dealActionStmt])
+  const nextHandPlayersStmt = DB.prepare(
+    `INSERT INTO hand_players (game_id, hand_number, seat, user_id)
+     SELECT ?, ?, seat, user_id FROM game_players WHERE game_id = ?`
+  ).bind(gameId, nextHandNumber, gameId)
+
+  await DB.batch([...scoreStmts, ...upsertStmts, completeHandStmt, gameUpdateStmt, nextHandStmt, dealActionStmt, nextHandPlayersStmt])
 
   return nextState
 }
@@ -342,6 +347,10 @@ async function resolveNoPick(state, game, DB, gameId) {
     DB.prepare("UPDATE games SET settings_json = json_set(settings_json, '$.doubler_multiplier', ?), updated_at = datetime('now') WHERE id = ?").bind(newMultiplier, gameId),
     DB.prepare('INSERT INTO hands (game_id, hand_number) VALUES (?, ?)').bind(gameId, nextHandNumber),
     DB.prepare('INSERT INTO hand_actions (game_id, hand_number, seq, type, user_id, payload_json) VALUES (?, ?, 0, ?, NULL, ?)').bind(gameId, nextHandNumber, 'deal', JSON.stringify(newState)),
+    DB.prepare(
+      `INSERT INTO hand_players (game_id, hand_number, seat, user_id)
+       SELECT ?, ?, seat, user_id FROM game_players WHERE game_id = ?`
+    ).bind(gameId, nextHandNumber, gameId),
   ])
 
   return newState
