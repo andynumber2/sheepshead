@@ -106,10 +106,24 @@ A recurring concept below is a **guaranteed winner**: a trump card the bot holds
 
 #### Opponent bot following
 1. **Schmear** (a confirmed teammate — partner identity must be known — is currently winning):
-   - **Safe** (no picker or partner remains to play, or the teammate's winning card is itself a guaranteed winner): dump the highest-value non-trump. If only trump available, play the lowest card.
+   - **Safe** (no picker or partner remains to play, or the teammate's winning card is itself a guaranteed winner): dump the highest-priority non-trump per the **schmear priority** (see below). If only trump available, play the lowest card.
    - **Not safe**: if the bot can take the trick with a guaranteed-winning card, play the lowest-point such card. Otherwise schmear anyway — no speculative trump burn when a guaranteed takeover isn't available.
-2. **Trump in on called suit**: If the called suit was led and the picker team is currently winning the trick, play the lowest available trump to contest.
-3. **Otherwise**: play the lowest card.
+2. **Force-take to enable called-suit lead-back**: When the partner is **not yet revealed**, the current trick is **not** led with the called suit, the bot holds **at least one non-trump card of the called suit** in hand (a card that can be led back next trick), and the bot can take the current trick:
+   - Compute **potential opponents remaining** = count of non-self players still to play this trick. With partner unrevealed, no other defender is confirmed as a teammate, so every yet-to-play seat is treated as a picker-team threat.
+   - **Bot can play trump** (void in led suit, or trump led):
+     - Threats remaining > 0 → take with **highest trump** in the winning set.
+     - Threats remaining = 0 → take with the schmear-self pick using the **trump priority** (see below).
+   - **Bot must follow a non-called fail suit** (only fail winners available):
+     - Threats remaining > 0 → **skip** (an unrevealed opponent could be void and trump over). Fall through to default.
+     - Threats remaining = 0 → take with the schmear-self pick using the **fail priority** (see below).
+3. **Trump in on called suit**: If the called suit was led and the picker team is currently winning the trick, play the lowest available trump to contest.
+4. **Otherwise**: play the lowest card.
+
+**Schmear priority** (used by both the schmear branch above and the force-take branch's 0-threats-remaining cases): walk a rank-priority list and pick the first card found.
+- **Trump priority**: A, 10, K, 9, 8, 7, J, Q. Within the same letter (only meaningful for J or Q), prefer the **weakest by trump rank** (e.g. among Qs: Q♦ before Q♥ before Q♠ before Q♣).
+- **Fail priority**: A, 10, K, 9, 8, 7. Within the same rank (only meaningful for the schmear branch where the input may span multiple non-trump suits), prefer the card from the **shortest non-trump suit in hand** (move toward voiding); secondary tiebreak by suit alphabetical.
+
+Rationale: cash high-point cards (A=11, 10=10, K=4) first; spend zero-point pip cards next; keep the tactically valuable Js and Qs in reserve.
 
 ---
 
@@ -129,3 +143,4 @@ These pure functions support the strategy above but make no decisions themselves
 | `teammateWinning` | Returns true if the current trick leader is on the same team as the bot |
 | `isGuaranteedWinner` | For a trump card, returns true iff every higher-rank trump has been seen (own hand, played tricks, current trick, visible bury). Unseen higher trump is treated as opponent-held. Non-trump cards are never guaranteed. |
 | `cheapestGuaranteedWin` | From a set of candidate cards, returns the lowest-point card that satisfies `isGuaranteedWinner` (tiebreak: weaker trump first). Returns null if none qualify. |
+| `pickBySchmearPriority` | Pick the least-painful winning card to spend, walking a rank-priority list (`A,10,K,9,8,7,J,Q` for trump; `A,10,K,9,8,7` for fail). Trump tiebreak: weakest trump rank. Fail tiebreak: shortest non-trump suit in hand, then alphabetical. |
