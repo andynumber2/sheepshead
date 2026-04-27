@@ -189,6 +189,28 @@ export function cheapestGuaranteedWin(candidates, view, userId) {
 
 // ─── Schmear detection ────────────────────────────────────────────────────────
 
+// Returns true if the player currently winning the trick is on the same team as userId.
+// Picker-team bots: teammate = picker or partner.
+// Opponent bots: only returns true when partner is known AND winner is confirmed opponent.
+//   If partner is null (unrevealed), returns false — unsafe to schmear.
+export function teammateWinning(view, userId) {
+  const { currentTrick, picker, partner } = view
+  if (!currentTrick || currentTrick.length === 0) return false
+
+  const winner = currentWinner(currentTrick)
+  if (!winner) return false
+  const winnerId = winner.userId
+
+  const onPickerTeam = userId === picker || userId === partner
+
+  if (onPickerTeam) {
+    return winnerId === picker || winnerId === partner
+  } else {
+    if (partner === null) return false
+    return winnerId !== picker && winnerId !== partner
+  }
+}
+
 // ─── Schmear-priority pick ────────────────────────────────────────────────────
 
 // Rank priority for "schmear-self" — when the bot is guaranteed to take the
@@ -241,26 +263,4 @@ export function pickBySchmearPriority(candidates, kind, hand) {
   }
 
   return null
-}
-
-// Returns true if the player currently winning the trick is on the same team as userId.
-// Picker-team bots: teammate = picker or partner.
-// Opponent bots: only returns true when partner is known AND winner is confirmed opponent.
-//   If partner is null (unrevealed), returns false — unsafe to schmear.
-export function teammateWinning(view, userId) {
-  const { currentTrick, picker, partner } = view
-  if (!currentTrick || currentTrick.length === 0) return false
-
-  const winner = currentWinner(currentTrick)
-  if (!winner) return false
-  const winnerId = winner.userId
-
-  const onPickerTeam = userId === picker || userId === partner
-
-  if (onPickerTeam) {
-    return winnerId === picker || winnerId === partner
-  } else {
-    if (partner === null) return false
-    return winnerId !== picker && winnerId !== partner
-  }
 }
