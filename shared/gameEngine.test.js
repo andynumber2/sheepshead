@@ -2911,3 +2911,253 @@ describe('pickBySchmearPriority', () => {
     expect(pickBySchmearPriority(candidates, 'fail', [])).toBe(null)
   })
 })
+
+describe('decidePlay — defender force-take to enable called-suit lead-back', () => {
+  // Helper: build a 5-player view with the bot following on a trick already in progress.
+  // playedSeq is an array of {userId, card} representing the current trick so far.
+  function makeForceTakeView({
+    userId,
+    picker,
+    partner,
+    partnerRevealed,
+    calledSuit,
+    handCards,
+    playedSeq,
+  }) {
+    // Hands: only the bot's hand needs real cards; others can be placeholders for length detection.
+    const allIds = ['p1','p2','p3','p4','p5']
+    const hands = {}
+    for (const id of allIds) hands[id] = id === userId ? handCards : []
+    return {
+      hands,
+      currentTrick: playedSeq,
+      tricks: [],
+      picker,
+      partner,
+      partnerRevealed,
+      isLeaster: false,
+      phase: 'playing',
+      calledSuit,
+      calledAce: calledSuit ? { aceId: `A${calledSuit}` } : null,
+      calledTen: null,
+      calledKing: null,
+      pickerForcedPlays: [],
+      underCard: null,
+      buried: [],
+    }
+  }
+
+  it('void in led fail, picker still to play → highest trump (Q♣)', () => {
+    // Bot p3 (defender), called suit = hearts, partner unrevealed.
+    // p1 (picker) hasn't played; p2 led 8♠. Bot has Q♣ (top trump), J♦, A♥ (called-suit fail).
+    // Bot is void in spades → can play trump. picker still to play → highest trump = Q♣.
+    const view = makeForceTakeView({
+      userId: 'p3',
+      picker: 'p1',
+      partner: null,
+      partnerRevealed: false,
+      calledSuit: 'H',
+      handCards: [c('Q','C'), c('J','D'), c('A','H')],
+      playedSeq: [{ userId: 'p2', card: c('8','S') }],
+    })
+    expect(decidePlay(view, 'p3')).toBe('QC')
+  })
+
+  it('void in led fail, last to play (0 opps remaining) → A♦ from priority list', () => {
+    // Bot p5 (defender). p1 (picker) and p2,p3,p4 already played; bot is last.
+    // Called suit = hearts, partner unrevealed.
+    // Played: p1=8♠, p2=7♠, p3=K♠, p4=9♠. Bot is void in spades. Hand: A♦, 7♦, A♥.
+    // 0 opps remain → schmear-self priority → A♦ (top of trump priority).
+    const view = makeForceTakeView({
+      userId: 'p5',
+      picker: 'p1',
+      partner: null,
+      partnerRevealed: false,
+      calledSuit: 'H',
+      handCards: [c('A','D'), c('7','D'), c('A','H')],
+      playedSeq: [
+        { userId: 'p1', card: c('8','S') },
+        { userId: 'p2', card: c('7','S') },
+        { userId: 'p3', card: c('K','S') },
+        { userId: 'p4', card: c('9','S') },
+      ],
+    })
+    expect(decidePlay(view, 'p5')).toBe('AD')
+  })
+
+  it('trump led, 0 opps, only Qs in winning set → weakest Q (Q♦)', () => {
+    // Bot p5 (defender), last to play. Called=H, partner unrevealed.
+    // Played: p1=K♦ (trump led), p2=8♠? — but this would be invalid (must follow
+    // trump if held). Use a setup where everyone is void in trump:
+    // p1=K♦ (leads trump), p2=8♠ (void in trump), p3=7♠, p4=9♠. winner = K♦.
+    // Bot p5 has [Q♣, Q♦, A♥]. Must follow trump (has trump) → realCards excludes
+    // A♥ (called card) → [Q♣, Q♦]. Both beat K♦.
+    // 0 opps remain → schmear-self trump priority. Walk to Q rank → tiebreak by
+    // weakest trump rank → Q♦ (rank 3) over Q♣ (rank 0).
+    //
+    // Note: This setup is engine-legal only if other players truly have no trump.
+    // The test exercises decidePlay directly with a constructed view, so engine
+    // legality of historical plays isn't enforced.
+    const view = makeForceTakeView({
+      userId: 'p5',
+      picker: 'p1',
+      partner: null,
+      partnerRevealed: false,
+      calledSuit: 'H',
+      handCards: [c('Q','C'), c('Q','D'), c('A','H')],
+      playedSeq: [
+        { userId: 'p1', card: c('K','D') },
+        { userId: 'p2', card: c('8','S') },
+        { userId: 'p3', card: c('7','S') },
+        { userId: 'p4', card: c('9','S') },
+      ],
+    })
+    expect(decidePlay(view, 'p5')).toBe('QD')
+  })
+
+  it('trump led, 0 opps, Q♦ and J♥ both winning → J♥ (J before Q in priority)', () => {
+    // Bot p5 (defender), last to play. Called=H, partner unrevealed.
+    // Played: p1=8♦, p2=7♦, p3=9♦, p4=K♦ (trump trick). Current winner: p4 K♦ (rank 10).
+    // Bot hand: [Q♦, J♥, A♥]. Must follow trump → realCards excludes A♥ (called card,
+    // ledSuit T ≠ called H). realCards = [Q♦, J♥]. Both beat K♦.
+    // 0 opps remain → schmear-self trump priority. Walk A,10,K,9,8,7,J,Q:
+    //   J♥ found before Q♦ → return J♥.
+    const view = makeForceTakeView({
+      userId: 'p5',
+      picker: 'p1',
+      partner: null,
+      partnerRevealed: false,
+      calledSuit: 'H',
+      handCards: [c('Q','D'), c('J','H'), c('A','H')],
+      playedSeq: [
+        { userId: 'p1', card: c('8','D') },
+        { userId: 'p2', card: c('7','D') },
+        { userId: 'p3', card: c('9','D') },
+        { userId: 'p4', card: c('K','D') },
+      ],
+    })
+    expect(decidePlay(view, 'p5')).toBe('JH')
+  })
+
+  it('must-follow non-called fail, opps remain → strategy SKIPPED, plays lowest', () => {
+    // Bot p3 (defender). Called suit = hearts. Partner unrevealed. Picker still to play.
+    // p2 led 8♠. Bot has A♠ (could win), 7♠, A♥ (called-suit fail).
+    // Must follow spades → realCards = [A♠, 7♠]. Bot has A♥ to lead back.
+    // BUT picker still to play and could be void in spades → trump over.
+    // → strategy skipped; default lowest = 7♠.
+    const view = makeForceTakeView({
+      userId: 'p3',
+      picker: 'p1',
+      partner: null,
+      partnerRevealed: false,
+      calledSuit: 'H',
+      handCards: [c('A','S'), c('7','S'), c('A','H')],
+      playedSeq: [{ userId: 'p2', card: c('8','S') }],
+    })
+    expect(decidePlay(view, 'p3')).toBe('7S')
+  })
+
+  it('must-follow non-called fail, 0 opps, A♠ and K♠ both winning → A♠', () => {
+    // Bot p5 (defender), last to play. Called=H, partner unrevealed.
+    // Played: p1=9♠ (current winner among spades), p2=8♠, p3=7♠, p4=9♣ (void).
+    // Bot p5 hand: [A♠, K♠, A♥]. Must follow spades → realCards = [A♠, K♠].
+    //   A♠(rank 0) and K♠(rank 2) both beat 9♠(rank 4). winningSet = [A♠, K♠].
+    // canPlayTrump = false (both non-trump). 0 opps remain.
+    // → fail priority: A first → A♠.
+    const view = makeForceTakeView({
+      userId: 'p5',
+      picker: 'p1',
+      partner: null,
+      partnerRevealed: false,
+      calledSuit: 'H',
+      handCards: [c('A','S'), c('K','S'), c('A','H')],
+      playedSeq: [
+        { userId: 'p1', card: c('9','S') },
+        { userId: 'p2', card: c('8','S') },
+        { userId: 'p3', card: c('7','S') },
+        { userId: 'p4', card: c('9','C') },
+      ],
+    })
+    expect(decidePlay(view, 'p5')).toBe('AS')
+  })
+
+  it('strategy skipped when bot has no called-suit non-trump card', () => {
+    // Bot p3 defender. Called = hearts. Partner unrevealed. Picker still to play.
+    // Bot is void in spades and has trump but NO hearts (called-suit non-trump).
+    // p2 led 8♠. Hand: Q♣, J♦, 8♣. Bot is void in spades, can play any.
+    // Trigger #3 fails → strategy skipped → default opponent-following lowest non-trump = 8♣.
+    const view = makeForceTakeView({
+      userId: 'p3',
+      picker: 'p1',
+      partner: null,
+      partnerRevealed: false,
+      calledSuit: 'H',
+      handCards: [c('Q','C'), c('J','D'), c('8','C')],
+      playedSeq: [{ userId: 'p2', card: c('8','S') }],
+    })
+    expect(decidePlay(view, 'p3')).toBe('8C')
+  })
+
+  it('strategy skipped when partner is already revealed', () => {
+    // partnerRevealed=true, partner=p4. Picker p1 leads 8♠ (so picker is winning →
+    // teammateWinning is false → schmearOpp does NOT fire). New branch is skipped
+    // because partnerRevealed=true. Trump-in-on-called-suit skipped (S !== H).
+    // Falls to default lowestCard(realCards).
+    //
+    // Bot hand [Q♣, J♦, A♥]. A♥ is called card; ledSuit S ≠ called H, so A♥ excluded
+    // from realCards. realCards = [Q♣, J♦]. Both trump. lowestCard by points: Q♣=3, J♦=2 → J♦.
+    const view = makeForceTakeView({
+      userId: 'p3',
+      picker: 'p1',
+      partner: 'p4',
+      partnerRevealed: true,
+      calledSuit: 'H',
+      handCards: [c('Q','C'), c('J','D'), c('A','H')],
+      playedSeq: [{ userId: 'p1', card: c('8','S') }],
+    })
+    expect(decidePlay(view, 'p3')).toBe('JD')
+  })
+
+  it('strategy skipped when bot has no winning cards', () => {
+    // Bot p3 defender, called=H, partner unrevealed, picker still to play.
+    // p2 led Q♣ (top trump). Bot hand: [J♦, 7♦, A♥].
+    // Bot has no spades; ledSuit is trump. Bot has trump → must follow trump.
+    // realCards: A♥ is called card; ledSuit T ≠ called H → A♥ excluded.
+    //   = [J♦, 7♦] (both trump → satisfy follow-suit rule).
+    // winningSet: J♦(rank 7) and 7♦(rank 13) both lose to Q♣ (rank 0) → empty.
+    // New branch: winningSet empty → fall through. Default lowestCard:
+    //   both trump, both 0 points (J♦=2, 7♦=0). 7♦ has lower points → 7♦.
+    const view = makeForceTakeView({
+      userId: 'p3',
+      picker: 'p1',
+      partner: null,
+      partnerRevealed: false,
+      calledSuit: 'H',
+      handCards: [c('J','D'), c('7','D'), c('A','H')],
+      playedSeq: [{ userId: 'p2', card: c('Q','C') }],
+    })
+    expect(decidePlay(view, 'p3')).toBe('7D')
+  })
+
+  it('current trick led with called suit → existing trump-in branch fires (not new branch)', () => {
+    // Called = hearts, p2 led 9♥ (the called suit itself). Bot p3 defender, partner unrevealed.
+    // Bot is void in hearts; has trump. Existing logic: trump in with lowest trump.
+    // Bot hand: Q♣, J♦, 8♣. Void in hearts → realCards is full hand.
+    // Existing line 480 branch: "Trump in on called suit if picker team currently winning"
+    // Currently p2 is winning with 9♥. p2 is unknown role from defender POV (partner unrevealed).
+    // The check at line 484 is `winner.userId !== picker && winner.userId !== partner`
+    //   → with partner=null and winner=p2, opponentWinning = (p2 !== p1) && (p2 !== null) = true.
+    // opponentWinning=true → DOES NOT trump in. Falls through to default lowestCard(nonTrump) = 8♣.
+    // This test confirms the new branch is correctly gated to non-called-suit-led tricks.
+    const view = makeForceTakeView({
+      userId: 'p3',
+      picker: 'p1',
+      partner: null,
+      partnerRevealed: false,
+      calledSuit: 'H',
+      handCards: [c('Q','C'), c('J','D'), c('8','C')],
+      playedSeq: [{ userId: 'p2', card: c('9','H') }],
+    })
+    expect(decidePlay(view, 'p3')).toBe('8C')
+  })
+})
