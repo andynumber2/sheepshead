@@ -73,9 +73,20 @@ In the no-threats-remaining cases, the bot **always** takes the trick using the 
 
 **New work:** Only the trick-following decision logic. A new branch in the bot's "what to play when following a trick" decision, plus one small helper function for the schmear-self priority list, plus tests, plus an update to the bot's plain-English documentation.
 
+## Bonus Cleanup: Schmear Logic Consolidation
+
+There is existing bot logic for a related-but-different play called **"schmear"** — when a teammate has already won a trick, the bot dumps a high-point card to give them more points. Today, the schmear logic is duplicated in two places (one for picker-team bots, one for defender bots), and both implement essentially the same rule: pick the highest-points non-trump card from your hand.
+
+The new "schmear-self" logic for the trick-winning case turns out to be a generalization of the existing schmear logic — for the **fail-suit case**, the new priority list and the existing rule produce the same result. So as part of this change, we will:
+
+1. Extract the new priority-list logic into a shared helper.
+2. Replace both existing schmear sites to call that helper.
+3. While we're at it, give the existing schmear a small strategic upgrade: when the bot has multiple non-trump cards of the same rank in different suits (e.g., the Ace of Spades and the Ace of Clubs both in hand), prefer the one in the **shortest non-trump suit** — moving the bot toward voiding a suit, which is strategically valuable.
+
+This is a small intentional behavior change to existing schmear, called out so it's not a surprise.
+
 ## Out of Scope
 
-- Refactoring existing bot logic that handles "schmear on a teammate's win." That logic uses a different rule (highest-points non-trump) and consolidating it would muddy two separate ideas.
 - Behavior changes after the partner has been revealed.
 - Any UI work to surface bot reasoning. (One reason the new helper is being placed in the bot inference module rather than a private location is that future debug/replay UI work may surface inference primitives — but that work is not happening here.)
 

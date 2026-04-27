@@ -70,16 +70,47 @@ No changes needed. The existing leading logic at `shared/botStrategy.js:312-318`
 
 A single new pure helper in `shared/botInference.js`:
 
-`pickBySchmearPriority(winningCards, kind)` where `kind ∈ {'trump', 'fail'}`.
+`pickBySchmearPriority(candidates, kind, hand)` where `kind ∈ {'trump', 'fail'}` and `hand` is the bot's full hand of remaining cards.
 
-- Walks the appropriate rank-priority list.
-- For each rank, finds candidates in `winningCards` matching that rank.
-- If multiple candidates exist (only possible for J/Q in the trump case), returns the weakest by trump rank.
-- Returns `null` if `winningCards` is empty.
+- Walks the appropriate rank-priority list (`A, 10, K, 9, 8, 7, J, Q` for trump; `A, 10, K, 9, 8, 7` for fail).
+- For each rank, finds candidates in `candidates` matching that rank.
+- If multiple candidates share the rank, applies the within-rank tiebreak rule for that `kind` (see below).
+- Returns `null` if `candidates` is empty or contains no card of any priority-list rank.
 
-Placed in `botInference.js` rather than as a file-local helper in `botStrategy.js` because (a) it's a pure card-selection primitive in the same family as `cheapestGuaranteedWin` and `cheapestWinningTrump`, and (b) future debug/replay UI work may surface inference primitives, and consistent placement makes that easier.
+### Within-rank tiebreaks
 
-No refactor of the existing two `schmear()` / `schmearOpp()` closures (lines 333, 450). They implement a different rule (highest-points non-trump for "dump on teammate") and consolidating would force a false generalization. That is out of scope.
+- **`kind: 'trump'`** → return the **weakest by trump rank**. Among Q's: Q♦ < Q♥ < Q♠ < Q♣. Among J's: J♦ < J♥ < J♠ < J♣. Reasoning: dump the weakest member of the rank first; keep the absolute top trump in reserve. (For other ranks in the trump priority list, only one card exists per rank since the diamond is the only trump representative — A♦, 10♦, K♦, 9♦, 8♦, 7♦ — so no tiebreak is reachable.)
+- **`kind: 'fail'`** → return the card whose **suit is shortest in `hand`** (counting non-trump cards only). Reasoning: voiding a non-trump suit is strategically valuable (enables future trump-ins). Move toward voiding by playing from the shortest suit you hold.
+  - Secondary tiebreak (multiple suits tied for shortest length, each contributing a card of the target rank): pick deterministically by suit alphabetical order. This is a degenerate case that rarely arises and the deeper choice has minimal strategic weight.
+
+### Placement rationale
+
+In `botInference.js` rather than as a file-local helper in `botStrategy.js` because (a) it's a pure card-selection primitive in the same family as `cheapestGuaranteedWin` and `cheapestWinningTrump`, and (b) future debug/replay UI work may surface inference primitives, and consistent placement makes that easier.
+
+## Refactor: existing schmear closures
+
+The two existing closures `schmear()` (line 333) and `schmearOpp()` (line 450) currently use `highestValueCard(nonTrump)` to pick the highest-points non-trump card from the bot's hand, falling back to `lowestCard(realCards)` when no non-trump exists.
+
+The fail-priority list (`A, 10, K, 9, 8, 7`) is exactly the highest-points-first ordering for non-trump cards (A=11, 10=10, K=4, 9/8/7=0). Calling `pickBySchmearPriority(nonTrump, 'fail', realCards)` produces the same ranking, with two improvements:
+
+1. **Defined tiebreak among 0-pointers** (9 vs 8 vs 7 — previously whichever `cardPoints` reduce returned first).
+2. **Strategic shortest-suit tiebreak** for same-rank multi-suit candidates (e.g., A♠ vs A♣ when both in hand) — moves the bot toward voiding a suit.
+
+Both existing closures collapse to a single shared form:
+
+```
+schmear() = (pickBySchmearPriority(realCards.filter(c => !isTrump(c)), 'fail', realCards)
+              ?? lowestCard(realCards)).id
+```
+
+Net effect: ~6 lines of duplicated body removed; the new helper has 3 call sites (existing schmear, existing schmearOpp, new branch's 0-opps cases) instead of 2.
+
+### Behavior change disclosure
+
+The refactor introduces a small intentional behavior change to existing schmear:
+
+- When the bot's non-trump hand contains multiple non-trump aces (or 10's, K's, etc.) of different suits, schmear will now pick the one in the **shortest non-trump suit in hand** rather than whatever `highestValueCard` happens to return. This is a deliberate strategic improvement (move toward voiding), not a bug fix.
+- Existing tests that depend on the prior tiebreak behavior may need to be updated. The implementation plan should review existing schmear tests and update assertions where they would break.
 
 ## Tests
 
@@ -96,13 +127,22 @@ Add cases to the existing bot strategy test file. Required scenarios:
 - **Bot has no winning cards → strategy skipped entirely.** Expect lowest card.
 - **Current trick led with called suit → existing trump-in branch fires, new branch does not.** Verify existing behavior unchanged.
 
-Also add a small unit test file (or section) for `pickBySchmearPriority`:
+Also add a unit test file (or section) for `pickBySchmearPriority`:
 
-- Trump kind, winning set covers all ranks → returns A.
-- Trump kind, winning set is {Q♣, Q♦, J♥} → returns J♥ (J before Q in priority).
-- Trump kind, winning set is {Q♣, Q♦} → returns Q♦ (weakest Q).
-- Fail kind, winning set is {A♠, K♠, 8♠} → returns A♠.
-- Empty winning set → returns null.
+- Trump kind, candidates cover all ranks → returns A♦.
+- Trump kind, candidates are {Q♣, Q♦, J♥} → returns J♥ (J before Q in priority).
+- Trump kind, candidates are {Q♣, Q♦} → returns Q♦ (weakest Q).
+- Fail kind, candidates {A♠, K♠, 8♠}, hand contains those plus other suits → returns A♠.
+- Fail kind, candidates {A♠, A♣}, hand has 3 spades and 1 club → returns A♣ (clubs is shorter in hand).
+- Fail kind, candidates {A♠, A♣}, hand has 2 spades and 2 clubs → returns A♣ (alphabetical secondary tiebreak).
+- Fail kind, candidates {9♠, 9♣}, hand has 1 spade and 3 clubs → returns 9♠ (move toward voiding spades).
+- Empty candidates → returns null.
+
+Plus regression / behavior-change tests for refactored existing schmear:
+
+- Existing schmear, hand has {A♠, K♣, 7♥} → picks A♠ (highest-priority rank, only one suit has it). Same result as before.
+- Existing schmear, hand has {A♠, A♣}, plus more spades than clubs → now picks A♣ (was: implementation-dependent). Document this as the intended new behavior.
+- Existing schmear, hand has only trump → returns lowest card overall (helper returns null, fallback fires). Unchanged.
 
 ## Documentation Sync
 
@@ -110,7 +150,6 @@ Update `docs/BOTS.md` "Opponent bot following" section. Add the new branch as it
 
 ## Out of Scope
 
-- Refactoring the existing duplicated `schmear()` / `schmearOpp()` closures.
 - Adjusting the existing leading logic at line 312-318.
 - Adjusting the existing trump-in-on-called-suit branch at line 480.
 - Bot debug/replay UI surfaces for inference outputs (mentioned as future motivation for placing the helper in `botInference.js`, but no work here).
@@ -124,4 +163,4 @@ Update `docs/BOTS.md` "Opponent bot following" section. Add the new branch as it
 4. Lead-back behavior is observed in integration: bot wins trick via new branch → next trick, bot leads called suit (via existing leading logic).
 5. All existing tests continue to pass; new tests cover all listed scenarios.
 6. `docs/BOTS.md` updated and consistent with code.
-7. No changes to existing schmear closures, leading logic, or trump-in-on-called-suit branch.
+7. Existing `schmear()` / `schmearOpp()` closures refactored to call the shared helper; intentional shortest-suit tiebreak documented and tested. No changes to leading logic or trump-in-on-called-suit branch.
