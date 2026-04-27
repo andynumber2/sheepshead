@@ -30,9 +30,36 @@ export default function LobbyPage({ user, onNavigate, onLogout }) {
   }
 
   useEffect(() => {
+    let intervalId = null
+
+    const start = () => {
+      if (intervalId != null) return
+      intervalId = setInterval(loadGames, 5000)
+    }
+    const stop = () => {
+      if (intervalId != null) {
+        clearInterval(intervalId)
+        intervalId = null
+      }
+    }
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        stop()
+      } else {
+        loadGames()
+        start()
+      }
+    }
+
     loadGames()
-    const interval = setInterval(loadGames, 5000)
-    return () => clearInterval(interval)
+    if (!document.hidden) start()
+    document.addEventListener('visibilitychange', onVisibility)
+
+    return () => {
+      stop()
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [])
 
   async function handleCreate(e) {

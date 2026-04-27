@@ -1,4 +1,4 @@
-import { json, err, requireAdmin, hashPassword, randomHex, getDayScoreRange, AuthError } from '../../../_helpers.js'
+import { json, err, requireAdmin, hashPassword, randomHex, getDayScoreRange, getScoreTimezone, AuthError } from '../../../_helpers.js'
 
 export async function onRequest({ request, env, params }) {
   try {
@@ -21,8 +21,7 @@ async function getUser({ request, env, params }) {
   ).bind(userId).first()
   if (!user) return err('User not found.', 404)
 
-  const tzRow = await env.DB.prepare("SELECT value FROM config WHERE key = 'score_timezone'").first()
-  const timezone = tzRow?.value ?? 'America/Chicago'
+  const timezone = await getScoreTimezone(env.DB)
   const [dayStart, dayEnd] = getDayScoreRange(timezone)
 
   const lifetimeRow = await env.DB.prepare(

@@ -1,11 +1,10 @@
-import { json, err, requireAdmin, getDayScoreRange, AuthError } from '../../_helpers.js'
+import { json, err, requireAdmin, getDayScoreRange, getScoreTimezone, AuthError } from '../../_helpers.js'
 
 export async function onRequestGet({ request, env }) {
   try {
     const _admin = await requireAdmin(request, env.DB)
 
-    const tzRow = await env.DB.prepare("SELECT value FROM config WHERE key = 'score_timezone'").first()
-    const timezone = tzRow?.value ?? 'America/Chicago'
+    const timezone = await getScoreTimezone(env.DB)
     const [dayStart, dayEnd] = getDayScoreRange(timezone)
 
     const { results } = await env.DB.prepare(

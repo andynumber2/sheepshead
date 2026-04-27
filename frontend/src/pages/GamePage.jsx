@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { effectiveSuit } from '@shared/gameEngine.js'
 import { computeBotSuggestion } from '@shared/botSuggestion.js'
 import { api } from '../lib/api.js'
+import { useGameState } from '../hooks/useGameState.js'
 import PlayerSeat from '../components/PlayerSeat.jsx'
 import TrickArea, { LastTrickArea } from '../components/TrickArea.jsx'
 import ActionPanel from '../components/ActionPanel.jsx'
@@ -146,8 +147,8 @@ function getLegalCardIds(state, userId, hand) {
 
 // ── Main GamePage ─────────────────────────────────────────────────────────────
 export default function GamePage({ gameId, user, onNavigate }) {
-  const [gameData, setGameData]             = useState(null)
   const [error, setError]                   = useState(null)
+  const { game: gameData, error: hookError, refresh } = useGameState(gameId, api.games.get)
   const [actionLoading, setActionLoading]   = useState(false)
   const [leaving, setLeaving]               = useState(false)
   const [currentVariant, setCurrentVariant] = useState(null)
@@ -170,7 +171,6 @@ export default function GamePage({ gameId, user, onNavigate }) {
       // localStorage unavailable — in-memory state still updates.
     }
   }
-  const pollingRef = useRef(null)
   // Tracks the auto-play timer for the last trick. We key by
   // `${turnUserId}:${trickLen}` so each "pending play" only schedules once,
   // even though state polling produces a new state object every 2s.
@@ -184,25 +184,18 @@ export default function GamePage({ gameId, user, onNavigate }) {
 
   const myUserId = String(user.id)
 
-  const fetchGame = useCallback(async () => {
-    try {
-      const data = await api.games.get(gameId)
-      setGameData(data)
-      // Only set once — don't clobber in-flight admin changes
-      setCurrentVariant(prev => prev ?? data.settings?.no_pick_variant)
-      setRevealPartner(prev => prev ?? data.settings?.reveal_partner)
-      setDobEnabled(prev => prev ?? data.settings?.double_on_bump)
-      setError(null)
-    } catch (e) {
-      setError(e.message)
-    }
-  }, [gameId])
-
+  // ── Seed variant/reveal/DOB defaults once from game settings ────────────────
   useEffect(() => {
-    fetchGame()
-    pollingRef.current = setInterval(fetchGame, 2000)
-    return () => clearInterval(pollingRef.current)
-  }, [fetchGame])
+    if (!gameData) return
+    setCurrentVariant(prev => prev ?? gameData.settings?.no_pick_variant)
+    setRevealPartner(prev => prev ?? gameData.settings?.reveal_partner)
+    setDobEnabled(prev => prev ?? gameData.settings?.double_on_bump)
+  }, [gameData])
+
+  // ── Mirror hook errors into local error state ────────────────────────────────
+  useEffect(() => {
+    if (hookError) setError(hookError.message)
+  }, [hookError])
 
   // ── Auto-play the last trick ────────────────────────────────────────────────
   // Once we're down to the final trick (every player has exactly 1 card left),
@@ -286,13 +279,13 @@ export default function GamePage({ gameId, user, onNavigate }) {
       botPlayRef.current.timer = null
       try {
         await api.games.action(gameId, 'bot_play', {})
-        await fetchGame()
+        await refresh()
       } catch {
         // State may have already advanced (e.g. another client acted); ignore.
       }
     }, delay)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameData, gameId, fetchGame])
+  }, [gameData, gameId, refresh])
 
   // Cancel any pending bot-play timer on unmount.
   useEffect(() => () => {
@@ -353,7 +346,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
     setActionLoading(true)
     try {
       await api.games.action(gameId, type, payload, actAs)
-      await fetchGame()
+      await refresh()
     } finally {
       setActionLoading(false)
     }
@@ -369,7 +362,7 @@ export default function GamePage({ gameId, user, onNavigate }) {
   async function handleFillWithBots() {
     try {
       await api.games.fillWithBots(gameId)
-      await fetchGame()
+      await refresh()
     } catch (e) {
       setError(e.message)
     }

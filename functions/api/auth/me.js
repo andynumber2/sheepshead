@@ -1,11 +1,10 @@
-import { json, err, getUser, getDayScoreRange } from '../_helpers.js'
+import { json, err, getUser, getDayScoreRange, getScoreTimezone } from '../_helpers.js'
 
 export async function onRequestGet({ request, env }) {
   const user = await getUser(request, env.DB)
   if (!user) return err('Not authenticated.', 401)
 
-  const tzRow = await env.DB.prepare("SELECT value FROM config WHERE key = 'score_timezone'").first()
-  const timezone = tzRow?.value ?? 'America/Chicago'
+  const timezone = await getScoreTimezone(env.DB)
   const [dayStart, dayEnd] = getDayScoreRange(timezone)
 
   const lifetimeRow = await env.DB.prepare(

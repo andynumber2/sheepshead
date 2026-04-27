@@ -111,3 +111,14 @@ function _localMidnightUTC(y, m, d, timezone) {
   // Local midnight = noonRef minus the local time at noonRef
   return new Date(noonRef.getTime() - (h * 3600 + min * 60 + sec) * 1000)
 }
+
+let cachedScoreTimezone = null
+
+export async function getScoreTimezone(db) {
+  if (cachedScoreTimezone) return cachedScoreTimezone
+  const row = await db.prepare(
+    "SELECT value FROM config WHERE key = 'score_timezone'"
+  ).first()
+  cachedScoreTimezone = row?.value ?? 'America/Chicago'
+  return cachedScoreTimezone
+}
