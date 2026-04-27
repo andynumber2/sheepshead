@@ -1,4 +1,4 @@
-import { json, err, requireUser, getDayScoreRange, AuthError } from '../../_helpers.js'
+import { json, err, requireUser, getDayScoreRange, getScoreTimezone, AuthError } from '../../_helpers.js'
 import { getPlayerView } from '../../../../shared/gameEngine.js'
 
 export async function onRequestGet({ request, env, params }) {
@@ -27,8 +27,7 @@ export async function onRequestGet({ request, env, params }) {
     ).bind(gameId).all()
 
     // Lifetime from user_scores cache; game score and day score from bounded score_events queries
-    const tzRow = await env.DB.prepare("SELECT value FROM config WHERE key = 'score_timezone'").first()
-    const timezone = tzRow?.value ?? 'America/Chicago'
+    const timezone = await getScoreTimezone(env.DB)
     const [dayStart, dayEnd] = getDayScoreRange(timezone)
 
     const { results: scoreRows } = await env.DB.prepare(`
