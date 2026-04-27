@@ -16,6 +16,7 @@ import {
   bestVoidBury,
   isGuaranteedWinner,
   cheapestGuaranteedWin,  // NEW
+  pickBySchmearPriority,
 } from './botInference.js'
 
 const c = (rank, suit) => ({ id: `${rank}${suit}`, rank, suit })
@@ -2828,5 +2829,69 @@ describe('decidePlay — non-trump-win point maximization', () => {
     })
     // trumpRemainingElsewhere > 0 → lowestCard(nonTrumpWins) = 10H (10pts < 11pts).
     expect(decidePlay(view, 'p1')).toBe('10H')
+  })
+})
+
+describe('pickBySchmearPriority', () => {
+  it('trump kind: returns A♦ when winning set covers all priority ranks', () => {
+    const candidates = [c('A','D'), c('10','D'), c('K','D'), c('9','D'), c('J','H'), c('Q','D')]
+    const hand = [...candidates]
+    expect(pickBySchmearPriority(candidates, 'trump', hand).id).toBe('AD')
+  })
+
+  it('trump kind: returns J♥ over Q (J before Q in priority)', () => {
+    const candidates = [c('Q','C'), c('Q','D'), c('J','H')]
+    const hand = [...candidates]
+    expect(pickBySchmearPriority(candidates, 'trump', hand).id).toBe('JH')
+  })
+
+  it('trump kind: among Qs, returns weakest by trump rank (Q♦)', () => {
+    const candidates = [c('Q','C'), c('Q','D'), c('Q','S')]
+    const hand = [...candidates]
+    expect(pickBySchmearPriority(candidates, 'trump', hand).id).toBe('QD')
+  })
+
+  it('trump kind: among Js, returns weakest by trump rank (J♦)', () => {
+    const candidates = [c('J','C'), c('J','S'), c('J','D')]
+    const hand = [...candidates]
+    expect(pickBySchmearPriority(candidates, 'trump', hand).id).toBe('JD')
+  })
+
+  it('fail kind: returns A♠ when winning set is single-suit', () => {
+    const candidates = [c('A','S'), c('K','S'), c('8','S')]
+    const hand = [...candidates]
+    expect(pickBySchmearPriority(candidates, 'fail', hand).id).toBe('AS')
+  })
+
+  it('fail kind: prefers card from shortest non-trump suit in hand', () => {
+    const candidates = [c('A','S'), c('A','C')]
+    // Hand has 3 spades and 1 club among non-trump → clubs is shorter
+    const hand = [c('A','S'), c('K','S'), c('9','S'), c('A','C'), c('Q','D')]
+    expect(pickBySchmearPriority(candidates, 'fail', hand).id).toBe('AC')
+  })
+
+  it('fail kind: alphabetical suit tiebreak when suit lengths tied', () => {
+    const candidates = [c('A','S'), c('A','C')]
+    // 2 spades, 2 clubs in non-trump hand → tied; C < S alphabetically → AC
+    const hand = [c('A','S'), c('8','S'), c('A','C'), c('7','C')]
+    expect(pickBySchmearPriority(candidates, 'fail', hand).id).toBe('AC')
+  })
+
+  it('fail kind: moves toward voiding — picks card from the rarer non-trump suit', () => {
+    const candidates = [c('9','S'), c('9','C')]
+    // Hand has 1 spade and 3 clubs in non-trump → spades is shorter
+    const hand = [c('9','S'), c('9','C'), c('K','C'), c('7','C'), c('Q','D')]
+    expect(pickBySchmearPriority(candidates, 'fail', hand).id).toBe('9S')
+  })
+
+  it('returns null when candidates is empty', () => {
+    expect(pickBySchmearPriority([], 'trump', [])).toBe(null)
+    expect(pickBySchmearPriority([], 'fail', [])).toBe(null)
+  })
+
+  it('returns null when no candidate matches any priority rank', () => {
+    // Should not happen in practice but defensive
+    const candidates = []
+    expect(pickBySchmearPriority(candidates, 'fail', [])).toBe(null)
   })
 })
