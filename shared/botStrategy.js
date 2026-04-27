@@ -6,7 +6,7 @@
 import {
   isTrump, cardPoints, effectiveSuit, trumpRank, suitRank, schwanzerCardPoints,
 } from './gameEngine.js'
-import { currentWinner, beats, handScore, bestVoidBury, teammateWinning, trumpRemainingElsewhere, isGuaranteedWinner, cheapestGuaranteedWin } from './botInference.js'
+import { currentWinner, beats, handScore, bestVoidBury, teammateWinning, trumpRemainingElsewhere, isGuaranteedWinner, cheapestGuaranteedWin, pickBySchmearPriority } from './botInference.js'
 
 // ─── Legal card helper ────────────────────────────────────────────────────────
 // Mirrors getLegalCardIds from the frontend; computes which cards can be played.
@@ -332,8 +332,10 @@ export function decidePlay(view, userId) {
     if (teammateWinning(view, userId)) {
       const schmear = () => {
         const nonTrump = realCards.filter(c => !isTrump(c))
-        if (nonTrump.length > 0) return highestValueCard(nonTrump).id
-        return lowestCard(realCards).id  // only trump available — don't burn trump to schmear
+        // Pass the bot's full hand (not realCards) so the suit-count tiebreak counts
+        // suits across the entire remaining hand, not just legal plays.
+        const pick = pickBySchmearPriority(nonTrump, 'fail', view.hands[userId])
+        return (pick ?? lowestCard(realCards)).id  // helper returns null when no non-trump available — don't burn trump
       }
 
       const winnerPlay = currentWinner(currentTrick)
@@ -449,8 +451,8 @@ export function decidePlay(view, userId) {
     if (teammateWinning(view, userId)) {
       const schmearOpp = () => {
         const nonTrump = realCards.filter(c => !isTrump(c))
-        if (nonTrump.length > 0) return highestValueCard(nonTrump).id
-        return lowestCard(realCards).id
+        const pick = pickBySchmearPriority(nonTrump, 'fail', view.hands[userId])
+        return (pick ?? lowestCard(realCards)).id
       }
 
       const winnerPlay = currentWinner(currentTrick)

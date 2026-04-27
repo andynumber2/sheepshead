@@ -1890,6 +1890,22 @@ describe('decidePlay schmearing', () => {
     // Should NOT schmear — play lowest (9S: 0 pts, first 0-pt non-trump encountered)
     expect(decidePlay(view, 'p3')).toBe('9S')
   })
+
+  it('schmears card from shortest non-trump suit on within-rank tie', () => {
+    // Bot p3 (defender). Picker=p1, partner=p2 (revealed/known). Confirmed defender
+    // teammate p4 is winning with Q♣. teammateWinning=true → schmearOpp fires.
+    // Bot hand has A♠ and A♣ — both highest priority. Hand has 3 spades and 1 club
+    // among non-trump → clubs is the shortest non-trump suit → schmear A♣, not A♠.
+    const view = makeFollowView({
+      userId: 'p3',
+      picker: 'p1',
+      partner: 'p2',
+      trickWinner: 'p4',
+      trickCard: c('Q','C'),
+      handCards: [c('A','S'), c('K','S'), c('9','S'), c('A','C')],
+    })
+    expect(decidePlay(view, 'p3')).toBe('AC')
+  })
 })
 
 describe('decidePlay trump counting', () => {
