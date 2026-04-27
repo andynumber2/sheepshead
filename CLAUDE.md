@@ -123,6 +123,8 @@ When reading instructions or discussing this project, check for terminology inco
 ### Roles
 - **Picker** — The player who picked up the blind.
 - **Partner** — The player who holds the card called by the picker. Depending on the call mode, this may be the Ace, Ten, or King of the called suit.
+- **Picker Team** — The Picker plus the Partner. If the Picker goes alone, the Picker Team is just the Picker.
+- **Opponent Team** — All players who are not on the Picker Team.
 
 ### Points & Scores
 - **Score** — A signed integer delta awarded to each player at the end of a hand (e.g. +2, -1). Accumulates into game, day, and lifetime totals.
