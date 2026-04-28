@@ -1774,9 +1774,8 @@ describe('decidePick', () => {
   })
 
   it('passes a low-score hand at seat 0 (score below threshold, no veto)', () => {
-    // Same marginal hand used in tests 4 and 5: QH=3, JH=2, 9D=1, 7C, 8C, 9S
-    // → schwanzer 6 → 24; trump 3 (QH, JH, 9D); no QC, no fail A/10 → score 24.
-    // Threshold at pickIndex=0 = 30 → 24 < 30 → pass. Trump count = 3 so veto does NOT fire.
+    // QH=3, JH=2, 9D=1, 7C, 8C, 9S → schwanzer 6 → 24; trump 3 (QH, JH, 9D); no QC, no fail A/10 → score 24.
+    // Threshold at pickIndex=0 = BASE=35 → 24 < 35 → pass. Trump count = 3 so veto does NOT fire.
     const hand = [c('Q','H'), c('J','H'), c('9','D'), c('7','C'), c('8','C'), c('9','S')]
     expect(decidePick({ hands: { p1: hand }, pickIndex: 0 }, 'p1')).toBe(false)
   })
@@ -1789,17 +1788,18 @@ describe('decidePick', () => {
   })
 
   it('position-aware: a marginal hand passes early-seat but picks late-seat', () => {
-    // Hand: QH=3, JH=2, 9D=1, 7C, 8C, 9S → schwanzer 6 → 24; trump 3 (QH, JH, 9D); no QC, no fail A/10 → score 24.
-    // At pickIndex=0 (threshold 30): 24 < 30 → pass.
-    // At pickIndex=3 (threshold 24): 24 ≥ 24 → pick.
-    const hand = [c('Q','H'), c('J','H'), c('9','D'), c('7','C'), c('8','C'), c('9','S')]
+    // Hand: QH=3, JH=2, JD=2, 9D=1, 7C, 8C → schwanzer 8 → score 32; trump 4 (QH, JH, JD, 9D); no QC, no fail A/10.
+    // BASE=35, DISCOUNT=2.
+    // At pickIndex=0 (threshold 35): 32 < 35 → pass.
+    // At pickIndex=3 (threshold 35 - 3×2 = 29): 32 ≥ 29 → pick.
+    const hand = [c('Q','H'), c('J','H'), c('J','D'), c('9','D'), c('7','C'), c('8','C')]
     expect(decidePick({ hands: { p1: hand }, pickIndex: 0 }, 'p1')).toBe(false)
     expect(decidePick({ hands: { p1: hand }, pickIndex: 3 }, 'p1')).toBe(true)
   })
 
   it('defaults pickIndex to 0 when undefined', () => {
     // Same marginal hand as above; without pickIndex, behaves as seat 0 → pass.
-    const hand = [c('Q','H'), c('J','H'), c('9','D'), c('7','C'), c('8','C'), c('9','S')]
+    const hand = [c('Q','H'), c('J','H'), c('J','D'), c('9','D'), c('7','C'), c('8','C')]
     expect(decidePick({ hands: { p1: hand } }, 'p1')).toBe(false)
   })
 })
