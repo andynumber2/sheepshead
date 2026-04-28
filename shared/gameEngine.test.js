@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { decidePick, decideBury, decideCall, decidePlay } from './botStrategy.js'
+import { pickThreshold, PICK_THRESHOLD_BASE, PICK_THRESHOLD_DISCOUNT, decidePick, decideBury, decideCall, decidePlay } from './botStrategy.js'
 import {
   isTrump, trumpRank, suitRank, effectiveSuit, cardPoints,
   schwanzerCardPoints, resolveSchwanzer,
@@ -1751,6 +1751,17 @@ describe('handScore', () => {
     // Only QC visible: schwanzer 3 → 12; +5 QC = 17
     const hand = [c('Q','C'), { id: 'HIDDEN', hidden: true }, { id: 'HIDDEN', hidden: true }]
     expect(handScore(hand)).toBe(17)
+  })
+})
+
+describe('pickThreshold', () => {
+  it('returns BASE at passesSoFar = 0', () => {
+    expect(pickThreshold(0)).toBe(PICK_THRESHOLD_BASE)
+  })
+
+  it('subtracts DISCOUNT per pass', () => {
+    expect(pickThreshold(1)).toBe(PICK_THRESHOLD_BASE - PICK_THRESHOLD_DISCOUNT)
+    expect(pickThreshold(4)).toBe(PICK_THRESHOLD_BASE - 4 * PICK_THRESHOLD_DISCOUNT)
   })
 })
 

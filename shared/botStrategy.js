@@ -132,9 +132,29 @@ function cheapestWinningTrump(cards) {
 }
 
 // ─── decidePick ───────────────────────────────────────────────────────────────
-export function decidePick(view, userId) {
+// Placeholder calibration values; tuned in scripts/simulate-pick.js (issue #126).
+export const PICK_THRESHOLD_BASE = 30
+export const PICK_THRESHOLD_DISCOUNT = 2
+
+export function pickThreshold(passesSoFar) {
+  return PICK_THRESHOLD_BASE - PICK_THRESHOLD_DISCOUNT * passesSoFar
+}
+
+// Parameterized core — used by the simulator to sweep base/discount values.
+export function decidePickWith(view, userId, base, discount) {
   const hand = view.hands[userId]
-  return handScore(hand) >= 24
+  const visible = hand.filter(c => !c.hidden)
+
+  // Hard veto: too few trump → never pick.
+  const trumpCount = visible.filter(c => isTrump(c)).length
+  if (trumpCount <= 2) return false
+
+  const passesSoFar = view.pickIndex ?? 0
+  return handScore(hand) >= base - discount * passesSoFar
+}
+
+export function decidePick(view, userId) {
+  return decidePickWith(view, userId, PICK_THRESHOLD_BASE, PICK_THRESHOLD_DISCOUNT)
 }
 
 // ─── decideBlitz ──────────────────────────────────────────────────────────────
