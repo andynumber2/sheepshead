@@ -14,6 +14,7 @@
     "db:migrate:local": "wrangler d1 migrations apply sheepshead-db --local",
     "db:migrate": "wrangler d1 migrations apply sheepshead-db --remote",
     "test": "vitest run && npm test -w frontend",
+    "sim:pick": "node scripts/simulate-pick.js",
     "postinstall": "git config core.hooksPath .githooks"
   },
   "devDependencies": {
