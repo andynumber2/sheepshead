@@ -132,7 +132,7 @@ function cheapestWinningTrump(cards) {
 }
 
 // ─── decidePick ───────────────────────────────────────────────────────────────
-// Placeholder calibration values; tuned in scripts/simulate-pick.js (issue #126).
+// Calibrated values from scripts/simulate-pick.mjs targeting ~15% no-pick rate (issue #126).
 export const PICK_THRESHOLD_BASE = 35
 export const PICK_THRESHOLD_DISCOUNT = 2
 

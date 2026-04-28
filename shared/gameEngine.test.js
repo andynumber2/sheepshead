@@ -1768,7 +1768,7 @@ describe('pickThreshold', () => {
 describe('decidePick', () => {
   it('picks a strong hand at seat 0', () => {
     // QC=3, QS=3, JC=2, JS=2, AD=1, 10D=1 → schwanzer 12 → 48; +5 QC; trump 6 → score 53
-    // Threshold at pickIndex=0 = BASE (30). Picks.
+    // Threshold at pickIndex=0 = BASE (35). Picks.
     const hand = [c('Q','C'), c('Q','S'), c('J','C'), c('J','S'), c('A','D'), c('10','D')]
     expect(decidePick({ hands: { p1: hand }, pickIndex: 0 }, 'p1')).toBe(true)
   })
