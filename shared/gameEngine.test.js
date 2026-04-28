@@ -1773,14 +1773,16 @@ describe('decidePick', () => {
     expect(decidePick({ hands: { p1: hand }, pickIndex: 0 }, 'p1')).toBe(true)
   })
 
-  it('passes a weak hand at seat 0', () => {
-    // QH=3, JH=2, 7C=0, 8C=0, 9S=0, 8S=0 → schwanzer 5 → 20; trump 2 → HARD VETO → pass
-    const hand = [c('Q','H'), c('J','H'), c('7','C'), c('8','C'), c('9','S'), c('8','S')]
+  it('passes a low-score hand at seat 0 (score below threshold, no veto)', () => {
+    // Same marginal hand used in tests 4 and 5: QH=3, JH=2, 9D=1, 7C, 8C, 9S
+    // → schwanzer 6 → 24; trump 3 (QH, JH, 9D); no QC, no fail A/10 → score 24.
+    // Threshold at pickIndex=0 = 30 → 24 < 30 → pass. Trump count = 3 so veto does NOT fire.
+    const hand = [c('Q','H'), c('J','H'), c('9','D'), c('7','C'), c('8','C'), c('9','S')]
     expect(decidePick({ hands: { p1: hand }, pickIndex: 0 }, 'p1')).toBe(false)
   })
 
   it('hard veto: never picks with trumpCount ≤ 2 even if score is high', () => {
-    // QH=3, QD=3, AC=0, AH=0, AS=0, 10C=0 → schwanzer 7 → 28; +3*3 aces = 37
+    // QH=3, QD=3, AC=0, AH=0, AS=0, 10C(fail ten) → schwanzer 6 → 24; +3*3 aces +2*1 ten = 35
     // But trump count = 2 (QH, QD) → hard veto → false.
     const hand = [c('Q','H'), c('Q','D'), c('A','C'), c('A','H'), c('A','S'), c('10','C')]
     expect(decidePick({ hands: { p1: hand }, pickIndex: 0 }, 'p1')).toBe(false)
