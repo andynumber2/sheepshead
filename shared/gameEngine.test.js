@@ -11,7 +11,7 @@ import {
 } from './gameEngine.js'
 import {
   countTrumpPlayed, trumpRemainingElsewhere,
-  buriablePoints, handScore,
+  handScore,
   beats, currentWinner, teammateWinning,
   bestVoidBury,
   isGuaranteedWinner,
@@ -1530,51 +1530,6 @@ describe('trumpRemainingElsewhere', () => {
   })
 })
 
-describe('buriablePoints', () => {
-  it('returns sum of top 2 non-trump cards by point value', () => {
-    // AC=11, 10H=10, KS=4 → top 2 are AC + 10H = 21
-    const hand = [c('Q','C'), c('J','S'), c('A','C'), c('10','H'), c('K','S'), c('9','C')]
-    expect(buriablePoints(hand)).toBe(21)
-  })
-
-  it('returns 0 when fewer than 2 non-trump cards exist', () => {
-    const hand = [c('Q','C'), c('Q','S'), c('J','C'), c('J','S'), c('A','D'), c('10','D')]
-    expect(buriablePoints(hand)).toBe(0)
-  })
-
-  it('returns 0 when exactly 1 non-trump card exists', () => {
-    // Only KS is non-trump; fewer than 2 → 0
-    const hand = [c('Q','C'), c('Q','S'), c('J','C'), c('J','S'), c('A','D'), c('K','S')]
-    expect(buriablePoints(hand)).toBe(0)
-  })
-
-  it('returns sum when exactly 2 non-trump cards exist', () => {
-    // KS=4, 9C=0 → 4
-    const hand = [c('Q','C'), c('Q','S'), c('J','C'), c('J','S'), c('K','S'), c('9','C')]
-    expect(buriablePoints(hand)).toBe(4)
-  })
-})
-
-describe('handScore', () => {
-  it('returns schwanzerPts * 4 + buriablePoints (exact formula check)', () => {
-    // QC=3, QS=3 = 6 schwanzer pts; 7C=0, 8C=0 non-trump → buriable=0; score = 6*4+0 = 24
-    const hand = [c('Q','C'), c('Q','S'), c('7','C'), c('8','C'), c('9','H'), c('8','H')]
-    expect(handScore(hand)).toBe(24)
-  })
-
-  it('scores < 24 for 5 schwanzer pts, 0 burial', () => {
-    // QC=3, JC=2 = 5 schwanzer pts; 7C=0, 8C=0 non-trump → buriable=0; score = 5*4+0 = 20
-    const hand = [c('Q','C'), c('J','C'), c('7','C'), c('8','C'), c('9','C'), c('9','H')]
-    expect(handScore(hand)).toBeLessThan(24)
-    expect(handScore(hand)).toBe(20)
-  })
-
-  it('scores >= 24 for 5 schwanzer pts + two aces to bury', () => {
-    // QC=3, JC=2 = 5 schwanzer pts; AC=11, AH=11 → buriable=22; score = 5*4+22 = 42
-    const hand = [c('Q','C'), c('J','C'), c('7','C'), c('A','C'), c('A','H'), c('8','S')]
-    expect(handScore(hand)).toBe(42)
-  })
-})
 
 describe('beats', () => {
   it('trump beats non-trump', () => {
@@ -1748,6 +1703,54 @@ describe('bestVoidBury', () => {
       c('K','S'), c('Q','C'),
     ]
     expect(bestVoidBury(hand)).toBeNull()
+  })
+})
+
+describe('handScore', () => {
+  it('returns schwanzerPts × 4 for an all-trump-no-QC hand', () => {
+    // QH=3, QD=3, JS=2, JH=2, JD=2, 9D=1 → schwanzer 13 → 13*4 = 52
+    // No QC, no fail aces, no fail tens
+    const hand = [c('Q','H'), c('Q','D'), c('J','S'), c('J','H'), c('J','D'), c('9','D')]
+    expect(handScore(hand)).toBe(52)
+  })
+
+  it('adds 5 when QC is held', () => {
+    // QC=3, JS=2, JH=2, 7C=0, 8C=0, 9C=0 → schwanzer 7 → 7*4 = 28; +5 QC = 33
+    const hand = [c('Q','C'), c('J','S'), c('J','H'), c('7','C'), c('8','C'), c('9','C')]
+    expect(handScore(hand)).toBe(33)
+  })
+
+  it('adds 3 per non-trump ace', () => {
+    // QH=3, JH=2, AC=0, AH=0, 7S=0, 8S=0 → schwanzer 5 → 20; +3*2 fail aces = 26
+    // No QC, no tens
+    const hand = [c('Q','H'), c('J','H'), c('A','C'), c('A','H'), c('7','S'), c('8','S')]
+    expect(handScore(hand)).toBe(26)
+  })
+
+  it('adds 2 per non-trump ten', () => {
+    // QH=3, JH=2, 10C=0, 10H=0, 7S=0, 8S=0 → schwanzer 5 → 20; +2*2 fail tens = 24
+    const hand = [c('Q','H'), c('J','H'), c('10','C'), c('10','H'), c('7','S'), c('8','S')]
+    expect(handScore(hand)).toBe(24)
+  })
+
+  it('does not count A♦ or 10♦ as a fail ace/ten (they are trump)', () => {
+    // AD and 10D are diamonds → trump. They contribute schwanzerPts=1 each (diamond pips)
+    // but are NOT fail aces/tens.
+    // QH=3, JH=2, AD=1, 10D=1, 7S=0, 8S=0 → schwanzer 7 → 28; no QC, no fail A/10 → 28
+    const hand = [c('Q','H'), c('J','H'), c('A','D'), c('10','D'), c('7','S'), c('8','S')]
+    expect(handScore(hand)).toBe(28)
+  })
+
+  it('combines all terms', () => {
+    // QC=3, QS=3, JC=2, AC=0, AH=0, 10S=0 → schwanzer 8 → 32; +5 QC; +3*2 aces; +2*1 ten = 45
+    const hand = [c('Q','C'), c('Q','S'), c('J','C'), c('A','C'), c('A','H'), c('10','S')]
+    expect(handScore(hand)).toBe(45)
+  })
+
+  it('ignores hidden cards', () => {
+    // Only QC visible: schwanzer 3 → 12; +5 QC = 17
+    const hand = [c('Q','C'), { id: 'HIDDEN', hidden: true }, { id: 'HIDDEN', hidden: true }]
+    expect(handScore(hand)).toBe(17)
   })
 })
 
