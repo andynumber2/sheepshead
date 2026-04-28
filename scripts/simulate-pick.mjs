@@ -29,6 +29,10 @@ function parseArgs(argv) {
     console.error('--base, --discount, and --hands must all be numbers')
     process.exit(1)
   }
+  if (!Number.isInteger(args.hands) || args.hands < 1) {
+    console.error('--hands must be a positive integer')
+    process.exit(1)
+  }
   return args
 }
 
@@ -88,7 +92,7 @@ console.log(`base=${args.base} discount=${args.discount} hands=${args.hands}` +
 console.log(`Total hands:        ${r.total}`)
 console.log(`Picked total:       ${r.pickedTotal} (${pct(r.pickedTotal / r.total)})`)
 for (let i = 0; i < 5; i++) {
-  console.log(`  Seat ${i + 1} picks: ${r.picksBySeat[i]} (${pct(r.picksBySeat[i] / r.total)})`)
+  console.log(`  Pick position ${i + 1}: ${r.picksBySeat[i]} (${pct(r.picksBySeat[i] / r.total)})`)
 }
 console.log(`No-pick (Leaster):  ${r.noPick} (${pct(r.noPickRate)})`)
 console.log(`Target ~15%; current delta: ${((r.noPickRate - 0.15) * 100).toFixed(2)}%`)
