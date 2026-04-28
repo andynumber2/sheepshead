@@ -1766,22 +1766,39 @@ describe('pickThreshold', () => {
 })
 
 describe('decidePick', () => {
-  it('picks when handScore >= 24 (6 schwanzer pts, 0 burial = 24)', () => {
-    // QC=3, QS=3 = 6 schwanzer pts; 7C+8C non-trump = 0 burial; score = 24
-    const hand = [c('Q','C'), c('Q','S'), c('J','C'), c('J','S'), c('7','C'), c('8','C')]
-    expect(decidePick({ hands: { p1: hand } }, 'p1')).toBe(true)
+  it('picks a strong hand at seat 0', () => {
+    // QC=3, QS=3, JC=2, JS=2, AD=1, 10D=1 → schwanzer 12 → 48; +5 QC; trump 6 → score 53
+    // Threshold at pickIndex=0 = BASE (30). Picks.
+    const hand = [c('Q','C'), c('Q','S'), c('J','C'), c('J','S'), c('A','D'), c('10','D')]
+    expect(decidePick({ hands: { p1: hand }, pickIndex: 0 }, 'p1')).toBe(true)
   })
 
-  it('passes when handScore < 24 (5 schwanzer pts, 0 burial = 20)', () => {
-    // QC=3, JC=2 = 5 schwanzer pts; 7C+8C non-trump = 0 burial; score = 20
-    const hand = [c('Q','C'), c('J','C'), c('7','C'), c('8','C'), c('9','C'), c('9','H')]
+  it('passes a weak hand at seat 0', () => {
+    // QH=3, JH=2, 7C=0, 8C=0, 9S=0, 8S=0 → schwanzer 5 → 20; trump 2 → HARD VETO → pass
+    const hand = [c('Q','H'), c('J','H'), c('7','C'), c('8','C'), c('9','S'), c('8','S')]
+    expect(decidePick({ hands: { p1: hand }, pickIndex: 0 }, 'p1')).toBe(false)
+  })
+
+  it('hard veto: never picks with trumpCount ≤ 2 even if score is high', () => {
+    // QH=3, QD=3, AC=0, AH=0, AS=0, 10C=0 → schwanzer 7 → 28; +3*3 aces = 37
+    // But trump count = 2 (QH, QD) → hard veto → false.
+    const hand = [c('Q','H'), c('Q','D'), c('A','C'), c('A','H'), c('A','S'), c('10','C')]
+    expect(decidePick({ hands: { p1: hand }, pickIndex: 0 }, 'p1')).toBe(false)
+  })
+
+  it('position-aware: a marginal hand passes early-seat but picks late-seat', () => {
+    // Hand: QH=3, JH=2, 9D=1, 7C, 8C, 9S → schwanzer 6 → 24; trump 3 (QH, JH, 9D); no QC, no fail A/10 → score 24.
+    // At pickIndex=0 (threshold 30): 24 < 30 → pass.
+    // At pickIndex=3 (threshold 24): 24 ≥ 24 → pick.
+    const hand = [c('Q','H'), c('J','H'), c('9','D'), c('7','C'), c('8','C'), c('9','S')]
+    expect(decidePick({ hands: { p1: hand }, pickIndex: 0 }, 'p1')).toBe(false)
+    expect(decidePick({ hands: { p1: hand }, pickIndex: 3 }, 'p1')).toBe(true)
+  })
+
+  it('defaults pickIndex to 0 when undefined', () => {
+    // Same marginal hand as above; without pickIndex, behaves as seat 0 → pass.
+    const hand = [c('Q','H'), c('J','H'), c('9','D'), c('7','C'), c('8','C'), c('9','S')]
     expect(decidePick({ hands: { p1: hand } }, 'p1')).toBe(false)
-  })
-
-  it('picks when 5 schwanzer pts + two aces (score = 42)', () => {
-    // QC=3, JC=2 = 5 schwanzer pts; AC+AH non-trump = 22 burial; score = 42
-    const hand = [c('Q','C'), c('J','C'), c('7','C'), c('A','C'), c('A','H'), c('8','S')]
-    expect(decidePick({ hands: { p1: hand } }, 'p1')).toBe(true)
   })
 })
 
