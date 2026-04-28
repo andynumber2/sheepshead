@@ -13,12 +13,43 @@ Bots operate only on their own player view — they can see their own hand, all 
 
 ## Pick Decision (`decidePick`)
 
-The bot picks if its **hand score** is at least **24**.
+The bot picks if **all** of the following hold:
 
-Hand score = `(schwanzer points × 4) + buriable points`
+1. **Trump-count floor:** the hand contains at least 3 trump cards.
+2. **Hand score meets a position-aware threshold:** `handScore(hand) >= base − discount × passesSoFar`.
 
-- **Schwanzer points**: each card in hand contributes schwanzer card points (queen = 3, jack = 2, trump = 1, ace = 1, ten = 1, etc.)
-- **Buriable points**: sum of card points for the top 2 non-trump cards in the hand (0 if fewer than 2 non-trump cards)
+Both bot decisions and the human pick-suggestion go through this single function — the suggestion shown to a human is the same play a competent bot would make.
+
+### Hand score formula
+
+```
+handScore = (schwanzer points) × 4
+          + 3 × (count of non-trump aces)
+          + 2 × (count of non-trump tens)
+          + 5  if the Queen of Clubs is held
+```
+
+- **Schwanzer points** (defined in `gameEngine.js`): Queen=3, Jack=2, non-Q-non-J diamond=1, else=0. This term is the strongest signal of trump quality.
+- **Queen of Clubs bonus:** the QC is the highest card in the deck and never loses a trump fight; it is materially stronger than other queens, so it gets a flat +5.
+- **Non-trump aces and tens** capture point density in fail. Counted as `+3` and `+2` respectively. Note that the Ace and Ten of Diamonds are *trump*, not fail — they contribute via the schwanzer-points term, not here.
+
+### Position-aware threshold
+
+The threshold drops by `discount` (currently `2`) for each seat that has already passed in this hand. With the base set to `35`, the per-seat thresholds are:
+
+| Seat in pick order | Threshold |
+|---|---|
+| 1 (first to act) | 35 |
+| 2 | 33 |
+| 3 | 31 |
+| 4 | 29 |
+| 5 (last) | 27 |
+
+This reflects real sheepshead strategy: each preceding pass is evidence that the remaining hands are weaker, so a later seat can pick on a marginally weaker hand. Calibrated against an offline Monte Carlo simulator (`scripts/simulate-pick.mjs`) targeting a ~15% Leaster/Schwanzer rate.
+
+### Hard trump-count veto
+
+If the hand contains 2 or fewer trump, the bot never picks regardless of `handScore`. Real players auto-pass these hands. This veto prevents pathological "all aces, no trump" hands from clearing the threshold.
 
 ---
 
@@ -135,8 +166,7 @@ These pure functions support the strategy above but make no decisions themselves
 |---|---|
 | `countTrumpPlayed` | Count visible trump in completed tricks and the current trick |
 | `trumpRemainingElsewhere` | Estimate trump still held by other players: `14 − own trump − seen trump − buried trump` |
-| `buriablePoints` | Card points of the best 2 non-trump cards for burial |
-| `handScore` | Combined pick-quality score: `schwanzerPts × 4 + buriablePoints` |
+| `handScore` | Combined pick-quality score: `schwanzerPts × 4 + 3×(non-trump aces) + 2×(non-trump tens) + 5 if QC held` |
 | `beats` | Returns true if a challenger card beats the current winner given led suit |
 | `currentWinner` | Returns the play object currently winning a trick |
 | `bestVoidBury` | Finds the best 2-card bury that voids a non-trump suit with ≥11 combined card points |

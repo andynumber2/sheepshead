@@ -33,20 +33,17 @@ export function trumpRemainingElsewhere(view, userId) {
 
 // ─── Hand evaluation ──────────────────────────────────────────────────────────
 
-// Sum of card points for the top 2 non-trump cards in hand.
-// Returns 0 if fewer than 2 non-trump cards exist.
-export function buriablePoints(hand) {
-  const nonTrump = hand.filter(c => !c.hidden && !isTrump(c))
-  if (nonTrump.length < 2) return 0
-  const sorted = [...nonTrump].sort((a, b) => cardPoints(b) - cardPoints(a))
-  return sorted.slice(0, 2).reduce((sum, c) => sum + cardPoints(c), 0)
-}
-
 // Combined hand quality score for the pick decision.
-// schwanzerPts * 4 + buriablePoints. Threshold: >= 24 → pick.
+// schwanzerPts × 4 + 3 × failAces + 2 × failTens + (5 if QC).
+// Hidden cards are ignored — handScore is called from decidePick on the bot's own hand,
+// but the hidden filter mirrors the prior implementation for safety.
 export function handScore(hand) {
-  const schwanzerPts = hand.filter(c => !c.hidden).reduce((sum, c) => sum + schwanzerCardPoints(c), 0)
-  return schwanzerPts * 4 + buriablePoints(hand)
+  const visible = hand.filter(c => !c.hidden)
+  const schwanzerPts = visible.reduce((sum, c) => sum + schwanzerCardPoints(c), 0)
+  const failAces = visible.filter(c => !isTrump(c) && c.rank === 'A').length
+  const failTens = visible.filter(c => !isTrump(c) && c.rank === '10').length
+  const hasQC = visible.some(c => c.id === 'QC')
+  return schwanzerPts * 4 + 3 * failAces + 2 * failTens + (hasQC ? 5 : 0)
 }
 
 // ─── Trick evaluation ─────────────────────────────────────────────────────────
