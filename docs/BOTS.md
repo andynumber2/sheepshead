@@ -147,7 +147,9 @@ A recurring concept below is a **guaranteed winner**: a trump card the bot holds
    - **Bot must follow a non-called fail suit** (only fail winners available):
      - Threats remaining > 0 → **skip** (an unrevealed opponent could be void and trump over). Fall through to default.
      - Threats remaining = 0 → take with the schmear-self pick using the **fail priority** (see below).
-3. **Trump in on called suit**: If the called suit was led and the picker team is currently winning the trick, play the lowest available trump to contest.
+3. **Trump in to contest a picker-team-winning fail-led trick**: If a fail card was led, the picker team is currently winning, and the bot is void in the led suit, trump in. The picker-team-winning gate naturally excludes the case where another opponent has already trumped in (then a teammate would be winning and the schmear branch above would have fired). Card choice splits on the partner-reveal state:
+   - **Partner-revealing called-suit lead** (called suit led and partner **not yet revealed**): use the **trump schmear priority** (A, 10, K before pip cards; Js/Qs reserved). The partner is forced to play the called card on this trick, so cashing high trump captures both those points and the partner's high card.
+   - **Otherwise**: play the **highest trump** (strongest by trump rank — Q♣ at the top). The aim is to force the picker to overtrump with their best trump to retake the lead, or simply steal the trick if the picker has already played.
 4. **Otherwise**: play the lowest card.
 
 **Schmear priority** (used by both the schmear branch above and the force-take branch's 0-threats-remaining cases): walk a rank-priority list and pick the first card found.

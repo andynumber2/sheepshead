@@ -551,14 +551,30 @@ export function decidePlay(view, userId) {
         }
       }
     }
-    // Trump in on called suit if picker team is currently winning the trick
-    const { calledSuit } = view
-    if (ledSuit === calledSuit) {
+    // Trump in to contest a picker-team-winning fail-led trick. Goal: force the
+    // picker up — make them play their strongest trump to retake the lead — or
+    // simply steal the trick if the picker has already played. The picker-team-
+    // winning gate naturally excludes the case where another opponent has
+    // already trumped in (then the bot's teammate is winning, handled above).
+    //
+    // Specialization: when the called suit was led and the partner has not yet
+    // been revealed, the partner is forced to play the called card on this
+    // trick, so cash A/10/K of trump via the schmear priority to capture those
+    // points along with the partner's high card.
+    if (!isTrump(currentTrick[0].card)) {
       const winner = currentWinner(currentTrick)
-      const opponentWinning = winner && winner.userId !== picker && winner.userId !== partner
-      if (!opponentWinning) {
+      const pickerTeamWinning = winner && (winner.userId === picker || winner.userId === partner)
+      if (pickerTeamWinning) {
         const trumpCards = realCards.filter(c => isTrump(c))
-        if (trumpCards.length > 0) return lowestCard(trumpCards).id
+        if (trumpCards.length > 0) {
+          const { calledSuit, partnerRevealed } = view
+          if (!partnerRevealed && ledSuit === calledSuit) {
+            const fullHand = view.hands[userId] ?? []
+            const pick = pickBySchmearPriority(trumpCards, 'trump', fullHand)
+            return (pick ?? lowestCard(trumpCards)).id
+          }
+          return highestTrump(trumpCards).id
+        }
       }
     }
     return lowestCard(realCards).id

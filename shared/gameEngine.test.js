@@ -2137,9 +2137,10 @@ describe('decidePlay (botStrategy)', () => {
     }
   }
 
-  it('opponent plays trump when called suit is led and picker team is winning', () => {
-    // p1 (picker) leads 9♥ (called suit), p2 (partner) plays K♥ and is winning
-    // p3 has trump (J♦) and two fails — should trump in
+  it('opponent plays trump (highest) when called suit is led and picker team is winning', () => {
+    // p1 (picker) leads 9♥ (called suit), p2 (partner, already revealed) plays K♥
+    // and is winning. With partner already revealed the schmear specialization
+    // does not apply, so p3 plays highest trump to force-up: J♦.
     const view = makeView({
       userId: 'p3',
       hand: [c('J','D'), c('8','S'), c('7','C')],
@@ -3131,14 +3132,14 @@ describe('decidePlay — defender force-take to enable called-suit lead-back', (
     expect(decidePlay(view, 'p3')).toBe('8C')
   })
 
-  it('strategy skipped when partner is already revealed', () => {
-    // partnerRevealed=true, partner=p4. Picker p1 leads 8♠ (so picker is winning →
-    // teammateWinning is false → schmearOpp does NOT fire). New branch is skipped
-    // because partnerRevealed=true. Trump-in-on-called-suit skipped (S !== H).
-    // Falls to default lowestCard(realCards).
+  it('lead-back force-take is skipped when partner is already revealed; force-up branch trumps in', () => {
+    // partnerRevealed=true → schmearOpp does not fire (picker p1 winning), and the
+    // lead-back force-take branch is skipped (it gates on !partnerRevealed). Falls
+    // through to the general force-up branch: ledSuit S is fail, picker team is
+    // currently winning, bot is void in spades and holds trump → highest trump.
     //
-    // Bot hand [Q♣, J♦, A♥]. A♥ is called card; ledSuit S ≠ called H, so A♥ excluded
-    // from realCards. realCards = [Q♣, J♦]. Both trump. lowestCard by points: Q♣=3, J♦=2 → J♦.
+    // Bot hand [Q♣, J♦, A♥]. A♥ is called card; ledSuit S ≠ called H, so A♥ is
+    // excluded from realCards. realCards = [Q♣, J♦]. Both trump. highestTrump = Q♣.
     const view = makeForceTakeView({
       userId: 'p3',
       picker: 'p1',
@@ -3148,7 +3149,7 @@ describe('decidePlay — defender force-take to enable called-suit lead-back', (
       handCards: [c('Q','C'), c('J','D'), c('A','H')],
       playedSeq: [{ userId: 'p1', card: c('8','S') }],
     })
-    expect(decidePlay(view, 'p3')).toBe('JD')
+    expect(decidePlay(view, 'p3')).toBe('QC')
   })
 
   it('strategy skipped when bot has no winning cards', () => {
