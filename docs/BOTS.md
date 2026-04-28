@@ -166,7 +166,6 @@ These pure functions support the strategy above but make no decisions themselves
 |---|---|
 | `countTrumpPlayed` | Count visible trump in completed tricks and the current trick |
 | `trumpRemainingElsewhere` | Estimate trump still held by other players: `14 − own trump − seen trump − buried trump` |
-| `buriablePoints` | Card points of the best 2 non-trump cards for burial |
 | `handScore` | Combined pick-quality score: `schwanzerPts × 4 + 3×(non-trump aces) + 2×(non-trump tens) + 5 if QC held` |
 | `beats` | Returns true if a challenger card beats the current winner given led suit |
 | `currentWinner` | Returns the play object currently winning a trick |
