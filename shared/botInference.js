@@ -210,3 +210,57 @@ export function teammateWinning(view, userId) {
     return winnerId !== picker && winnerId !== partner
   }
 }
+
+// ─── Schmear-priority pick ────────────────────────────────────────────────────
+
+// Rank priority for "schmear-self" — when the bot is guaranteed to take the
+// trick and is choosing the least-painful winning card to spend.
+//
+// Order rationale: cash high-point cards (A=11, 10=10, K=4) first, then 0-point
+// pip cards (9, 8, 7), then keep tactical strength in reserve (Js before Qs,
+// since Q is the top trump rank).
+const TRUMP_SCHMEAR_PRIORITY = ['A', '10', 'K', '9', '8', '7', 'J', 'Q']
+const FAIL_SCHMEAR_PRIORITY = ['A', '10', 'K', '9', '8', '7']
+
+// Returns the schmear-priority pick from `candidates`, or null if no candidate
+// matches any priority rank (or `candidates` is empty).
+//
+// `kind` ∈ {'trump', 'fail'} selects the priority list.
+// `hand` is the bot's full remaining hand — used only for the fail tiebreak
+// (prefer card whose suit is shortest in hand to move toward voiding a suit).
+//
+// Within-rank tiebreaks:
+//   'trump' → weakest by trump rank (e.g., among Qs: Q♦ over Q♣)
+//   'fail'  → shortest non-trump suit in `hand`; secondary tiebreak alphabetical by suit
+export function pickBySchmearPriority(candidates, kind, hand) {
+  if (!candidates || candidates.length === 0) return null
+  const ranks = kind === 'trump' ? TRUMP_SCHMEAR_PRIORITY : FAIL_SCHMEAR_PRIORITY
+
+  for (const rank of ranks) {
+    const matches = candidates.filter(card => card.rank === rank)
+    if (matches.length === 0) continue
+    if (matches.length === 1) return matches[0]
+
+    if (kind === 'trump') {
+      // Weakest by trump rank = highest trumpRank index value
+      return matches.reduce((best, card) =>
+        trumpRank(card) > trumpRank(best) ? card : best
+      )
+    }
+
+    // 'fail' tiebreak: shortest non-trump suit in hand, then alphabetical
+    const nonTrumpHand = (hand ?? []).filter(card => !card.hidden && !isTrump(card))
+    const suitCount = {}
+    for (const card of nonTrumpHand) {
+      suitCount[card.suit] = (suitCount[card.suit] ?? 0) + 1
+    }
+    return matches.reduce((best, card) => {
+      const cCount = suitCount[card.suit] ?? 0
+      const bestCount = suitCount[best.suit] ?? 0
+      if (cCount !== bestCount) return cCount < bestCount ? card : best
+      return card.suit < best.suit ? card : best
+    })
+  }
+
+  return null
+}

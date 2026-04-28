@@ -6,7 +6,7 @@
 import {
   isTrump, cardPoints, effectiveSuit, trumpRank, suitRank, schwanzerCardPoints,
 } from './gameEngine.js'
-import { currentWinner, beats, handScore, bestVoidBury, teammateWinning, trumpRemainingElsewhere, isGuaranteedWinner, cheapestGuaranteedWin } from './botInference.js'
+import { currentWinner, beats, handScore, bestVoidBury, teammateWinning, trumpRemainingElsewhere, isGuaranteedWinner, cheapestGuaranteedWin, pickBySchmearPriority } from './botInference.js'
 
 // ─── Legal card helper ────────────────────────────────────────────────────────
 // Mirrors getLegalCardIds from the frontend; computes which cards can be played.
@@ -332,8 +332,10 @@ export function decidePlay(view, userId) {
     if (teammateWinning(view, userId)) {
       const schmear = () => {
         const nonTrump = realCards.filter(c => !isTrump(c))
-        if (nonTrump.length > 0) return highestValueCard(nonTrump).id
-        return lowestCard(realCards).id  // only trump available — don't burn trump to schmear
+        // Pass the bot's full hand (not realCards) so the suit-count tiebreak counts
+        // suits across the entire remaining hand, not just legal plays.
+        const pick = pickBySchmearPriority(nonTrump, 'fail', view.hands[userId])
+        return (pick ?? lowestCard(realCards)).id  // helper returns null when no non-trump available — don't burn trump
       }
 
       const winnerPlay = currentWinner(currentTrick)
@@ -449,8 +451,8 @@ export function decidePlay(view, userId) {
     if (teammateWinning(view, userId)) {
       const schmearOpp = () => {
         const nonTrump = realCards.filter(c => !isTrump(c))
-        if (nonTrump.length > 0) return highestValueCard(nonTrump).id
-        return lowestCard(realCards).id
+        const pick = pickBySchmearPriority(nonTrump, 'fail', view.hands[userId])
+        return (pick ?? lowestCard(realCards)).id
       }
 
       const winnerPlay = currentWinner(currentTrick)
@@ -476,6 +478,58 @@ export function decidePlay(view, userId) {
       const takeover = cheapestGuaranteedWin(winningOpp, view, userId)
       if (takeover) return takeover.id
       return schmearOpp()
+    }
+    // Force-take to enable called-suit lead-back: when the called suit hasn't been led
+    // yet (partner unrevealed) and the bot has a called-suit fail card to lead back,
+    // win this trick aggressively so the bot can lead the called suit on the next
+    // trick and flush the picker's partner.
+    {
+      const { calledSuit, partnerRevealed } = view
+      const ledThisTrickIsCalled = ledSuit === calledSuit
+      // Note: realCards already filters by must-follow rules. If the bot has a called-suit
+      // card but is here following a different suit, the called-suit card is in `view.hands[userId]`
+      // but not in `realCards`. We need to check the bot's full hand for the lead-back card.
+      const fullHand = view.hands[userId] ?? []
+      const hasCalledSuitFailInHand = !!calledSuit && fullHand.some(card =>
+        !card.hidden && !isTrump(card) && effectiveSuit(card) === calledSuit
+      )
+
+      if (!partnerRevealed && !ledThisTrickIsCalled && hasCalledSuitFailInHand) {
+        const winningSet = realCards.filter(card => {
+          for (const play of currentTrick) {
+            if (!beats(card, play.card, ledSuit)) return false
+          }
+          return true
+        })
+
+        if (winningSet.length > 0) {
+          const playedIds = new Set(currentTrick.map(p => p.userId))
+          const allIds = Object.keys(view.hands)
+          const potentialOppsRemaining = allIds.filter(id =>
+            !playedIds.has(id) && id !== userId
+          ).length
+
+          const canPlayTrump = winningSet.some(card => isTrump(card))
+
+          if (canPlayTrump) {
+            // Void in led suit, or trump led
+            if (potentialOppsRemaining > 0) {
+              // Highest trump in winning set
+              return highestTrump(winningSet).id
+            }
+            // 0 opps remain — schmear-self with trump priority
+            const pick = pickBySchmearPriority(winningSet, 'trump', fullHand)
+            if (pick) return pick.id
+          } else {
+            // Must-follow non-called fail; only fail-suit winners
+            if (potentialOppsRemaining === 0) {
+              const pick = pickBySchmearPriority(winningSet, 'fail', fullHand)
+              if (pick) return pick.id
+            }
+            // potentialOppsRemaining > 0 → fall through (opponent could trump over)
+          }
+        }
+      }
     }
     // Trump in on called suit if picker team is currently winning the trick
     const { calledSuit } = view
