@@ -261,8 +261,8 @@ export function deducedPartner(view, userId) {
 
 // Returns true if the player currently winning the trick is on the same team as userId.
 // Picker-team bots: teammate = picker or partner.
-// Opponent bots: only returns true when partner is known AND winner is confirmed opponent.
-//   If partner is null (unrevealed), returns false — unsafe to schmear.
+// Opponent bots: only returns true when partner identity is known AND winner is confirmed opponent.
+//   If partner is null (identity not yet deduced), returns false — unsafe to schmear.
 export function teammateWinning(view, userId) {
   const { currentTrick, picker } = view
   if (!currentTrick || currentTrick.length === 0) return false

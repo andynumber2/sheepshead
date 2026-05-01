@@ -333,8 +333,8 @@ export function decidePlay(view, userId) {
           .sort((a, b) => cardPoints(b) - cardPoints(a))
         if (failAces.length > 0) return failAces[0].id
       }
-      // Lead called suit to flush out the unrevealed partner — skipped if partner
-      // has already been deduced from public information (crack/recrack/elimination).
+      // Lead called suit to flush out the partner whose identity is not yet deduced —
+      // skipped if partner identity is already known from public information (crack/recrack/elimination).
       const { calledSuit } = view
       const nonTrump = realCards.filter(c => !isTrump(c))
       if (deducedPartner(view, userId) === null && calledSuit) {
@@ -505,13 +505,14 @@ export function decidePlay(view, userId) {
       if (takeover) return takeover.id
 
       // Predicted-win override (#163): when the called suit was led by a fellow
-      // opponent, the partner is unrevealed (engine flag), and no trump has
-      // been played in this trick, the picker-team partner is forced to play
-      // the called card later this trick and will overtake any current
-      // fail-suit winner. Schmearing high points to the current leader just
-      // donates them to the picker team. Fall through to the predicted-win
-      // trump-in branch below (which trumps in via the trump schmear priority,
-      // or returns the lowest card if no trump is held).
+      // opponent, the called card has not yet been played this trick
+      // (`partnerRevealed` engine flag), and no trump has been played in this
+      // trick, the picker-team partner is forced to play the called card later
+      // this trick and will overtake any current fail-suit winner. Schmearing
+      // high points to the current leader just donates them to the picker team.
+      // Fall through to the predicted-win trump-in branch below (which trumps
+      // in via the trump schmear priority, or returns the lowest card if no
+      // trump is held).
       const calledSuitLedUnrevealed = !view.partnerRevealed && !!view.calledSuit && ledSuit === view.calledSuit
       const noTrumpPlayedYet = !currentTrick.some(p => isTrump(p.card))
       if (!(calledSuitLedUnrevealed && noTrumpPlayedYet)) {
@@ -519,10 +520,10 @@ export function decidePlay(view, userId) {
       }
       // else fall through to predicted-win / lead-back branches below
     }
-    // Force-take to enable called-suit lead-back: when the called suit hasn't been led
-    // yet (partner unrevealed) and the bot has a called-suit fail card to lead back,
-    // win this trick aggressively so the bot can lead the called suit on the next
-    // trick and flush the picker's partner.
+    // Force-take to enable called-suit lead-back: when the called suit has not been led
+    // on this trick AND the partner identity is not yet deduced, and the bot has a
+    // called-suit fail card to lead back, win this trick aggressively so the bot can
+    // lead the called suit on the next trick and flush the picker's partner.
     {
       const { calledSuit } = view
       const ledThisTrickIsCalled = ledSuit === calledSuit
@@ -579,16 +580,17 @@ export function decidePlay(view, userId) {
     // winning gate naturally excludes the case where another opponent has
     // already trumped in (then the bot's teammate is winning, handled above).
     //
-    // Predicted-win extension: when the called suit was led, the partner has
-    // not yet been revealed, and no trump has been played in this trick, the
-    // partner (ace call) or picker (ten/king call) is forced to play the called
-    // ace later this trick — the picker team will take the trick. Treat that as
-    // a picker-team win for trump-in purposes. The no-trump guard avoids firing
-    // when a fellow opponent has already trumped in (their trump beats the
-    // forced ace, so the picker team will not win).
+    // Predicted-win extension: when the called suit was led, the called card
+    // has not yet been played this trick (`partnerRevealed` engine flag), and
+    // no trump has been played in this trick, the partner (ace call) or picker
+    // (ten/king call) is forced to play the called card later this trick — the
+    // picker team will take the trick. Treat that as a picker-team win for
+    // trump-in purposes. The no-trump guard avoids firing when a fellow opponent
+    // has already trumped in (their trump beats the forced card, so the picker
+    // team will not win).
     //
-    // Specialization: when the called suit was led and the partner has not yet
-    // been revealed, the partner is forced to play the called card on this
+    // Specialization: when the called suit was led and the called card has not
+    // yet been played this trick, the partner is forced to play it on this
     // trick, so cash A/10/K of trump via the schmear priority to capture those
     // points along with the partner's high card.
     if (!isTrump(currentTrick[0].card)) {
