@@ -6,7 +6,7 @@
 import {
   isTrump, cardPoints, effectiveSuit, trumpRank, suitRank, schwanzerCardPoints,
 } from './gameEngine.js'
-import { currentWinner, beats, handScore, bestVoidBury, teammateWinning, trumpRemainingElsewhere, isGuaranteedWinner, cheapestGuaranteedWin, pickBySchmearPriority } from './botInference.js'
+import { currentWinner, beats, handScore, bestVoidBury, teammateWinning, trumpRemainingElsewhere, isGuaranteedWinner, cheapestGuaranteedWin, pickBySchmearPriority, deducedPartner } from './botInference.js'
 
 // ─── Legal card helper ────────────────────────────────────────────────────────
 // Mirrors getLegalCardIds from the frontend; computes which cards can be played.
@@ -290,6 +290,10 @@ export function decidePlay(view, userId) {
   if (isLeaster) return lowestCard(realCards).id
 
   const isLeading = !currentTrick || currentTrick.length === 0
+  // `view.partner` is set on picker-team views (the picker sees the partner;
+  // the partner sees themselves), so this self-team check is correct as-is.
+  // Opponent-side identity checks elsewhere in this file consult deducedPartner
+  // to handle the case where view.partner is redacted to null.
   const isPickerTeam = userId === picker || userId === partner
 
   if (isLeading) {
@@ -329,10 +333,11 @@ export function decidePlay(view, userId) {
           .sort((a, b) => cardPoints(b) - cardPoints(a))
         if (failAces.length > 0) return failAces[0].id
       }
-      // Lead called suit to flush out the unrevealed partner
-      const { calledSuit, partnerRevealed } = view
+      // Lead called suit to flush out the unrevealed partner — skipped if partner
+      // has already been deduced from public information (crack/recrack/elimination).
+      const { calledSuit } = view
       const nonTrump = realCards.filter(c => !isTrump(c))
-      if (!partnerRevealed && calledSuit) {
+      if (deducedPartner(view, userId) === null && calledSuit) {
         const calledSuitCards = nonTrump.filter(c => effectiveSuit(c) === calledSuit)
         if (calledSuitCards.length > 0) return lowestCard(calledSuitCards).id
       }
@@ -479,8 +484,9 @@ export function decidePlay(view, userId) {
       const playedIdsOpp = new Set(currentTrick.map(p => p.userId))
       const allIdsOpp = Object.keys(view.hands)
       // From opponent POV, "threats" (could overtake teammate) = picker + partner still to play.
+      const deducedOpp = deducedPartner(view, userId)
       const threatsRemaining = allIdsOpp.filter(id =>
-        !playedIdsOpp.has(id) && id !== userId && (id === picker || id === partner)
+        !playedIdsOpp.has(id) && id !== userId && (id === picker || id === deducedOpp)
       ).length
 
       const teammateSafe = threatsRemaining === 0 ||
@@ -504,7 +510,7 @@ export function decidePlay(view, userId) {
     // win this trick aggressively so the bot can lead the called suit on the next
     // trick and flush the picker's partner.
     {
-      const { calledSuit, partnerRevealed } = view
+      const { calledSuit } = view
       const ledThisTrickIsCalled = ledSuit === calledSuit
       // Note: realCards already filters by must-follow rules. If the bot has a called-suit
       // card but is here following a different suit, the called-suit card is in `view.hands[userId]`
@@ -514,7 +520,9 @@ export function decidePlay(view, userId) {
         !card.hidden && !isTrump(card) && effectiveSuit(card) === calledSuit
       )
 
-      if (!partnerRevealed && !ledThisTrickIsCalled && hasCalledSuitFailInHand) {
+      // Skipped if partner has already been deduced from public information —
+      // the lead-back goal (flush the unknown partner) is then moot.
+      if (deducedPartner(view, userId) === null && !ledThisTrickIsCalled && hasCalledSuitFailInHand) {
         const winningSet = realCards.filter(card => {
           for (const play of currentTrick) {
             if (!beats(card, play.card, ledSuit)) return false
@@ -571,7 +579,8 @@ export function decidePlay(view, userId) {
     // points along with the partner's high card.
     if (!isTrump(currentTrick[0].card)) {
       const winner = currentWinner(currentTrick)
-      const pickerTeamWinning = winner && (winner.userId === picker || winner.userId === partner)
+      const deducedForPredicted = deducedPartner(view, userId)
+      const pickerTeamWinning = winner && (winner.userId === picker || winner.userId === deducedForPredicted)
       const { calledSuit, partnerRevealed } = view
       const calledSuitLedUnrevealed = !partnerRevealed && !!calledSuit && ledSuit === calledSuit
       const noTrumpPlayedYet = !currentTrick.some(p => isTrump(p.card))

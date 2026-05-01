@@ -184,6 +184,79 @@ export function cheapestGuaranteedWin(candidates, view, userId) {
   })
 }
 
+// ─── Partner deduction ────────────────────────────────────────────────────────
+
+// Returns the set of userIds known not to be the partner, derived from public
+// information available in the view. Used by deducedPartner to identify the
+// partner once the rule-out set covers 3 of the 4 non-picker seats.
+//
+// Signals:
+//   - The picker is always ruled out.
+//   - The bot itself, if not on the picker team (view.partner !== userId).
+//   - The cracker, if view.crackerId is set.
+//   - Any player who played a non-called card on a called-suit-led trick before
+//     the called card was played in that trick.
+//
+// Hidden cards in tricks are treated as unknown (no deduction).
+// Leasters / no-picker hands return an empty set.
+export function knownNonPartners(view, userId) {
+  const set = new Set()
+  if (!view.picker) return set  // leaster / no-picker hand
+  set.add(view.picker)
+  if (view.partner !== userId && view.picker !== userId) {
+    set.add(userId)
+  }
+  if (view.crackerId) set.add(view.crackerId)
+
+  const calledCardId =
+    view.calledAce?.aceId ?? view.calledTen?.tenId ?? view.calledKing?.kingId
+  if (!view.calledSuit || !calledCardId) return set
+
+  const scanTrick = (plays) => {
+    if (!plays || plays.length === 0) return
+    const first = plays[0]
+    if (!first.card || first.card.hidden) return
+    const ledSuit = first.declaredSuit ?? effectiveSuit(first.card)
+    if (ledSuit !== view.calledSuit) return
+    let calledCardSeen = false
+    for (const play of plays) {
+      if (calledCardSeen) return  // plays after the called card carry no info
+      if (!play.card || play.card.hidden) continue
+      if (play.card.id === calledCardId) {
+        calledCardSeen = true
+        continue
+      }
+      set.add(play.userId)
+    }
+  }
+
+  for (const trick of (view.tricks ?? [])) scanTrick(trick.plays)
+  scanTrick(view.currentTrick ?? [])
+
+  return set
+}
+
+// Returns the partner's userId if known, else null. Resolution order:
+//   1. view.partner if set (engine-revealed, or bot is on picker team).
+//   2. view.recrackerId if set and not the picker (non-picker recrackers are
+//      uniquely the partner per the recrack rule in gameEngine.js).
+//   3. By elimination via knownNonPartners — if the rule-out set covers exactly
+//      3 of the 4 non-picker seats, the remaining seat is the partner.
+//   4. Otherwise, null.
+//
+// Returns null in alone/leaster/no-picker modes regardless of signals.
+export function deducedPartner(view, userId) {
+  if (!view.picker || view.callMode === 'alone' || view.isLeaster) return null
+  if (view.partner) return view.partner
+  if (view.recrackerId && view.recrackerId !== view.picker) return view.recrackerId
+
+  const ruled = knownNonPartners(view, userId)
+  const allIds = Object.keys(view.hands ?? {})
+  const candidates = allIds.filter(id => id !== view.picker && !ruled.has(id))
+  if (candidates.length === 1) return candidates[0]
+  return null
+}
+
 // ─── Schmear detection ────────────────────────────────────────────────────────
 
 // Returns true if the player currently winning the trick is on the same team as userId.
@@ -191,8 +264,10 @@ export function cheapestGuaranteedWin(candidates, view, userId) {
 // Opponent bots: only returns true when partner is known AND winner is confirmed opponent.
 //   If partner is null (unrevealed), returns false — unsafe to schmear.
 export function teammateWinning(view, userId) {
-  const { currentTrick, picker, partner } = view
+  const { currentTrick, picker } = view
   if (!currentTrick || currentTrick.length === 0) return false
+
+  const partner = deducedPartner(view, userId)
 
   const winner = currentWinner(currentTrick)
   if (!winner) return false

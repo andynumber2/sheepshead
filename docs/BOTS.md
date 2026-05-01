@@ -108,7 +108,7 @@ Play the **lowest-value card** always, to avoid winning tricks.
 
 #### Opponent bot leading
 1. **Cash a fail ace** if the picker team has **zero** trump remaining (all 14 trump accounted for in own hand, buried, and played tricks). The fail ace must not be the called card (in practice an opponent never holds the called card, but the code is explicit).
-2. **Lead called suit** (lowest card of that suit) if the partner has not yet been revealed and the bot holds at least one fail card of the called suit. This forces the partner to play their called card, revealing their identity.
+2. **Lead called suit** (lowest card of that suit) if the partner has not yet been deduced and the bot holds at least one fail card of the called suit. This forces the partner to play their called card, revealing their identity.
 3. Otherwise, lead the **lowest non-trump card** to avoid burning trump.
 4. If no non-trump cards remain, lead the lowest card overall.
 
@@ -136,10 +136,10 @@ A recurring concept below is a **guaranteed winner**: a trump card the bot holds
 3. **Can't win**: play the lowest card.
 
 #### Opponent bot following
-1. **Schmear** (a confirmed teammate — partner identity must be known — is currently winning):
+1. **Schmear** (a confirmed teammate — partner identity is known directly or by deduction — is currently winning):
    - **Safe** (no picker or partner remains to play, or the teammate's winning card is itself a guaranteed winner): dump the highest-priority non-trump per the **schmear priority** (see below). If only trump available, play the lowest card.
    - **Not safe**: if the bot can take the trick with a guaranteed-winning card, play the lowest-point such card. Otherwise schmear anyway — no speculative trump burn when a guaranteed takeover isn't available.
-2. **Force-take to enable called-suit lead-back**: When the partner is **not yet revealed**, the current trick is **not** led with the called suit, the bot holds **at least one non-trump card of the called suit** in hand (a card that can be led back next trick), and the bot can take the current trick:
+2. **Force-take to enable called-suit lead-back**: When the partner is **not yet known** (neither revealed nor deducible), the current trick is **not** led with the called suit, the bot holds **at least one non-trump card of the called suit** in hand (a card that can be led back next trick), and the bot can take the current trick:
    - Compute **potential opponents remaining** = count of non-self players still to play this trick. With partner unrevealed, no other defender is confirmed as a teammate, so every yet-to-play seat is treated as a picker-team threat.
    - **Bot can play trump** (void in led suit, or trump led):
      - Threats remaining > 0 → take with **highest trump** in the winning set.
@@ -148,10 +148,10 @@ A recurring concept below is a **guaranteed winner**: a trump card the bot holds
      - Threats remaining > 0 → **skip** (an unrevealed opponent could be void and trump over). Fall through to default.
      - Threats remaining = 0 → take with the schmear-self pick using the **fail priority** (see below).
 3. **Trump in to contest a picker-team-winning fail-led trick**: If a fail card was led, the picker team is winning (or *will* win — see the predicted-win extension below), and the bot is void in the led suit, trump in. The picker-team-winning gate naturally excludes the case where another opponent has already trumped in (then a teammate would be winning and the schmear branch above would have fired). Card choice splits on the partner-reveal state:
-   - **Partner-revealing called-suit lead** (called suit led and partner **not yet revealed**): use the **trump schmear priority** (A, 10, K before pip cards; Js/Qs reserved). The partner is forced to play the called card on this trick, so cashing high trump captures both those points and the partner's high card.
+   - **Partner-revealing called-suit lead** (called suit led and partner **not yet known**): use the **trump schmear priority** (A, 10, K before pip cards; Js/Qs reserved). The partner is forced to play the called card on this trick, so cashing high trump captures both those points and the partner's high card.
    - **Otherwise**: play the **highest trump** (strongest by trump rank — Q♣ at the top). The aim is to force the picker to overtrump with their best trump to retake the lead, or simply steal the trick if the picker has already played.
 
-   **Predicted-win extension**: when the called suit is led, the partner is unrevealed, and **no trump has been played in this trick**, treat the picker team as if they were already winning. Rationale: the partner (ace call) or the picker (ten/king call) is forced to play the called ace on this trick, which will take it over any called-suit fail. The partner cannot trump out of the obligation because they must follow the called suit by playing the ace. The no-trump guard skips the case where a fellow opponent has already trumped the lead — there the trumpor beats the forced ace and the picker team does not win the trick, so the bot should not burn a trump on top.
+   **Predicted-win extension**: when the called suit is led, the partner is unrevealed, and **no trump has been played in this trick**, treat the picker team as if they were already winning. Rationale: the partner is forced to play the called card on this trick, which will take it over any called-suit fail. The partner cannot trump out of the obligation because they must follow the called suit by playing the called card. (Note: in ace calls the called ace is the highest fail card, so the picker team is essentially guaranteed to win the trick. In ten/king calls the partner's forced 10 or K can lose to a higher called-suit fail held by an opponent — see issue #83.) The no-trump guard skips the case where a fellow opponent has already trumped the lead — there the trumpor beats the forced ace and the picker team does not win the trick, so the bot should not burn a trump on top. The `pickerTeamWinning` identity check uses `deducedPartner` to gate this behavior.
 4. **Otherwise**: play the lowest card.
 
 **Schmear priority** (used by both the schmear branch above and the force-take branch's 0-threats-remaining cases): walk a rank-priority list and pick the first card found.
@@ -166,6 +166,28 @@ Rationale: cash high-point cards (A=11, 10=10, K=4) first; spend zero-point pip 
 
 These pure functions support the strategy above but make no decisions themselves.
 
+### Partner deduction
+
+For most of a hand, opponent bots see `view.partner` as `null` — the engine
+redacts it until the partner plays the called card. But three public events
+allow the partner to be deduced earlier:
+
+- **Crack** — only an opponent may crack, so the cracker is not the partner.
+- **Recrack** — only the picker or partner may recrack; a non-picker recracker
+  is uniquely the partner.
+- **Called-suit-led elimination** — the partner is forced to play the called
+  card on the first called-suit-led trick. Any seat that plays a non-called
+  card on such a trick is not the partner. Once 3 of the 4 non-picker seats
+  are ruled out, the remaining seat is the partner.
+
+`deducedPartner(view, userId)` returns the partner if knowable from any of
+these signals, else `null`. Opponent-bot identity checks consult it for "who
+is the partner?" questions; picker-team-bot checks continue to use
+`view.partner` directly because that field is unredacted on the picker-team
+view. "Has the called card been played?" timing checks (e.g., the predicted-win
+extension's no-trump-played gate) continue to use `partnerRevealed` regardless
+of bot team.
+
 | Function | Purpose |
 |---|---|
 | `countTrumpPlayed` | Count visible trump in completed tricks and the current trick |
@@ -178,3 +200,5 @@ These pure functions support the strategy above but make no decisions themselves
 | `isGuaranteedWinner` | For a trump card, returns true iff every higher-rank trump has been seen (own hand, played tricks, current trick, visible bury). Unseen higher trump is treated as opponent-held. Non-trump cards are never guaranteed. |
 | `cheapestGuaranteedWin` | From a set of candidate cards, returns the lowest-point card that satisfies `isGuaranteedWinner` (tiebreak: weaker trump first). Returns null if none qualify. |
 | `pickBySchmearPriority` | Pick the least-painful winning card to spend, walking a rank-priority list (`A,10,K,9,8,7,J,Q` for trump; `A,10,K,9,8,7` for fail). Trump tiebreak: weakest trump rank. Fail tiebreak: shortest non-trump suit in hand, then alphabetical. |
+| `knownNonPartners` | Returns the set of userIds known not to be the partner from public information: picker, self (if non-picker-team), cracker, players who played non-called on a called-suit-led trick before the called card was played. |
+| `deducedPartner` | Returns the partner's userId if known (`view.partner` set, recrack identifies them, or full elimination via `knownNonPartners`), else `null`. Returns `null` in alone/leaster modes regardless of signals. |

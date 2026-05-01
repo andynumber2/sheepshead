@@ -130,6 +130,8 @@ export function dealHand(playerIds, dealerSeat, handNumber, doublerMultiplier) {
     currentLeader: null,       // userId who leads next trick
     handCrackMultiplier: 1,    // 1 | 2 | 4 — crack/recrack multiplier for this hand only
     crackState: null,          // null | 'cracked' | 'recracked'
+    crackerId: null,           // userId of opponent who cracked, or null
+    recrackerId: null,         // userId of picker or partner who recracked, or null
     potentialBlitzes,          // [{ userId, type: 'black'|'red' }] — players who may blitz
     blitzes: [],               // [{ userId, type: 'black'|'red' }] — players who declared a blitz
     log: [],                   // string messages
@@ -434,6 +436,7 @@ export function crack(state, userId) {
 
   const newState = deepClone(state)
   newState.crackState = 'cracked'
+  newState.crackerId = userId
   newState.handCrackMultiplier = 2
   newState.log.push(`${userId} cracked! Hand stakes ×2.`)
   return newState
@@ -446,6 +449,7 @@ export function recrack(state, userId) {
 
   const newState = deepClone(state)
   newState.crackState = 'recracked'
+  newState.recrackerId = userId
   newState.handCrackMultiplier = 4
   newState.log.push(`${userId} recracked! Hand stakes ×4.`)
   return newState
