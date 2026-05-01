@@ -306,6 +306,137 @@ describe('decidePlay — opponent identifies picker-team winner via deducedPartn
   })
 })
 
+describe('decidePlay — opponent schmear-anyway fallback overridden when picker-team will overtake (#163)', () => {
+  // When the called suit is led by a fellow opponent, the deduced partner is
+  // unrevealed, and no trump has been played, the picker-team partner is
+  // forced to play the called card later this trick and will overtake the
+  // current fail-suit winner. Without a guaranteed-winner takeover, the bot
+  // would otherwise schmear high-value fail to the picker team.
+  //
+  // The fix only overrides the *fallback* (no guaranteed takeover available).
+  // When the bot has a guaranteed winner (e.g., Q♣), the existing takeover
+  // path still wins the trick — that case must not regress.
+
+  it('after recrack, bot trumps in instead of schmearing when no guaranteed takeover available', () => {
+    // Setup: ace call on hearts. u3 recracked → u3 deduced partner.
+    // u1 (cracker, opp) leads KH (called-suit fail). Bot u4 (opp) is void in H,
+    // holds [JD, AD, 10C, 7C] — trump but no top trump (J♣/Q's would beat JD).
+    // u3 (partner) and u2 (picker) yet to play.
+    // Pre-fix: teammateWinning(u4) true; takeover path returns null (JD/AD not
+    //   guaranteed against unseen Q's/J♣); schmear-anyway fallback dumps 10C —
+    //   partner u3's forced AH overtakes → picker team collects 10C.
+    // Post-fix: predicted-win precondition holds (called-suit led, partner
+    //   unrevealed, no trump played) → fallback overridden → falls through to
+    //   predicted-win trump-in branch → AD via trump schmear priority (A first).
+    const view = {
+      phase: 'playing',
+      hands: {
+        u1: [], u2: [], u3: [],
+        u4: [
+          c('JD', 'D', 'J'), c('AD', 'D', 'A'),
+          c('10C', 'C', '10'), c('7C', 'C', '7'),
+        ],
+        u5: [],
+      },
+      currentTrick: [
+        { userId: 'u1', card: c('KH', 'H', 'K') },
+      ],
+      tricks: [],
+      picker: 'u2',
+      partner: null,
+      partnerRevealed: false,
+      callMode: 'ace',
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: 'u1',
+      recrackerId: 'u3',
+      isLeaster: false,
+      lastTrick: [],
+    }
+    expect(decidePlay(view, 'u4')).toBe('AD')
+  })
+
+  it('with partner deduced by 3-of-4 elimination, bot trumps in on called-suit lead', () => {
+    // 5 seats. Ace call on hearts. picker=u3.
+    // u1 (opp) leads KH — eliminates u1 (didn't play AH on first hearts trick).
+    // u2 (opp) plays 8C — non-called on called-suit lead → eliminates u2.
+    // From u4's POV: picker=u3, u1 eliminated, u2 eliminated, u4 self →
+    //   u5 deduced as partner by elimination.
+    // Bot u4 holds [JD, AD, 10C, 7C] — same non-top-trump shape as recrack test.
+    // teammateWinning(u4) true (winner u1 not picker u3, not partner u5).
+    // No trump played yet → predicted-win precondition holds → fallback override
+    //   fires → bot trumps in with AD via schmear priority.
+    const view = {
+      phase: 'playing',
+      hands: {
+        u1: [], u2: [],
+        u3: [], u5: [],
+        u4: [
+          c('JD', 'D', 'J'), c('AD', 'D', 'A'),
+          c('10C', 'C', '10'), c('7C', 'C', '7'),
+        ],
+      },
+      currentTrick: [
+        { userId: 'u1', card: c('KH', 'H', 'K') },
+        { userId: 'u2', card: c('8C', 'C', '8') },
+      ],
+      tricks: [],
+      picker: 'u3',
+      partner: null,
+      partnerRevealed: false,
+      callMode: 'ace',
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: null,
+      recrackerId: null,
+      isLeaster: false,
+      lastTrick: [],
+    }
+    expect(decidePlay(view, 'u4')).toBe('AD')
+  })
+
+  it('regression guard: takeover path still fires when bot holds a guaranteed winner', () => {
+    // Same recrack setup, but bot u4 holds Q♣ (top trump, always guaranteed).
+    // The schmear-branch takeover path (cheapestGuaranteedWin) must still fire
+    // and the bot should win the trick with QC. The predicted-win override
+    // applies only to the schmear-anyway *fallback*, not the takeover.
+    // QC is the cheapest guaranteed winner by points (Q♣=3, A♦=11, K♦=4).
+    const view = {
+      phase: 'playing',
+      hands: {
+        u1: [], u2: [], u3: [],
+        u4: [
+          c('QC', 'C', 'Q'), c('AD', 'D', 'A'),
+          c('10C', 'C', '10'), c('7C', 'C', '7'),
+          c('KD', 'D', 'K'),
+        ],
+        u5: [],
+      },
+      currentTrick: [
+        { userId: 'u1', card: c('KH', 'H', 'K') },
+      ],
+      tricks: [],
+      picker: 'u2',
+      partner: null,
+      partnerRevealed: false,
+      callMode: 'ace',
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: 'u1',
+      recrackerId: 'u3',
+      isLeaster: false,
+      lastTrick: [],
+    }
+    expect(decidePlay(view, 'u4')).toBe('QC')
+  })
+})
+
 describe('decidePlay — opponent leading after recrack does not lead called suit', () => {
   it('skips lead-called-suit-to-flush when partner is deduced via recrack', () => {
     // Hand has only point-bearing hearts (KH=4pts, 10H=10pts) and zero-point clubs (7C, 8C).
