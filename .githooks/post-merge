@@ -2,7 +2,7 @@
 
 # Auto-delete local branches whose remote tracking branch is gone
 git fetch --prune
-gone=$(git branch -vv | awk '/: gone\]/ {print $1}')
+gone=$(git branch -vv | awk '/: gone\]/ {print ($1=="*"||$1=="+") ? $2 : $1}')
 [ -n "$gone" ] && echo "$gone" | xargs git branch -d
 
 # Pull main down to latest when we're on a different branch
