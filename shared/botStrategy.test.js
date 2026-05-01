@@ -776,14 +776,15 @@ describe('decidePlay — opponent-team leading: guaranteed fail cards (call site
   })
 
   it('does NOT cash a guaranteed fail card when trump remains elsewhere', () => {
-    // Bot holds AC + 7D + 8D. Only 9 trump in tricks → trumpRemainingElsewhere = 3.
+    // Bot holds AC + 9C + 7D + 8D. Only 9 trump in tricks → trumpRemainingElsewhere = 3.
     // Opponents not all trump-void (they played trump in trick 0).
     // isGuaranteedWinner(AC) = false → skip guaranteed-cash branch.
     // Falls through: deducedPartner is null (no signals) → lead called-suit-to-flush.
-    // Bot holds no hearts → no called-suit cards → falls to lowest non-trump = AC (11pts)
-    // since no other fail card. Actually: last branch is lowestCard(nonTrump).
+    // Bot holds no hearts → no called-suit cards → falls to lowestCard(nonTrump).
+    // lowestCard([AC, 9C]) = 9C (0pts < 11pts) — NOT AC, proving the cash path was skipped.
     const hand = [
       c('AC', 'C', 'A'),
+      c('9C', 'C', '9'),
       c('7D', 'D', '7'),
       c('8D', 'D', '8'),
     ]
@@ -822,10 +823,299 @@ describe('decidePlay — opponent-team leading: guaranteed fail cards (call site
       isLeaster: false,
       lastTrick: [],
     }
-    // trumpRemainingElsewhere = 14 - 2 - 9 = 3 → not zero → isGuaranteedWinner = false
-    // Falls through to called-suit flush logic (no hearts in hand → no calledSuitCards)
-    // → lowestCard(nonTrump) = AC (only non-trump card)
-    expect(decidePlay(view, 'u2')).toBe('AC')
+    // trumpRemainingElsewhere = 14 - 2 - 9 = 3 → not zero → isGuaranteedWinner(AC) = false
+    // Cash path is skipped → falls through to called-suit flush logic (no hearts → no calledSuitCards)
+    // → lowestCard([AC, 9C]) = 9C (0pts) — confirms AC was NOT cashed
+    const result = decidePlay(view, 'u2')
+    expect(result).not.toBe('AC')
+    expect(result).toBe('9C')
+  })
+})
+
+// ─── Wire 1: picker-team leading — avoid risky suit leads ─────────────────────
+// When the picker-team bot has no trump, avoid leading into a suit where an opponent
+// is known void (they could trump it). Prefer a safe suit if one exists. Fall back
+// to highestValueCard when all suits are risky.
+
+describe('decidePlay — Wire 1: picker-team avoids leading into known opponent voids', () => {
+  // Bot = u1 (picker). Partner = u3. No trump in bot's hand.
+  // Opponent u4 is known void in clubs (trick 1: clubs led, u4 played hearts).
+  // Bot has clubs and spades fail cards. Clubs is risky (u4 void), spades is safe.
+
+  function wire1BaseView({ hand, tricks = [] }) {
+    return {
+      phase: 'playing',
+      hands: { u1: hand, u2: [], u3: [], u4: [], u5: [] },
+      currentTrick: [],
+      tricks,
+      picker: 'u1',
+      partner: 'u3',
+      partnerRevealed: true,
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: null,
+      recrackerId: null,
+      isLeaster: false,
+      lastTrick: [],
+    }
+  }
+
+  it('avoids leading into a known opponent void when a safe suit exists (even if risky card has higher value)', () => {
+    // Prior trick: AC (clubs) led; u4 played KH (not clubs) → u4 void in C.
+    // Bot has: AC (11pts, risky suit C — u4 will trump it), 7S (0pts, safe suit S).
+    // Without Wire 1: highestValueCard = AC (11pts > 0pts).
+    // With Wire 1: AC is in risky suit → skip; prefer safe suit → 7S.
+    const tricks = [{
+      plays: [
+        { userId: 'u2', card: c('9C', 'C', '9') },  // led clubs
+        { userId: 'u4', card: c('KH', 'H', 'K') },  // off-suit → void in C
+        { userId: 'u3', card: c('8C', 'C', '8') },  // followed
+        { userId: 'u5', card: c('7C', 'C', '7') },  // followed
+        { userId: 'u1', card: c('8S', 'S', '8') },  // bot plays spades (not clubs)
+      ],
+    }]
+    const hand = [
+      c('AC', 'C', 'A'),   // risky suit (u4 void in C) — 11pts but dangerous
+      c('7S', 'S', '7'),   // safe suit — 0pts but safe
+    ]
+    const view = wire1BaseView({ hand, tricks })
+    // Wire 1: u4 (opponent) is void in C → AC is risky. 7S is safe. Prefer 7S.
+    expect(decidePlay(view, 'u1')).toBe('7S')
+  })
+
+  it('falls back to highestValueCard when all suits are risky', () => {
+    // Prior tricks: u4 void in C and S. Bot has only C and S fail cards.
+    // All suits risky → fall through to highestValueCard(realCards).
+    // KS (4pts) > 9C (0pts) → highestValueCard = KS.
+    const tricks = [
+      {
+        plays: [
+          { userId: 'u2', card: c('AC', 'C', 'A') },  // led clubs
+          { userId: 'u4', card: c('KH', 'H', 'K') },  // void in C
+          { userId: 'u1', card: c('9C', 'C', '9') },
+          { userId: 'u3', card: c('8C', 'C', '8') },
+          { userId: 'u5', card: c('7C', 'C', '7') },
+        ],
+      },
+      {
+        plays: [
+          { userId: 'u2', card: c('AS', 'S', 'A') },  // led spades
+          { userId: 'u4', card: c('9H', 'H', '9') },  // void in S
+          { userId: 'u1', card: c('7S', 'S', '7') },
+          { userId: 'u3', card: c('8S', 'S', '8') },
+          { userId: 'u5', card: c('KS', 'S', 'K') },
+        ],
+      },
+    ]
+    const hand = [
+      c('KS', 'S', 'K'),   // risky suit S
+      c('9C', 'C', '9'),   // risky suit C
+    ]
+    const view = wire1BaseView({ hand, tricks })
+    // All suits risky → highestValueCard = KS (4pts > 0pts)
+    expect(decidePlay(view, 'u1')).toBe('KS')
+  })
+})
+
+// ─── Wire 2: opponent-team leading — lead into picker-team void ────────────────
+// When the opponent-team bot knows the partner's identity AND a picker-team member
+// is void in a fail suit the bot holds, lead that suit to force the picker-team to
+// trump or waste a high card.
+
+describe('decidePlay — Wire 2: opponent leads into picker-team void to flush trump', () => {
+  // Bot = u4 (opponent). Picker = u2. Partner deduced via recrackerId = u3.
+  // Prior trick: spades led; u3 (partner) played hearts (off-suit) → void in S.
+  // Bot holds spades fail cards. Should lead spades to force u3 to trump.
+
+  function wire2BaseView({ hand, tricks = [], recrackerId = 'u3' }) {
+    return {
+      phase: 'playing',
+      hands: { u1: [], u2: [], u3: [], u4: hand, u5: [] },
+      currentTrick: [],
+      tricks,
+      picker: 'u2',
+      partner: null,       // masked from opponent view
+      partnerRevealed: false,
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: null,
+      recrackerId,
+      isLeaster: false,
+      lastTrick: [],
+    }
+  }
+
+  it('leads into picker-team (partner) known void to flush trump', () => {
+    // Prior trick: AS (spades) led; u3 (partner, deduced via recrack) played KH → void in S.
+    // Bot holds: KS (4pts), 8C (0pts). KS is in risky suit for the opponent team goal:
+    // we WANT to lead spades here (partner is void → will have to trump or discard).
+    // Wire 2: lead KS (spades, suit where picker-team member is void).
+    const tricks = [{
+      plays: [
+        { userId: 'u1', card: c('AS', 'S', 'A') },  // led spades
+        { userId: 'u3', card: c('KH', 'H', 'K') },  // off-suit → void in S
+        { userId: 'u2', card: c('7S', 'S', '7') },
+        { userId: 'u4', card: c('8S', 'S', '8') },
+        { userId: 'u5', card: c('9S', 'S', '9') },
+      ],
+    }]
+    const hand = [
+      c('KS', 'S', 'K'),   // spades → suits where partner (u3) is void
+      c('8C', 'C', '8'),   // clubs
+    ]
+    const view = wire2BaseView({ hand, tricks })
+    expect(decidePlay(view, 'u4')).toBe('KS')
+  })
+
+  it('does NOT fire Wire 2 when partner identity is unknown', () => {
+    // No crack/recrack signals → deducedPartner = null.
+    // Wire 2 must not fire. Should fall through to lowestCard(nonTrump).
+    // Prior trick: AS led; u3 played KH → would imply void in S, but we don't know u3 is partner.
+    // Bot holds: KS, 8C. lowestCard(nonTrump) = 8C (0pts < 4pts).
+    const tricks = [{
+      plays: [
+        { userId: 'u1', card: c('AS', 'S', 'A') },  // led spades
+        { userId: 'u3', card: c('KH', 'H', 'K') },  // off-suit (but u3 is not yet deduced as partner)
+        { userId: 'u2', card: c('7S', 'S', '7') },
+        { userId: 'u4', card: c('8S', 'S', '8') },
+        { userId: 'u5', card: c('9S', 'S', '9') },
+      ],
+    }]
+    const hand = [
+      c('KS', 'S', 'K'),
+      c('8C', 'C', '8'),
+    ]
+    const view = wire2BaseView({ hand, tricks, recrackerId: null })
+    // No crack/recrack → deducedPartner null → Wire 2 does not fire
+    // Falls to lowestCard(nonTrump) = 8C
+    expect(decidePlay(view, 'u4')).toBe('8C')
+  })
+
+  it('leads the lowest-value card across all void-suit candidates (not highest)', () => {
+    // Partner (u3) void in both C and S.
+    // Bot holds: 9C (0pts), KC (4pts) in clubs; 7S (0pts) in spades.
+    // All three qualify (their suits are picker-team voids).
+    // lowestCard([9C, KC, 7S]) = 9C or 7S (both 0pts); lowestCard picks 9C because it
+    // iterates left-to-right and 9C appears first with 0pts, then 7S ties but doesn't
+    // displace it. The key assertion is that the expensive KC is NOT chosen.
+    const tricks = [
+      {
+        plays: [
+          { userId: 'u1', card: c('AC', 'C', 'A') },  // led clubs
+          { userId: 'u3', card: c('KH', 'H', 'K') },  // off-suit → void in C
+          { userId: 'u2', card: c('7C', 'C', '7') },
+          { userId: 'u4', card: c('8C', 'C', '8') },
+          { userId: 'u5', card: c('9C', 'C', '9') },
+        ],
+      },
+      {
+        plays: [
+          { userId: 'u1', card: c('AS', 'S', 'A') },  // led spades
+          { userId: 'u3', card: c('9H', 'H', '9') },  // off-suit → void in S
+          { userId: 'u2', card: c('7S', 'S', '7') },
+          { userId: 'u4', card: c('8S', 'S', '8') },
+          { userId: 'u5', card: c('6S', 'S', '6') },
+        ],
+      },
+    ]
+    const hand = [
+      c('9C', 'C', '9'),   // clubs (0pts)
+      c('KC', 'C', 'K'),   // clubs (4pts) — must NOT be chosen
+      c('7S', 'S', '7'),   // spades (0pts)
+    ]
+    const view = wire2BaseView({ hand, tricks })
+    // Wire 2 fires; lowestCard picks from [9C, KC, 7S]: KC (4pts) is skipped;
+    // 9C and 7S both 0pts, 9C wins the reduce as the initial accumulator.
+    expect(decidePlay(view, 'u4')).not.toBe('KC')
+  })
+
+  it('fires Wire 2 when only the partner (not the picker) is void in a suit', () => {
+    // Picker (u2) followed all suits normally — no void in spades.
+    // Partner (u3, deduced via recrack) is void in spades.
+    // Bot holds: KS (spades, partner void) and 8H (hearts, no void).
+    // Wire 2 should fire because pickerTeamIds.some(id => nonTrumpVoids[id]?.has('S'))
+    // is satisfied by u3 (partner), even though u2 (picker) is not void.
+    const tricks = [{
+      plays: [
+        { userId: 'u1', card: c('AS', 'S', 'A') },  // led spades
+        { userId: 'u2', card: c('7S', 'S', '7') },  // picker follows → NOT void in S
+        { userId: 'u3', card: c('KH', 'H', 'K') },  // partner off-suit → void in S
+        { userId: 'u4', card: c('8S', 'S', '8') },
+        { userId: 'u5', card: c('9S', 'S', '9') },
+      ],
+    }]
+    const hand = [
+      c('KS', 'S', 'K'),   // spades (partner u3 void) → Wire 2 candidate
+      c('8H', 'H', '8'),   // hearts (no picker-team void)
+    ]
+    const view = wire2BaseView({ hand, tricks })
+    // deducedPartner = u3 (recrack). nonTrumpVoids[u3] has 'S'. Picker u2 NOT void.
+    // Wire 2 fires on 'S'. voidSuitCards = [KS]. lowestCard([KS]) = KS.
+    expect(decidePlay(view, 'u4')).toBe('KS')
+  })
+
+  it('fires Wire 2 when partner is deduced by seat-elimination (knownNonPartners path)', () => {
+    // 5 seats. Picker = u2. Bot = u4 (opponent). view.partner = null, partnerRevealed = false.
+    // Ace call on hearts.
+    // Elimination: u2 (picker), u4 (self), u1 (played non-called on called-suit-led trick)
+    // rule out 3 seats → u5 is the deduced partner.
+    // Completed trick 1: hearts led by u1, u1 plays 9H (non-called; AH is called card)
+    //   → u1 added to knownNonPartners. u5 plays AH (called card) → loop stops.
+    // Completed trick 2: spades led; u5 (deduced partner) plays 7H (off-suit) → void in S.
+    // Bot holds: KS (spades, u5 void) and 9C (clubs, no void).
+    // Wire 2 should fire and lead KS (lowest of [KS]).
+    const tricks = [
+      {
+        // Trick 1: hearts led — eliminates u1 (plays non-called before AH)
+        plays: [
+          { userId: 'u1', card: c('9H', 'H', '9') },  // leads hearts (non-called)
+          { userId: 'u3', card: c('KH', 'H', 'K') },  // follows hearts (non-called) → also eliminated
+          { userId: 'u5', card: c('AH', 'H', 'A') },  // plays called card → partner, stops scan
+          { userId: 'u2', card: c('7H', 'H', '7') },
+          { userId: 'u4', card: c('8H', 'H', '8') },
+        ],
+      },
+      {
+        // Trick 2: spades led — u5 (deduced partner) plays off-suit → void in S
+        plays: [
+          { userId: 'u1', card: c('AS', 'S', 'A') },  // led spades
+          { userId: 'u5', card: c('7H', 'H', '7') },  // off-suit → void in S
+          { userId: 'u2', card: c('7S', 'S', '7') },
+          { userId: 'u3', card: c('8S', 'S', '8') },
+          { userId: 'u4', card: c('9S', 'S', '9') },
+        ],
+      },
+    ]
+    const hand = [
+      c('KS', 'S', 'K'),   // spades (u5 deduced partner is void in S)
+      c('9C', 'C', '9'),   // clubs (no picker-team void)
+    ]
+    const view = {
+      phase: 'playing',
+      hands: { u1: [], u2: [], u3: [], u4: hand, u5: [] },
+      currentTrick: [],
+      tricks,
+      picker: 'u2',
+      partner: null,        // masked — must deduce via elimination
+      partnerRevealed: false,
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: null,
+      recrackerId: null,    // no recrack — must use elimination path
+      isLeaster: false,
+      lastTrick: [],
+    }
+    // knownNonPartners: u2 (picker), u4 (self), u1 (played non-called before AH), u3 (same)
+    // → 4 ruled out of 5 non-picker seats? Wait: 5 seats total, picker=u2, non-picker = u1,u3,u4,u5.
+    // ruled = {u2, u4, u1, u3} → candidates = [u5] → deducedPartner = u5.
+    // nonTrumpVoids[u5] has 'S'. pickerTeamIds = [u2, u5]. Wire 2 fires on KS.
+    expect(decidePlay(view, 'u4')).toBe('KS')
   })
 })
 

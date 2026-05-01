@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { knownNonPartners, deducedPartner, deducedTrumpVoids, isGuaranteedWinner } from './botInference.js'
+import { knownNonPartners, deducedPartner, deducedTrumpVoids, isGuaranteedWinner, deducedNonTrumpVoids } from './botInference.js'
 
 const c = (id, suit, rank) => ({ id, suit, rank })
 
@@ -560,5 +560,161 @@ describe('isGuaranteedWinner – non-trump extension', () => {
     // trumpRemainingElsewhere = 14 - ownTrump(0) - tricksTrump(0) - buriedTrump(0) = 14
     // With the vacuous-truth bug this returned true; with the fix it returns false.
     expect(isGuaranteedWinner(aceOfClubs, view, 'p1')).toBe(false)
+  })
+})
+
+// ─── deducedNonTrumpVoids ─────────────────────────────────────────────────────
+// Fail cards: suit ∈ {C,H,S}, rank ≠ Q/J; trump = all Qs, all Js, all diamonds.
+
+describe('deducedNonTrumpVoids', () => {
+  it('empty tricks → empty object (no voids)', () => {
+    const view = baseView({ tricks: [] })
+    const result = deducedNonTrumpVoids(view)
+    expect(Object.keys(result)).toHaveLength(0)
+  })
+
+  it('fail suit led, one player played a different fail suit → that player void in led suit', () => {
+    // p1 leads AC (clubs fail). p2 plays KH (hearts fail) — not clubs → void in clubs.
+    // p3 plays 9C (follows clubs) → NOT void.
+    const view = baseView({
+      tricks: [{
+        plays: [
+          { userId: 'p1', card: { id: 'AC', suit: 'C', rank: 'A' } },   // led: clubs fail
+          { userId: 'p2', card: { id: 'KH', suit: 'H', rank: 'K' } },   // off-suit fail → void in C
+          { userId: 'p3', card: { id: '9C', suit: 'C', rank: '9' } },   // followed suit → not void
+          { userId: 'p4', card: { id: '7C', suit: 'C', rank: '7' } },   // followed suit → not void
+          { userId: 'p5', card: { id: '8C', suit: 'C', rank: '8' } },   // followed suit → not void
+        ],
+      }],
+    })
+    const result = deducedNonTrumpVoids(view)
+    expect(result['p2'] instanceof Set).toBe(true)
+    expect(result['p2'].has('C')).toBe(true)
+    expect(result['p3']).toBeUndefined()
+    expect(result['p4']).toBeUndefined()
+    expect(result['p5']).toBeUndefined()
+  })
+
+  it('fail suit led, player followed suit → NOT void in that suit', () => {
+    // p1 leads KH; p2 plays 7H (hearts fail) → followed suit → not void.
+    const view = baseView({
+      tricks: [{
+        plays: [
+          { userId: 'p1', card: { id: 'KH', suit: 'H', rank: 'K' } },   // led: hearts fail
+          { userId: 'p2', card: { id: '7H', suit: 'H', rank: '7' } },   // followed hearts → not void
+          { userId: 'p3', card: { id: '9H', suit: 'H', rank: '9' } },   // followed hearts → not void
+        ],
+      }],
+    })
+    const result = deducedNonTrumpVoids(view)
+    expect(result['p2']).toBeUndefined()
+    expect(result['p3']).toBeUndefined()
+  })
+
+  it('fail suit led, player trumped in → void in led fail suit', () => {
+    // p1 leads KH (hearts fail). p2 plays 7D (diamond trump) — not hearts → void in hearts.
+    const view = baseView({
+      tricks: [{
+        plays: [
+          { userId: 'p1', card: { id: 'KH', suit: 'H', rank: 'K' } },   // led: hearts fail
+          { userId: 'p2', card: { id: '7D', suit: 'D', rank: '7' } },   // trump → void in H
+          { userId: 'p3', card: { id: 'QC', suit: 'C', rank: 'Q' } },   // queen trump → void in H
+        ],
+      }],
+    })
+    const result = deducedNonTrumpVoids(view)
+    expect(result['p2'] instanceof Set).toBe(true)
+    expect(result['p2'].has('H')).toBe(true)
+    expect(result['p3'] instanceof Set).toBe(true)
+    expect(result['p3'].has('H')).toBe(true)
+  })
+
+  it('trump led → no void deduction for any player', () => {
+    // 7D (diamond = trump) is led. p2 plays AC (fail) — but trump led means we learn
+    // nothing about fail-suit voids. deducedNonTrumpVoids skips the trick.
+    const view = baseView({
+      tricks: [{
+        plays: [
+          { userId: 'p1', card: { id: '7D', suit: 'D', rank: '7' } },   // led: trump
+          { userId: 'p2', card: { id: 'AC', suit: 'C', rank: 'A' } },   // fail
+          { userId: 'p3', card: { id: 'KH', suit: 'H', rank: 'K' } },   // fail
+        ],
+      }],
+    })
+    const result = deducedNonTrumpVoids(view)
+    expect(result['p2']).toBeUndefined()
+    expect(result['p3']).toBeUndefined()
+  })
+
+  it('hidden led card → skip that trick', () => {
+    const view = baseView({
+      tricks: [{
+        plays: [
+          { userId: 'p1', card: { id: 'HIDDEN', hidden: true } },        // led: hidden
+          { userId: 'p2', card: { id: 'KH', suit: 'H', rank: 'K' } },   // could be anything
+        ],
+      }],
+    })
+    const result = deducedNonTrumpVoids(view)
+    expect(result['p2']).toBeUndefined()
+  })
+
+  it('multiple tricks accumulate voids across suits', () => {
+    // Trick 1: AC (clubs fail) led; p2 plays KH → void in C.
+    // Trick 2: KH (hearts fail) led; p3 plays 7D (trump) → void in H.
+    const view = baseView({
+      tricks: [
+        {
+          plays: [
+            { userId: 'p1', card: { id: 'AC', suit: 'C', rank: 'A' } },
+            { userId: 'p2', card: { id: 'KH', suit: 'H', rank: 'K' } },  // void in C
+            { userId: 'p3', card: { id: '9C', suit: 'C', rank: '9' } },  // follows
+          ],
+        },
+        {
+          plays: [
+            { userId: 'p1', card: { id: 'KH', suit: 'H', rank: 'K' } },
+            { userId: 'p3', card: { id: '7D', suit: 'D', rank: '7' } },  // trump → void in H
+            { userId: 'p2', card: { id: '9H', suit: 'H', rank: '9' } },  // follows hearts
+          ],
+        },
+      ],
+    })
+    const result = deducedNonTrumpVoids(view)
+    expect(result['p2'] instanceof Set).toBe(true)
+    expect(result['p2'].has('C')).toBe(true)
+    expect(result['p2'].has('H')).toBe(false)   // p2 followed hearts in trick 2
+    expect(result['p3'] instanceof Set).toBe(true)
+    expect(result['p3'].has('H')).toBe(true)
+    expect(result['p3'].has('C')).toBe(false)   // p3 followed clubs in trick 1
+  })
+
+  it('currentTrick is ignored — only completed tricks are scanned', () => {
+    // Clubs fail led in currentTrick; p2 plays hearts. Should NOT be deduced void.
+    const view = baseView({
+      tricks: [],
+      currentTrick: [
+        { userId: 'p1', card: { id: 'AC', suit: 'C', rank: 'A' } },
+        { userId: 'p2', card: { id: 'KH', suit: 'H', rank: 'K' } },  // would imply void
+      ],
+    })
+    const result = deducedNonTrumpVoids(view)
+    expect(result['p2']).toBeUndefined()
+  })
+
+  it('hidden non-led play in fail-led trick → skip that play, no void deduction', () => {
+    const view = baseView({
+      tricks: [{
+        plays: [
+          { userId: 'p1', card: { id: 'AC', suit: 'C', rank: 'A' } },       // led: clubs
+          { userId: 'p2', card: { id: 'HIDDEN', hidden: true } },            // hidden → skip
+          { userId: 'p3', card: { id: 'KH', suit: 'H', rank: 'K' } },       // visible off-suit → void in C
+        ],
+      }],
+    })
+    const result = deducedNonTrumpVoids(view)
+    expect(result['p2']).toBeUndefined()   // hidden → no deduction
+    expect(result['p3'] instanceof Set).toBe(true)
+    expect(result['p3'].has('C')).toBe(true)
   })
 })

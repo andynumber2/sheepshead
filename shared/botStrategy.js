@@ -6,7 +6,7 @@
 import {
   isTrump, cardPoints, effectiveSuit, trumpRank, suitRank, schwanzerCardPoints,
 } from './gameEngine.js'
-import { currentWinner, beats, handScore, bestVoidBury, teammateWinning, isGuaranteedWinner, cheapestGuaranteedWin, pickBySchmearPriority, deducedPartner } from './botInference.js'
+import { currentWinner, beats, handScore, bestVoidBury, teammateWinning, isGuaranteedWinner, cheapestGuaranteedWin, pickBySchmearPriority, deducedPartner, deducedNonTrumpVoids } from './botInference.js'
 
 // ─── Legal card helper ────────────────────────────────────────────────────────
 // Mirrors getLegalCardIds from the frontend; computes which cards can be played.
@@ -320,8 +320,21 @@ export function decidePlay(view, userId) {
         return fails.length > 0 ? lowestCard(fails).id : lowestCard(realCards).id
       }
 
-      // No trump; lead highest-value fail card
-      return highestValueCard(realCards).id
+      // No trump; lead highest-value fail card — but avoid suits where an opponent
+      // is known void (Wire 1: they could trump in). Prefer a safe suit if available.
+      // Wire 1 applies to the picker (not the partner, who follows a different lead-back strategy).
+      {
+        const allIds = Object.keys(view.hands)
+        const opponentIds = allIds.filter(id => id !== picker && id !== partner)
+        const nonTrumpVoids = deducedNonTrumpVoids(view)
+        const failCards = realCards.filter(c => !isTrump(c))
+        const safeFails = failCards.filter(card => {
+          const suit = effectiveSuit(card)
+          return !opponentIds.some(id => nonTrumpVoids[id]?.has(suit))
+        })
+        if (safeFails.length > 0) return highestValueCard(safeFails).id
+        return highestValueCard(realCards).id
+      }
     } else {
       // Cash any guaranteed non-trump winner (excluding the called card which can't be led before reveal)
       {
@@ -339,6 +352,26 @@ export function decidePlay(view, userId) {
       if (deducedPartner(view, userId) === null && calledSuit) {
         const calledSuitCards = nonTrump.filter(c => effectiveSuit(c) === calledSuit)
         if (calledSuitCards.length > 0) return lowestCard(calledSuitCards).id
+      }
+      // Wire 2: when the partner identity is known, lead into a picker-team member's
+      // known fail-suit void to force them to trump or waste a card.
+      // Only fires when deducedPartner !== null (otherwise the called-suit flush above handles it).
+      {
+        const { calledAce: ca, calledTen: ct, calledKing: ck } = view
+        const calledCardId = ca?.aceId ?? ct?.tenId ?? ck?.kingId
+        const knownPartner = deducedPartner(view, userId)
+        if (knownPartner !== null) {
+          const nonTrumpVoids = deducedNonTrumpVoids(view)
+          const pickerTeamIds = [picker, knownPartner].filter(Boolean)
+          // Candidate fail cards: non-trump, not the called card
+          const failLeads = nonTrump.filter(c => c.id !== calledCardId)
+          // Find cards in suits where at least one picker-team member is void
+          const voidSuitCards = failLeads.filter(card => {
+            const suit = effectiveSuit(card)
+            return pickerTeamIds.some(id => nonTrumpVoids[id]?.has(suit))
+          })
+          if (voidSuitCards.length > 0) return lowestCard(voidSuitCards).id
+        }
       }
       // Otherwise: lead lowest non-trump to avoid burning trump
       if (nonTrump.length > 0) return lowestCard(nonTrump).id
@@ -411,6 +444,9 @@ export function decidePlay(view, userId) {
           !playedIdsNT.has(id) && id !== userId && id !== picker && id !== partner
         ).length
         const bestNonTrumpWin = highestValueCard(nonTrumpWins)
+        // Checking only the best non-trump winner is sufficient: in a fail-led trick
+        // all nonTrumpWins are the same suit, so if the highest-value card isn't
+        // guaranteed (a higher same-suit rank is unaccounted for), none of them are.
         const safeFromTrumpIn = opponentsRemainingNT === 0 ||
           isGuaranteedWinner(bestNonTrumpWin, view, userId)
         if (safeFromTrumpIn) {
