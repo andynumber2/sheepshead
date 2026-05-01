@@ -503,7 +503,21 @@ export function decidePlay(view, userId) {
       })
       const takeover = cheapestGuaranteedWin(winningOpp, view, userId)
       if (takeover) return takeover.id
-      return schmearOpp()
+
+      // Predicted-win override (#163): when the called suit was led by a fellow
+      // opponent, the partner is unrevealed (engine flag), and no trump has
+      // been played in this trick, the picker-team partner is forced to play
+      // the called card later this trick and will overtake any current
+      // fail-suit winner. Schmearing high points to the current leader just
+      // donates them to the picker team. Fall through to the predicted-win
+      // trump-in branch below (which trumps in via the trump schmear priority,
+      // or returns the lowest card if no trump is held).
+      const calledSuitLedUnrevealed = !view.partnerRevealed && !!view.calledSuit && ledSuit === view.calledSuit
+      const noTrumpPlayedYet = !currentTrick.some(p => isTrump(p.card))
+      if (!(calledSuitLedUnrevealed && noTrumpPlayedYet)) {
+        return schmearOpp()
+      }
+      // else fall through to predicted-win / lead-back branches below
     }
     // Force-take to enable called-suit lead-back: when the called suit hasn't been led
     // yet (partner unrevealed) and the bot has a called-suit fail card to lead back,
