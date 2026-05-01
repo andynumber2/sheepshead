@@ -264,8 +264,10 @@ export function deducedPartner(view, userId) {
 // Opponent bots: only returns true when partner is known AND winner is confirmed opponent.
 //   If partner is null (unrevealed), returns false — unsafe to schmear.
 export function teammateWinning(view, userId) {
-  const { currentTrick, picker, partner } = view
+  const { currentTrick, picker } = view
   if (!currentTrick || currentTrick.length === 0) return false
+
+  const partner = deducedPartner(view, userId)
 
   const winner = currentWinner(currentTrick)
   if (!winner) return false

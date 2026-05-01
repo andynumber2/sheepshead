@@ -126,7 +126,7 @@ describe('decidePlay — predicted picker-team win on called-suit lead by an opp
   function predictedWinView({ hand, currentTrick, calledSuit = 'H', aceId = 'AH' }) {
     return {
       phase: 'playing',
-      hands: { u1: [], u2: hand, u3: [], u4: [], u5: [] },
+      hands: { u1: [], u2: hand, u3: [], u4: [], u5: [], u6: [] },
       currentTrick,
       tricks: [],
       picker: 'u3',
@@ -136,6 +136,8 @@ describe('decidePlay — predicted picker-team win on called-suit lead by an opp
       calledAce: { aceId },
       isLeaster: false,
       lastTrick: [],
+      crackerId: null,
+      recrackerId: null,
     }
   }
 
@@ -209,5 +211,48 @@ describe('decidePlay — predicted picker-team win on called-suit lead by an opp
     })
     // Must follow ♠; legal plays are KS, AS. lowestCard prefers lower points → KS.
     expect(decidePlay(view, 'u2')).toBe('KS')
+  })
+})
+
+describe('decidePlay — opponent schmears via deduced partner from elimination', () => {
+  it('schmears 10S onto opp2 trump-in when partner is deduced by elimination', () => {
+    // 5 seats: u1=opp1 (led KH), u2=picker, u3=opp2 (trumped in QC), u4=bot (opp3),
+    // u5=partner (still to play, holds AH). Ace call on hearts.
+    // u4 is void in hearts, holds 10S among other cards.
+    // Deductions: u1 played non-called on called-suit lead → not partner;
+    //             u3 played non-called → not partner; u2 picker. So u5 is partner,
+    //             and u3 is a confirmed teammate currently winning the trick.
+    // Expected: schmear 10S (highest fail) onto QC.
+    const view = {
+      phase: 'playing',
+      hands: {
+        u1: [], u2: [], u3: [],
+        u4: [
+          c('10S', 'S', '10'), c('9S', 'S', '9'),
+          c('8C', 'C', '8'), c('7C', 'C', '7'),
+          c('AD', 'D', 'A'),
+        ],
+        u5: [],
+      },
+      currentTrick: [
+        { userId: 'u1', card: c('KH', 'H', 'K') },
+        { userId: 'u2', card: c('7H', 'H', '7') },
+        { userId: 'u3', card: c('QC', 'C', 'Q') },
+      ],
+      tricks: [],
+      picker: 'u2',
+      partner: null,
+      partnerRevealed: false,
+      callMode: 'ace',
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: null,
+      recrackerId: null,
+      isLeaster: false,
+      lastTrick: [],
+    }
+    expect(decidePlay(view, 'u4')).toBe('10S')
   })
 })
