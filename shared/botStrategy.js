@@ -557,6 +557,14 @@ export function decidePlay(view, userId) {
     // winning gate naturally excludes the case where another opponent has
     // already trumped in (then the bot's teammate is winning, handled above).
     //
+    // Predicted-win extension: when the called suit was led, the partner has
+    // not yet been revealed, and no trump has been played in this trick, the
+    // partner (ace call) or picker (ten/king call) is forced to play the called
+    // ace later this trick — the picker team will take the trick. Treat that as
+    // a picker-team win for trump-in purposes. The no-trump guard avoids firing
+    // when a fellow opponent has already trumped in (their trump beats the
+    // forced ace, so the picker team will not win).
+    //
     // Specialization: when the called suit was led and the partner has not yet
     // been revealed, the partner is forced to play the called card on this
     // trick, so cash A/10/K of trump via the schmear priority to capture those
@@ -564,11 +572,14 @@ export function decidePlay(view, userId) {
     if (!isTrump(currentTrick[0].card)) {
       const winner = currentWinner(currentTrick)
       const pickerTeamWinning = winner && (winner.userId === picker || winner.userId === partner)
-      if (pickerTeamWinning) {
+      const { calledSuit, partnerRevealed } = view
+      const calledSuitLedUnrevealed = !partnerRevealed && !!calledSuit && ledSuit === calledSuit
+      const noTrumpPlayedYet = !currentTrick.some(p => isTrump(p.card))
+      const pickerTeamWillWin = calledSuitLedUnrevealed && noTrumpPlayedYet
+      if (pickerTeamWinning || pickerTeamWillWin) {
         const trumpCards = realCards.filter(c => isTrump(c))
         if (trumpCards.length > 0) {
-          const { calledSuit, partnerRevealed } = view
-          if (!partnerRevealed && ledSuit === calledSuit) {
+          if (calledSuitLedUnrevealed) {
             const fullHand = view.hands[userId] ?? []
             const pick = pickBySchmearPriority(trumpCards, 'trump', fullHand)
             return (pick ?? lowestCard(trumpCards)).id

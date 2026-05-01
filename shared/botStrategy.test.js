@@ -116,3 +116,98 @@ describe('decidePlay — trump in on partner-revealing called-suit lead', () => 
     expect(played).not.toBe('AD')
   })
 })
+
+describe('decidePlay — predicted picker-team win on called-suit lead by an opponent', () => {
+  // Production scenario: an opponent leads the called suit, the partner is
+  // unrevealed, and the partner (forced to play the called ace later this
+  // trick) is set to take the trick. View.partner is masked to null because
+  // partnerRevealed is false. The bot is void in the called suit, so realCards
+  // already excludes any called-suit cards.
+  function predictedWinView({ hand, currentTrick, calledSuit = 'H', aceId = 'AH' }) {
+    return {
+      phase: 'playing',
+      hands: { u1: [], u2: hand, u3: [], u4: [], u5: [] },
+      currentTrick,
+      tricks: [],
+      picker: 'u3',
+      partner: null,           // masked: partnerRevealed is false
+      partnerRevealed: false,
+      calledSuit,
+      calledAce: { aceId },
+      isLeaster: false,
+      lastTrick: [],
+    }
+  }
+
+  it('trumps in (schmear priority) when an opponent led called suit and partner is unrevealed', () => {
+    // u1 (opponent) led 9H. u2 (bot, opponent) is void in H and has trump + fail.
+    // Partner is unrevealed and no trump played yet → trump in via schmear priority.
+    const hand = [
+      c('AD', 'D', 'A'), c('QC', 'C', 'Q'),
+      c('KS', 'S', 'K'), c('9S', 'S', '9'),
+      c('7C', 'C', '7'), c('8C', 'C', '8'),
+    ]
+    const view = predictedWinView({
+      hand,
+      currentTrick: [{ userId: 'u1', card: c('9H', 'H', '9') }],
+    })
+    expect(decidePlay(view, 'u2')).toBe('AD')
+  })
+
+  it('still trumps in when an intermediate opponent followed with a higher fail of the called suit', () => {
+    // u1 led 9H, u4 (opponent) followed with KH (forced to follow suit, higher fail).
+    // No trump played yet → predicted-win still applies; bot trumps in.
+    const hand = [
+      c('AD', 'D', 'A'), c('QC', 'C', 'Q'),
+      c('7C', 'C', '7'), c('8C', 'C', '8'),
+      c('9S', 'S', '9'), c('KS', 'S', 'K'),
+    ]
+    const view = predictedWinView({
+      hand,
+      currentTrick: [
+        { userId: 'u1', card: c('9H', 'H', '9') },
+        { userId: 'u4', card: c('KH', 'H', 'K') },
+      ],
+    })
+    expect(decidePlay(view, 'u2')).toBe('AD')
+  })
+
+  it('does not trump in when a fellow opponent has already trumped the called-suit lead', () => {
+    // u1 led 9H, u4 (opponent) was void and trumped in with JD. The trumpor's
+    // card beats the forced called ace, so the picker team will not win this
+    // trick. Predicted-win must NOT fire — bot should play its lowest fail.
+    const hand = [
+      c('AD', 'D', 'A'), c('QC', 'C', 'Q'),
+      c('7C', 'C', '7'), c('8C', 'C', '8'),
+      c('9S', 'S', '9'), c('KS', 'S', 'K'),
+    ]
+    const view = predictedWinView({
+      hand,
+      currentTrick: [
+        { userId: 'u1', card: c('9H', 'H', '9') },
+        { userId: 'u4', card: c('JD', 'D', 'J') },
+      ],
+    })
+    const played = decidePlay(view, 'u2')
+    expect(played).not.toBe('AD')
+    expect(played).not.toBe('QC')
+  })
+
+  it('does not fire when the led suit is not the called suit', () => {
+    // u1 leads 9♠ (non-called fail). Partner unrevealed, picker not currently
+    // winning, bot is forced to follow ♠ (no trump in legal plays). Predicted-
+    // win is gated on called-suit lead → branch must not fire, and there is no
+    // discretionary trump play available either.
+    const hand = [
+      c('AD', 'D', 'A'), c('QC', 'C', 'Q'),
+      c('7C', 'C', '7'), c('8C', 'C', '8'),
+      c('KS', 'S', 'K'), c('AS', 'S', 'A'),
+    ]
+    const view = predictedWinView({
+      hand,
+      currentTrick: [{ userId: 'u1', card: c('9S', 'S', '9') }],
+    })
+    // Must follow ♠; legal plays are KS, AS. lowestCard prefers lower points → KS.
+    expect(decidePlay(view, 'u2')).toBe('KS')
+  })
+})
