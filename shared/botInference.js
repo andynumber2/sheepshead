@@ -131,17 +131,95 @@ export function bestVoidBury(hand) {
   return bestPair
 }
 
+// ─── Void analysis (trump) ────────────────────────────────────────────────────
+
+// Returns a Set<userId> of players known to be void in trump based on completed
+// trick history. A player is trump-void if they played a non-trump (non-hidden)
+// card on a trick where the led card was trump (non-hidden).
+// Only completed tricks (view.tricks) are checked — the current trick is excluded.
+export function deducedTrumpVoids(view) {
+  const voids = new Set()
+  for (const trick of (view.tricks ?? [])) {
+    const plays = trick.plays
+    if (!plays || plays.length === 0) continue
+    const led = plays[0].card
+    if (!led || led.hidden) continue           // hidden led card — skip trick
+    if (!isTrump(led)) continue               // fail led — no trump info
+    for (let i = 1; i < plays.length; i++) {
+      const play = plays[i]
+      if (!play.card || play.card.hidden) continue  // can't see this card
+      if (!isTrump(play.card)) voids.add(play.userId)
+    }
+  }
+  return voids
+}
+
 // ─── Guaranteed-winner inference ──────────────────────────────────────────────
 
-// Returns true iff every trump that outranks `card` is visible to userId:
-//   - in userId's own hand
-//   - played in completed tricks (non-hidden)
-//   - played in the current trick (non-hidden)
-//   - in the visible bury (non-hidden; picker-only)
-// Unseen higher trump is always treated as a potential opponent holding.
-// Non-trump cards are never "guaranteed" — callers combine with trumpRemainingElsewhere.
+// Returns true iff `card` cannot be beaten by any opponent:
+//
+// For trump cards: every trump with a strictly lower trumpRank index (i.e. higher
+//   strength) must be accounted for (visible in own hand, played tricks, current
+//   trick, or bury).
+//
+// For non-trump (fail) cards: BOTH conditions must hold:
+//   1. Every same-suit non-trump card with a lower suitRank index (i.e. higher
+//      strength) must be accounted for in: own hand, completed tricks (non-hidden),
+//      current trick (non-hidden), or bury (non-hidden).
+//   2. No opponent can trump it — satisfied if either:
+//      a. trumpRemainingElsewhere(view, userId) === 0 (all trump accounted for), OR
+//      b. Every other player is in the deducedTrumpVoids set.
+//
+// Unseen higher trump / higher same-suit cards are always treated as opponent-held.
 export function isGuaranteedWinner(card, view, userId) {
-  if (!isTrump(card)) return false
+  if (!isTrump(card)) {
+    // ── Condition 1: no higher same-suit card is unaccounted for ─────────────
+    const mySuitRank = suitRank(card)
+    if (mySuitRank === 0) {
+      // Ace is the highest non-trump card; no need to check for higher same-suit
+    } else {
+      // Collect seen suitRank indices for same-suit non-trump cards from all sources.
+      // SUIT_RANK_ORDER = ['A','10','K','9','8','7'] so rank 0 = Ace (strongest).
+      // We need every rank index in 0..mySuitRank-1 to appear at least once.
+      const seenSuitRanks = new Set()
+      for (const c of (view.hands[userId] ?? [])) {
+        if (!c || c.hidden || isTrump(c) || c.suit !== card.suit) continue
+        seenSuitRanks.add(suitRank(c))
+      }
+      for (const trick of (view.tricks ?? [])) {
+        for (const play of trick.plays) {
+          const c = play.card
+          if (!c || c.hidden || isTrump(c) || c.suit !== card.suit) continue
+          seenSuitRanks.add(suitRank(c))
+        }
+      }
+      for (const play of (view.currentTrick ?? [])) {
+        const c = play.card
+        if (!c || c.hidden || isTrump(c) || c.suit !== card.suit) continue
+        seenSuitRanks.add(suitRank(c))
+      }
+      for (const c of (view.buried ?? [])) {
+        if (!c || c.hidden || isTrump(c) || c.suit !== card.suit) continue
+        seenSuitRanks.add(suitRank(c))
+      }
+
+      // Every rank strictly lower than mySuitRank (= stronger fail cards) must be seen.
+      for (let r = 0; r < mySuitRank; r++) {
+        if (!seenSuitRanks.has(r)) return false
+      }
+    }
+
+    // ── Condition 2: no opponent can trump it ─────────────────────────────────
+    const noTrumpElsewhere = trumpRemainingElsewhere(view, userId) === 0
+    if (!noTrumpElsewhere) {
+      const voids = deducedTrumpVoids(view)
+      const otherPlayerIds = Object.keys(view.hands).filter(id => id !== userId)
+      const allOthersVoid = otherPlayerIds.every(id => voids.has(id))
+      if (!allOthersVoid) return false
+    }
+
+    return true
+  }
   const myRank = trumpRank(card)
   if (myRank === 0) return true  // highest trump (Queen of Clubs)
 
