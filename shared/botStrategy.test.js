@@ -256,3 +256,46 @@ describe('decidePlay — opponent schmears via deduced partner from elimination'
     expect(decidePlay(view, 'u4')).toBe('10S')
   })
 })
+
+describe('decidePlay — opponent identifies picker-team winner via deducedPartner', () => {
+  it('after recrack, opponent trumps in to contest when deduced partner is winning', () => {
+    // Setup: ace call on hearts. u3 recracked → u3 is the deduced partner (picker team).
+    // Trick: u1 leads 9♠ (non-called fail). u3 (deduced partner) plays A♠ — picker team
+    // is currently winning the trick.
+    // Bot is u4 (opponent), void in spades, holds Q♣ (top trump) and other cards.
+    // Pre-fix: pickerTeamWinning consults view.partner (null) → false → predicted-win
+    //   branch doesn't fire → bot falls to lowestCard = 7C.
+    // Post-fix: pickerTeamWinning sees u3 = deducedPartner → true → predicted-win
+    //   trump-in branch fires → bot plays QC (top trump) to steal the trick.
+    const view = {
+      phase: 'playing',
+      hands: {
+        u1: [], u2: [], u3: [],
+        u4: [
+          c('QC', 'C', 'Q'), c('AD', 'D', 'A'),
+          c('10C', 'C', '10'), c('7C', 'C', '7'),
+          c('KD', 'D', 'K'),
+        ],
+        u5: [],
+      },
+      currentTrick: [
+        { userId: 'u1', card: c('9S', 'S', '9') },
+        { userId: 'u3', card: c('AS', 'S', 'A') },
+      ],
+      tricks: [],
+      picker: 'u2',
+      partner: null,
+      partnerRevealed: false,
+      callMode: 'ace',
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: 'u1',       // u1 cracked
+      recrackerId: 'u3',     // u3 recracked → u3 is the partner
+      isLeaster: false,
+      lastTrick: [],
+    }
+    expect(decidePlay(view, 'u4')).toBe('QC')
+  })
+})

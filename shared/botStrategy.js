@@ -6,7 +6,7 @@
 import {
   isTrump, cardPoints, effectiveSuit, trumpRank, suitRank, schwanzerCardPoints,
 } from './gameEngine.js'
-import { currentWinner, beats, handScore, bestVoidBury, teammateWinning, trumpRemainingElsewhere, isGuaranteedWinner, cheapestGuaranteedWin, pickBySchmearPriority } from './botInference.js'
+import { currentWinner, beats, handScore, bestVoidBury, teammateWinning, trumpRemainingElsewhere, isGuaranteedWinner, cheapestGuaranteedWin, pickBySchmearPriority, deducedPartner } from './botInference.js'
 
 // ─── Legal card helper ────────────────────────────────────────────────────────
 // Mirrors getLegalCardIds from the frontend; computes which cards can be played.
@@ -479,8 +479,9 @@ export function decidePlay(view, userId) {
       const playedIdsOpp = new Set(currentTrick.map(p => p.userId))
       const allIdsOpp = Object.keys(view.hands)
       // From opponent POV, "threats" (could overtake teammate) = picker + partner still to play.
+      const deducedOpp = deducedPartner(view, userId)
       const threatsRemaining = allIdsOpp.filter(id =>
-        !playedIdsOpp.has(id) && id !== userId && (id === picker || id === partner)
+        !playedIdsOpp.has(id) && id !== userId && (id === picker || id === deducedOpp)
       ).length
 
       const teammateSafe = threatsRemaining === 0 ||
@@ -571,7 +572,8 @@ export function decidePlay(view, userId) {
     // points along with the partner's high card.
     if (!isTrump(currentTrick[0].card)) {
       const winner = currentWinner(currentTrick)
-      const pickerTeamWinning = winner && (winner.userId === picker || winner.userId === partner)
+      const deducedForPredicted = deducedPartner(view, userId)
+      const pickerTeamWinning = winner && (winner.userId === picker || winner.userId === deducedForPredicted)
       const { calledSuit, partnerRevealed } = view
       const calledSuitLedUnrevealed = !partnerRevealed && !!calledSuit && ledSuit === calledSuit
       const noTrumpPlayedYet = !currentTrick.some(p => isTrump(p.card))
