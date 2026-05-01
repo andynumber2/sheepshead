@@ -99,22 +99,26 @@ Play the **lowest-value card** always, to avoid winning tricks.
 ### Leading a Trick
 
 #### Picker-team bot leading
-1. **Cash a fail ace** if opponents are likely trump-exhausted (≤2 trump estimated remaining elsewhere).
+1. **Cash any guaranteed non-trump winner** (any rank, not just aces): every higher same-suit card must be accounted for AND no opponent can trump it (all trump exhausted, or every other player is known trump-void). The highest-value qualifying card is played first.
 2. **Lead highest trump** to win tricks and accumulate card points.
 3. If no trump, and the bot is the **partner**:
    - If the last trick had 3 or fewer trump played, lead a called-suit card (lowest of that suit).
    - Otherwise, lead the lowest-point fail card.
-4. If no trump and not the partner: lead the **highest-value fail card**.
+4. If no trump and not the partner: lead the **highest-value fail card**, avoiding suits where an opponent is known void (they could trump in). Specifically, check which fail suits are **safe** (no opponent is known void in that suit based on completed trick history). If any safe-suit fail cards are available, prefer the highest-value card among them. If all suits are risky, fall back to the highest-value fail card overall.
 
 #### Opponent bot leading
-1. **Cash a fail ace** if the picker team has **zero** trump remaining (all 14 trump accounted for in own hand, buried, and played tricks). The fail ace must not be the called card (in practice an opponent never holds the called card, but the code is explicit).
+1. **Cash any guaranteed non-trump winner** (excluding the called card, which cannot be led before reveal): every higher same-suit card must be accounted for AND no opponent can trump it (all trump exhausted, or every other player is known trump-void). The highest-value qualifying card is played first.
 2. **Lead called suit** (lowest card of that suit) if the partner has not yet been deduced and the bot holds at least one fail card of the called suit. This forces the partner to play their called card, revealing their identity.
-3. Otherwise, lead the **lowest non-trump card** to avoid burning trump.
-4. If no non-trump cards remain, lead the lowest card overall.
+3. **Lead into a picker-team void** if the partner identity is known (via crack/recrack/elimination): if a picker-team member (picker or partner) is known to be void in a fail suit and the bot holds non-trump, non-called-card cards in that suit, lead the **lowest-value** card among all qualifying void-suit candidates to draw trump cheaply without gifting points to the picker team.
+4. Otherwise, lead the **lowest non-trump card** to avoid burning trump.
+5. If no non-trump cards remain, lead the lowest card overall.
 
 ### Following a Trick
 
-A recurring concept below is a **guaranteed winner**: a trump card the bot holds such that every higher-rank trump has already been seen (in own hand, completed tricks, current trick, or visible bury). Any unseen higher trump is treated conservatively as still in an opponent's hand. Non-trump cards are never "guaranteed."
+A recurring concept below is a **guaranteed winner**: a card the bot holds that cannot be beaten by any opponent.
+
+- **Trump card**: every higher-rank trump must have been seen (in own hand, completed tricks, current trick, or visible bury). Any unseen higher trump is treated conservatively as still in an opponent's hand.
+- **Non-trump (fail) card**: two conditions must both hold: (1) every same-suit card of higher rank has been seen in the same sources, AND (2) no opponent can trump it — meaning either all 14 trump are accounted for, or every other player is known to be void in trump (they played fail on a trump-led trick in history).
 
 #### Picker-team bot following
 1. **Schmear** (teammate is currently winning):
@@ -126,7 +130,7 @@ A recurring concept below is a **guaranteed winner**: a trump card the bot holds
      2. Else play the highest winning trump as risk reduction.
      3. Else fall back to a normal schmear.
 2. **Win the trick efficiently** (no teammate winning, bot can win):
-   - Prefer non-trump winners. Default is the lowest-point non-trump winner, but if the bot is safe from being trumped in (no opponents remaining, OR no trump left elsewhere), play the **highest-point** non-trump winner instead — squeeze the trick for everything it's worth.
+   - Prefer non-trump winners. Default is the lowest-point non-trump winner, but if the bot is safe (no opponents remaining, OR the best non-trump winner is itself a guaranteed winner — every higher same-suit card is accounted for and no opponent can trump in), play the **highest-point** non-trump winner instead — squeeze the trick for everything it's worth.
    - If only trump can win:
      - **Trump-led trick**: if no opponents remain to play, use the cheapest winning trump. Otherwise, if a guaranteed-winning trump is in the winning set, play the lowest-point one; else play the highest trump.
      - **Fail-led trick, bot is the picker** (void in led suit): lowest-point guaranteed-winning trump if any; else highest trump.
@@ -197,7 +201,9 @@ of bot team.
 | `currentWinner` | Returns the play object currently winning a trick |
 | `bestVoidBury` | Finds the best 2-card bury that voids a non-trump suit with ≥11 combined card points |
 | `teammateWinning` | Returns true if the current trick leader is on the same team as the bot |
-| `isGuaranteedWinner` | For a trump card, returns true iff every higher-rank trump has been seen (own hand, played tricks, current trick, visible bury). Unseen higher trump is treated as opponent-held. Non-trump cards are never guaranteed. |
+| `deducedTrumpVoids` | Returns the set of players known to be void in trump, based on completed trick history. A player is trump-void if they played a non-trump card on a trick where trump was led. |
+| `deducedNonTrumpVoids` | Returns a map of `{ [userId]: Set<suit> }` — the fail suits each player is known void in, deduced from completed trick history. A player is void in a fail suit if, on a trick where that fail suit was led, they played a card of a different suit (including trump). Only scans completed tricks. |
+| `isGuaranteedWinner` | Returns true iff a card cannot be beaten by any opponent. For trump: every higher-rank trump has been seen (own hand, played tricks, current trick, visible bury). For non-trump: every higher same-suit card has been seen AND no opponent can trump (all trump accounted for, or all others are deduced trump-void). |
 | `cheapestGuaranteedWin` | From a set of candidate cards, returns the lowest-point card that satisfies `isGuaranteedWinner` (tiebreak: weaker trump first). Returns null if none qualify. |
 | `pickBySchmearPriority` | Pick the least-painful winning card to spend, walking a rank-priority list (`A,10,K,9,8,7,J,Q` for trump; `A,10,K,9,8,7` for fail). Trump tiebreak: weakest trump rank. Fail tiebreak: shortest non-trump suit in hand, then alphabetical. |
 | `knownNonPartners` | Returns the set of userIds known not to be the partner from public information: picker, self (if non-picker-team), cracker, players who played non-called on a called-suit-led trick before the called card was played. |
