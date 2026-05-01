@@ -86,3 +86,43 @@ describe('computeBotSuggestion', () => {
       .toThrow(/unknown phase/i)
   })
 })
+
+describe('computeBotSuggestion — deduced-partner schmear unlock', () => {
+  it('suggests 10S in the headline scenario (matches decidePlay)', () => {
+    // Same view as the decidePlay headline test in botStrategy.test.js.
+    const view = {
+      phase: 'playing',
+      hands: {
+        u1: [], u2: [], u3: [],
+        u4: [
+          { id: '10S', suit: 'S', rank: '10' }, { id: '9S', suit: 'S', rank: '9' },
+          { id: '8C', suit: 'C', rank: '8' }, { id: '7C', suit: 'C', rank: '7' },
+          { id: 'AD', suit: 'D', rank: 'A' },
+        ],
+        u5: [],
+      },
+      currentTrick: [
+        { userId: 'u1', card: { id: 'KH', suit: 'H', rank: 'K' } },
+        { userId: 'u2', card: { id: '7H', suit: 'H', rank: '7' } },
+        { userId: 'u3', card: { id: 'QC', suit: 'C', rank: 'Q' } },
+      ],
+      tricks: [],
+      picker: 'u2',
+      partner: null,
+      partnerRevealed: false,
+      callMode: 'ace',
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: null,
+      recrackerId: null,
+      isLeaster: false,
+      lastTrick: [],
+      reveal_partner: false,
+    }
+    const result = computeBotSuggestion(view, 'u4')
+    expect(result.kind).toBe('play')
+    expect(result.ids).toEqual(['10S'])
+  })
+})
