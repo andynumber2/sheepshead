@@ -329,10 +329,11 @@ export function decidePlay(view, userId) {
           .sort((a, b) => cardPoints(b) - cardPoints(a))
         if (failAces.length > 0) return failAces[0].id
       }
-      // Lead called suit to flush out the unrevealed partner
-      const { calledSuit, partnerRevealed } = view
+      // Lead called suit to flush out the unrevealed partner — skipped if partner
+      // has already been deduced from public information (crack/recrack/elimination).
+      const { calledSuit } = view
       const nonTrump = realCards.filter(c => !isTrump(c))
-      if (!partnerRevealed && calledSuit) {
+      if (deducedPartner(view, userId) === null && calledSuit) {
         const calledSuitCards = nonTrump.filter(c => effectiveSuit(c) === calledSuit)
         if (calledSuitCards.length > 0) return lowestCard(calledSuitCards).id
       }
@@ -505,7 +506,7 @@ export function decidePlay(view, userId) {
     // win this trick aggressively so the bot can lead the called suit on the next
     // trick and flush the picker's partner.
     {
-      const { calledSuit, partnerRevealed } = view
+      const { calledSuit } = view
       const ledThisTrickIsCalled = ledSuit === calledSuit
       // Note: realCards already filters by must-follow rules. If the bot has a called-suit
       // card but is here following a different suit, the called-suit card is in `view.hands[userId]`
@@ -515,7 +516,9 @@ export function decidePlay(view, userId) {
         !card.hidden && !isTrump(card) && effectiveSuit(card) === calledSuit
       )
 
-      if (!partnerRevealed && !ledThisTrickIsCalled && hasCalledSuitFailInHand) {
+      // Skipped if partner has already been deduced from public information —
+      // the lead-back goal (flush the unknown partner) is then moot.
+      if (deducedPartner(view, userId) === null && !ledThisTrickIsCalled && hasCalledSuitFailInHand) {
         const winningSet = realCards.filter(card => {
           for (const play of currentTrick) {
             if (!beats(card, play.card, ledSuit)) return false

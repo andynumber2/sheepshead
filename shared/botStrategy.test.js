@@ -299,3 +299,39 @@ describe('decidePlay — opponent identifies picker-team winner via deducedPartn
     expect(decidePlay(view, 'u4')).toBe('QC')
   })
 })
+
+describe('decidePlay — opponent leading after recrack does not lead called suit', () => {
+  it('skips lead-called-suit-to-flush when partner is deduced via recrack', () => {
+    // Hand has only point-bearing hearts (KH=4pts, 10H=10pts) and zero-point clubs (7C, 8C).
+    // Pre-fix: gate fires (!partnerRevealed) → leads lowest heart by lowestCard = KH.
+    // Post-fix: deducedPartner non-null (recracker u3) → gate skipped → leads lowest
+    //   non-trump overall = 7C (zero-point club beats KH 4pts).
+    const view = {
+      phase: 'playing',
+      hands: {
+        u1: [], u2: [], u3: [],
+        u4: [
+          c('KH', 'H', 'K'), c('10H', 'H', '10'),
+          c('7C', 'C', '7'), c('8C', 'C', '8'),
+          c('AD', 'D', 'A'),
+        ],
+        u5: [],
+      },
+      currentTrick: [],
+      tricks: [],
+      picker: 'u2',
+      partner: null,
+      partnerRevealed: false,
+      callMode: 'ace',
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: null,
+      recrackerId: 'u3',
+      isLeaster: false,
+      lastTrick: [],
+    }
+    expect(decidePlay(view, 'u4')).toBe('7C')
+  })
+})
