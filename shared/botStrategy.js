@@ -655,7 +655,11 @@ export function decidePlay(view, userId) {
             const pick = pickBySchmearPriority(trumpCards, 'trump', fullHand)
             return (pick ?? lowestCard(trumpCards)).id
           }
-          return highestTrump(trumpCards).id
+          const winningTrump = trumpCards.filter(card =>
+            currentTrick.every(play => beats(card, play.card, ledSuit))
+          )
+          if (winningTrump.length > 0) return highestTrump(winningTrump).id
+          // No trump can beat the current winner — fall through to lowestCard
         }
       }
     }
