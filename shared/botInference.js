@@ -184,6 +184,58 @@ export function cheapestGuaranteedWin(candidates, view, userId) {
   })
 }
 
+// ─── Partner deduction ────────────────────────────────────────────────────────
+
+// Returns the set of userIds known not to be the partner, derived from public
+// information available in the view. Used by deducedPartner to identify the
+// partner once the rule-out set covers 3 of the 4 non-picker seats.
+//
+// Signals:
+//   - The picker is always ruled out.
+//   - The bot itself, if not on the picker team (view.partner !== userId).
+//   - The cracker, if view.crackerId is set.
+//   - Any player who played a non-called card on a called-suit-led trick before
+//     the called card was played in that trick.
+//
+// Hidden cards in tricks are treated as unknown (no deduction).
+// Leasters / no-picker hands return an empty set.
+export function knownNonPartners(view, userId) {
+  const set = new Set()
+  if (!view.picker) return set  // leaster / no-picker hand
+  set.add(view.picker)
+  if (view.partner !== userId && view.picker !== userId) {
+    set.add(userId)
+  }
+  if (view.crackerId) set.add(view.crackerId)
+
+  const calledCardId =
+    view.calledAce?.aceId ?? view.calledTen?.tenId ?? view.calledKing?.kingId
+  if (!view.calledSuit || !calledCardId) return set
+
+  const scanTrick = (plays) => {
+    if (!plays || plays.length === 0) return
+    const first = plays[0]
+    if (!first.card || first.card.hidden) return
+    const ledSuit = first.declaredSuit ?? effectiveSuit(first.card)
+    if (ledSuit !== view.calledSuit) return
+    let calledCardSeen = false
+    for (const play of plays) {
+      if (calledCardSeen) return  // plays after the called card carry no info
+      if (!play.card || play.card.hidden) continue
+      if (play.card.id === calledCardId) {
+        calledCardSeen = true
+        continue
+      }
+      set.add(play.userId)
+    }
+  }
+
+  for (const trick of (view.tricks ?? [])) scanTrick(trick.plays)
+  scanTrick(view.currentTrick ?? [])
+
+  return set
+}
+
 // ─── Schmear detection ────────────────────────────────────────────────────────
 
 // Returns true if the player currently winning the trick is on the same team as userId.
