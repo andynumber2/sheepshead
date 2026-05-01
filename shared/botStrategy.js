@@ -117,6 +117,12 @@ function highestTrump(cards) {
   return trumps.reduce((best, c) => trumpRank(c) < trumpRank(best) ? c : best)
 }
 
+function weakestTrump(cards) {
+  const trumps = cards.filter(c => isTrump(c))
+  if (trumps.length === 0) return null
+  return trumps.reduce((best, c) => trumpRank(c) > trumpRank(best) ? c : best)
+}
+
 function highestValueCard(cards) {
   return cards.reduce((best, c) => cardPoints(c) > cardPoints(best) ? c : best)
 }
@@ -514,7 +520,12 @@ export function decidePlay(view, userId) {
       return highestTrump(winning).id  // 1 trump, picker already played — play it
     }
 
-    // Can't win; play lowest
+    // Can't win — on a trump-led trick, shed the weakest trump (highest rank index)
+    // rather than the cheapest by points, to preserve tactically stronger trump.
+    if (ledSuit === 'T') {
+      const weak = weakestTrump(realCards)
+      if (weak) return weak.id
+    }
     return lowestCard(realCards).id
   } else {
     // Opponent: schmear on confirmed teammate wins — unless picker-team still to play
@@ -662,6 +673,12 @@ export function decidePlay(view, userId) {
           // No trump can beat the current winner — fall through to lowestCard
         }
       }
+    }
+    // On a trump-led trick, shed the weakest trump (highest rank index)
+    // rather than the cheapest by points, to preserve tactically stronger trump.
+    if (ledSuit === 'T') {
+      const weak = weakestTrump(realCards)
+      if (weak) return weak.id
     }
     return lowestCard(realCards).id
   }

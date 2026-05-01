@@ -1415,3 +1415,78 @@ describe('decidePlay — opponent plays cheapest trump when picker-team winner i
     expect(decidePlay(view, 'u4')).toBe('QS')
   })
 })
+
+describe('decidePlay — shed weakest trump when forced to follow and cannot win (#170)', () => {
+  it('opponent sheds weakest trump (KD rank 10) not cheapest (JS rank 5) on unbeatable trump trick', () => {
+    // Trump-led trick: u1 led JH (rank 6), u2 (picker) played QC (rank 0 — unbeatable).
+    // Bot u4 (opponent) must follow trump. Holds KD (rank 10, 4pts), QS (rank 1, 3pts), JS (rank 5, 2pts).
+    // Pre-fix: lowestCard picks JS (2pts). Post-fix: shed weakest trump → KD (rank 10).
+    const view = {
+      phase: 'playing',
+      hands: {
+        u1: [], u2: [], u3: [],
+        u4: [
+          c('KD', 'D', 'K'),
+          c('QS', 'S', 'Q'),
+          c('JS', 'S', 'J'),
+        ],
+        u5: [],
+      },
+      currentTrick: [
+        { userId: 'u1', card: c('JH', 'H', 'J') },
+        { userId: 'u2', card: c('QC', 'C', 'Q') },
+      ],
+      tricks: [],
+      picker: 'u2',
+      partner: 'u5',
+      partnerRevealed: true,
+      callMode: 'ace',
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: null,
+      recrackerId: null,
+      isLeaster: false,
+      lastTrick: [],
+    }
+    expect(decidePlay(view, 'u4')).toBe('KD')
+  })
+
+  it('picker-team bot sheds weakest trump (KD rank 10) not cheapest (JS rank 5) on unbeatable trump trick', () => {
+    // Trump-led trick: u1 (opponent) led QC (rank 0 — unbeatable).
+    // Bot u3 (partner, picker-team) must follow trump. Holds KD (rank 10, 4pts), QS (rank 1, 3pts), JS (rank 5, 2pts).
+    // No teammate is winning. winning.length === 0 → falls to picker-team "can't win" path.
+    // Pre-fix: lowestCard picks JS (2pts). Post-fix: shed weakest trump → KD (rank 10).
+    const view = {
+      phase: 'playing',
+      hands: {
+        u1: [],
+        u2: [c('JD', 'D', 'J')],
+        u3: [
+          c('KD', 'D', 'K'),
+          c('QS', 'S', 'Q'),
+          c('JS', 'S', 'J'),
+        ],
+        u4: [], u5: [],
+      },
+      currentTrick: [
+        { userId: 'u1', card: c('QC', 'C', 'Q') },
+      ],
+      tricks: [],
+      picker: 'u2',
+      partner: 'u3',
+      partnerRevealed: true,
+      callMode: 'ace',
+      calledSuit: 'S',
+      calledAce: { aceId: 'AS' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: null,
+      recrackerId: null,
+      isLeaster: false,
+      lastTrick: [],
+    }
+    expect(decidePlay(view, 'u3')).toBe('KD')
+  })
+})
