@@ -247,6 +247,36 @@ describe('deducedTrumpVoids', () => {
     const voids = deducedTrumpVoids(view)
     expect(voids.has('p2')).toBe(false)
   })
+
+  it('currentTrick is ignored — trump led + fail follow there does not add to void set', () => {
+    // Even if a player follows with fail on a trump-led currentTrick,
+    // deducedTrumpVoids must not add them: only completed tricks count.
+    const view = baseView({
+      tricks: [],   // no completed tricks
+      currentTrick: [
+        { userId: 'p1', card: { id: '7D', suit: 'D', rank: '7' } },   // led: trump
+        { userId: 'p2', card: { id: 'AC', suit: 'C', rank: 'A' } },   // fail — but in-progress
+      ],
+    })
+    const voids = deducedTrumpVoids(view)
+    expect(voids.has('p2')).toBe(false)
+  })
+
+  it('hidden non-led play in trump-led trick → NOT added to void set', () => {
+    // p2's play is face-down; we cannot see the card, so no void deduction.
+    const view = baseView({
+      tricks: [{
+        plays: [
+          { userId: 'p1', card: { id: '7D', suit: 'D', rank: '7' } },         // led: trump
+          { userId: 'p2', card: { id: 'HIDDEN', hidden: true } },              // can't see this
+          { userId: 'p3', card: { id: 'AC', suit: 'C', rank: 'A' } },         // fail → void
+        ],
+      }],
+    })
+    const voids = deducedTrumpVoids(view)
+    expect(voids.has('p2')).toBe(false)   // hidden — no deduction
+    expect(voids.has('p3')).toBe(true)    // visible fail — deduced void
+  })
 })
 
 describe('isGuaranteedWinner – non-trump extension', () => {
@@ -431,5 +461,87 @@ describe('isGuaranteedWinner – non-trump extension', () => {
       buried: [],
     })
     expect(isGuaranteedWinner(jc, view, 'p1')).toBe(false)
+  })
+
+  it('buried higher same-suit card satisfies condition 1 — fail 10 with buried ace returns true', () => {
+    // 10C has suitRank 1 → requires AC (suitRank 0) to be accounted for.
+    // AC is in view.buried (picker buried it), so condition 1 is satisfied.
+    // All opponents are trump-void (played fail on a trump-led completed trick).
+    const tenOfClubs = { id: '10C', suit: 'C', rank: '10' }
+    const aceOfClubs = { id: 'AC', suit: 'C', rank: 'A' }
+    const view = baseView({
+      hands: { p1: [tenOfClubs], p2: [], p3: [], p4: [], p5: [] },
+      tricks: [{
+        plays: [
+          { userId: 'p1', card: { id: '7D', suit: 'D', rank: '7' } }, // led trump
+          { userId: 'p2', card: { id: 'KH', suit: 'H', rank: 'K' } }, // fail → void
+          { userId: 'p3', card: { id: '9S', suit: 'S', rank: '9' } }, // fail → void
+          { userId: 'p4', card: { id: '8S', suit: 'S', rank: '8' } }, // fail → void
+          { userId: 'p5', card: { id: '7S', suit: 'S', rank: '7' } }, // fail → void
+        ],
+      }],
+      currentTrick: [],
+      buried: [aceOfClubs],   // AC buried — satisfies condition 1 for 10C
+    })
+    expect(isGuaranteedWinner(tenOfClubs, view, 'p1')).toBe(true)
+  })
+
+  it('fail King (suitRank 2) — false when only AC played (10C still outstanding)', () => {
+    // KC requires both AC (rank 0) and 10C (rank 1) to be accounted for.
+    // Only AC has been played → 10C is unaccounted → returns false.
+    const kingOfClubs = { id: 'KC', suit: 'C', rank: 'K' }
+    const view = baseView({
+      hands: { p1: [kingOfClubs], p2: [], p3: [], p4: [], p5: [] },
+      tricks: [
+        {
+          // Trump led — all followers play fail → trump-void
+          plays: [
+            { userId: 'p1', card: { id: '7D', suit: 'D', rank: '7' } }, // led trump
+            { userId: 'p2', card: { id: 'KH', suit: 'H', rank: 'K' } }, // fail → void
+            { userId: 'p3', card: { id: '9H', suit: 'H', rank: '9' } }, // fail → void
+            { userId: 'p4', card: { id: '8H', suit: 'H', rank: '8' } }, // fail → void
+            { userId: 'p5', card: { id: '7H', suit: 'H', rank: '7' } }, // fail → void
+          ],
+        },
+        {
+          // AC played — only rank 0 seen; rank 1 (10C) still outstanding
+          plays: [
+            { userId: 'p2', card: { id: 'AC', suit: 'C', rank: 'A' } },
+            { userId: 'p3', card: { id: '9S', suit: 'S', rank: '9' } },
+            { userId: 'p4', card: { id: '8S', suit: 'S', rank: '8' } },
+            { userId: 'p5', card: { id: '7S', suit: 'S', rank: '7' } },
+            { userId: 'p1', card: { id: 'QD', suit: 'D', rank: 'Q' } },
+          ],
+        },
+      ],
+      currentTrick: [],
+      buried: [],
+    })
+    expect(isGuaranteedWinner(kingOfClubs, view, 'p1')).toBe(false)
+  })
+
+  it('fail King (suitRank 2) — true when both AC and 10C played and all others trump-void', () => {
+    // KC requires AC (rank 0) and 10C (rank 1) both seen; all opponents must be void in trump.
+    // Both AC and 10C were played in tricks; trump-void established via trump-led trick.
+    const kingOfClubs = { id: 'KC', suit: 'C', rank: 'K' }
+    const view = baseView({
+      hands: { p1: [kingOfClubs], p2: [], p3: [], p4: [], p5: [] },
+      tricks: [
+        {
+          // Trump led — p2/p3/p4/p5 all play fail → all trump-void
+          plays: [
+            { userId: 'p1', card: { id: '7D', suit: 'D', rank: '7' } }, // led trump
+            { userId: 'p2', card: { id: 'AC', suit: 'C', rank: 'A' } }, // fail (clubs) → void
+            { userId: 'p3', card: { id: '10C', suit: 'C', rank: '10' } }, // fail (clubs) → void
+            { userId: 'p4', card: { id: '8H', suit: 'H', rank: '8' } }, // fail → void
+            { userId: 'p5', card: { id: '7H', suit: 'H', rank: '7' } }, // fail → void
+          ],
+        },
+      ],
+      currentTrick: [],
+      buried: [],
+    })
+    // Both AC (rank 0) and 10C (rank 1) seen in tricks; all opponents are trump-void.
+    expect(isGuaranteedWinner(kingOfClubs, view, 'p1')).toBe(true)
   })
 })

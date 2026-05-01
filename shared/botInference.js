@@ -136,7 +136,10 @@ export function bestVoidBury(hand) {
 // Returns a Set<userId> of players known to be void in trump based on completed
 // trick history. A player is trump-void if they played a non-trump (non-hidden)
 // card on a trick where the led card was trump (non-hidden).
-// Only completed tricks (view.tricks) are checked — the current trick is excluded.
+// Only completed tricks (view.tricks) are checked — the current trick is excluded
+// to keep this function a pure read of settled history; the led card's effective
+// suit in an in-progress trick may still be subject to `declaredSuit`, making
+// void deduction unreliable mid-trick.
 export function deducedTrumpVoids(view) {
   const voids = new Set()
   for (const trick of (view.tricks ?? [])) {
@@ -171,6 +174,12 @@ export function deducedTrumpVoids(view) {
 //      b. Every other player is in the deducedTrumpVoids set.
 //
 // Unseen higher trump / higher same-suit cards are always treated as opponent-held.
+//
+// NOTE — currentTrick is included in the "seen" sources. Callers should use this
+// function either (a) when leading (currentTrick is empty) or (b) when `card` is
+// the currently-winning card in the trick, so that including currentTrick cards in
+// the accounting does not conflate the question "can this card be beaten?" with
+// cards already played against it.
 export function isGuaranteedWinner(card, view, userId) {
   if (!isTrump(card)) {
     // ── Condition 1: no higher same-suit card is unaccounted for ─────────────
