@@ -335,3 +335,80 @@ describe('decidePlay — opponent leading after recrack does not lead called sui
     expect(decidePlay(view, 'u4')).toBe('7C')
   })
 })
+
+describe('decidePlay — regression: no behavior change when no deduction signals fired', () => {
+  // This pins the contract that deducedPartner returning null leaves all updated
+  // call sites behaving exactly as they did pre-fix.
+
+  it('teammateWinning still false for opponent bot with no signals (no schmear)', () => {
+    // 5 seats. Trick led with non-called suit (spades). No crack/recrack.
+    // Bot is u4 (opponent), follows spades. teammateWinning must remain false
+    // → no schmear → falls through. Bot must follow led suit; spade options are
+    // [10S, 9S]. Pre-fix the schmear branch was skipped (view.partner null) and
+    // the bot played 9S (lowest). Post-fix without signals deducedPartner returns
+    // null → schmear still skipped → still 9S.
+    const view = {
+      phase: 'playing',
+      hands: {
+        u1: [], u2: [], u3: [],
+        u4: [
+          c('10S', 'S', '10'), c('9S', 'S', '9'),
+          c('8C', 'C', '8'), c('7C', 'C', '7'),
+          c('AD', 'D', 'A'),
+        ],
+        u5: [],
+      },
+      currentTrick: [
+        { userId: 'u1', card: c('9S', 'S', '9') },
+        { userId: 'u2', card: c('7S', 'S', '7') },
+        { userId: 'u3', card: c('KS', 'S', 'K') },
+      ],
+      tricks: [],
+      picker: 'u2',
+      partner: null,
+      partnerRevealed: false,
+      callMode: 'ace',
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: null,
+      recrackerId: null,
+      isLeaster: false,
+      lastTrick: [],
+    }
+    expect(decidePlay(view, 'u4')).toBe('9S')
+  })
+
+  it('lead-flush still leads called suit when no signals fired', () => {
+    // Bot u4 leads. No crack/recrack. deducedPartner returns null → flush gate
+    // fires → bot leads lowest heart. Both pre- and post-fix: 7H.
+    const view = {
+      phase: 'playing',
+      hands: {
+        u1: [], u2: [], u3: [],
+        u4: [
+          c('7H', 'H', '7'), c('9H', 'H', '9'),
+          c('8C', 'C', '8'), c('7C', 'C', '7'),
+          c('AD', 'D', 'A'),
+        ],
+        u5: [],
+      },
+      currentTrick: [],
+      tricks: [],
+      picker: 'u2',
+      partner: null,
+      partnerRevealed: false,
+      callMode: 'ace',
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: null,
+      recrackerId: null,
+      isLeaster: false,
+      lastTrick: [],
+    }
+    expect(decidePlay(view, 'u4')).toBe('7H')
+  })
+})
