@@ -181,9 +181,12 @@ allow the partner to be deduced earlier:
   are ruled out, the remaining seat is the partner.
 
 `deducedPartner(view, userId)` returns the partner if knowable from any of
-these signals, else `null`. The strategy code consults it for every "who is
-the partner?" identity check; "has the called card been played?" timing
-checks continue to use `partnerRevealed`.
+these signals, else `null`. Opponent-bot identity checks consult it for "who
+is the partner?" questions; picker-team-bot checks continue to use
+`view.partner` directly because that field is unredacted on the picker-team
+view. "Has the called card been played?" timing checks (e.g., the predicted-win
+extension's no-trump-played gate) continue to use `partnerRevealed` regardless
+of bot team.
 
 | Function | Purpose |
 |---|---|

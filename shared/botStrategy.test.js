@@ -123,6 +123,12 @@ describe('decidePlay — predicted picker-team win on called-suit lead by an opp
   // trick) is set to take the trick. View.partner is masked to null because
   // partnerRevealed is false. The bot is void in the called suit, so realCards
   // already excludes any called-suit cards.
+  // Note: a 6th seat (u6) is included in `hands` to suppress mid-trick partner
+  // deduction in tests where 2+ players have played non-called cards on a
+  // called-suit-led trick. Without u6, knownNonPartners would resolve to a
+  // unique partner and the schmear branch would override predicted-win,
+  // masking what these tests are trying to verify. See #163 for the underlying
+  // schmear-vs-predicted-win interaction this workaround paints over.
   function predictedWinView({ hand, currentTrick, calledSuit = 'H', aceId = 'AH' }) {
     return {
       phase: 'playing',

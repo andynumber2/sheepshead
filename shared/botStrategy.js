@@ -290,6 +290,10 @@ export function decidePlay(view, userId) {
   if (isLeaster) return lowestCard(realCards).id
 
   const isLeading = !currentTrick || currentTrick.length === 0
+  // `view.partner` is set on picker-team views (the picker sees the partner;
+  // the partner sees themselves), so this self-team check is correct as-is.
+  // Opponent-side identity checks elsewhere in this file consult deducedPartner
+  // to handle the case where view.partner is redacted to null.
   const isPickerTeam = userId === picker || userId === partner
 
   if (isLeading) {
