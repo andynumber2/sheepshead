@@ -261,6 +261,12 @@ describe('dealHand', () => {
     expect(state.pickIndex).toBe(0)
   })
 
+  it('initializes crackerId and recrackerId to null', () => {
+    const state = dealHand(['p1','p2','p3','p4','p5'], 0, 1, 1)
+    expect(state.crackerId).toBeNull()
+    expect(state.recrackerId).toBeNull()
+  })
+
 })
 
 describe('pick / pass / blitz', () => {
@@ -1289,6 +1295,8 @@ describe('crack / recrack', () => {
       currentTrick: [],
       crackState: null,
       handCrackMultiplier: 1,
+      crackerId: null,
+      recrackerId: null,
       pickOrder: ['p1','p2','p3','p4','p5'],
       pickIndex: 0,  // p1 picked first — no one passed → all opponents eligible to crack
       log: [],
@@ -1316,6 +1324,25 @@ describe('crack / recrack', () => {
   it('throws if an opponent tries to recrack', () => {
     const cracked = crack(makeCrackState(), 'p3')
     expect(() => recrack(cracked, 'p5')).toThrow('Only the picker or partner may recrack.')
+  })
+
+  it('crack records the cracker userId', () => {
+    const next = crack(makeCrackState(), 'p3')
+    expect(next.crackerId).toBe('p3')
+    expect(next.recrackerId).toBeNull()
+  })
+
+  it('recrack records the recracker userId', () => {
+    const cracked = crack(makeCrackState(), 'p3')
+    const recracked = recrack(cracked, 'p1')
+    expect(recracked.crackerId).toBe('p3')
+    expect(recracked.recrackerId).toBe('p1')
+  })
+
+  it('partner recracks — recrackerId is the partner', () => {
+    const cracked = crack(makeCrackState(), 'p3')
+    const recracked = recrack(cracked, 'p2')
+    expect(recracked.recrackerId).toBe('p2')
   })
 })
 
@@ -1435,6 +1462,18 @@ describe('getPlayerView', () => {
     const state = { ...makeViewState(), partnerRevealed: true, reveal_partner: true }
     const oppView = getPlayerView(state, 'p3')
     expect(oppView.partner).toBe('p2')
+  })
+
+  it('exposes crackerId and recrackerId unredacted to all players', () => {
+    let state = dealHand(['p1','p2','p3','p4','p5'], 0, 1, 1)
+    state = { ...state, phase: 'playing', picker: 'p1', partner: 'p2', goingAlone: false, isLeaster: false, crackState: null, handCrackMultiplier: 1, pickOrder: ['p1','p2','p3','p4','p5'], pickIndex: 0, log: [] }
+    state = crack(state, 'p3')
+    state = recrack(state, 'p2')
+    for (const uid of ['p1','p2','p3','p4','p5']) {
+      const view = getPlayerView(state, uid)
+      expect(view.crackerId).toBe('p3')
+      expect(view.recrackerId).toBe('p2')
+    }
   })
 
 })
