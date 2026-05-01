@@ -113,3 +113,57 @@ describe('knownNonPartners', () => {
     expect(set).toEqual(new Set())
   })
 })
+
+describe('deducedPartner', () => {
+  it('returns view.partner when set (engine-revealed)', () => {
+    const view = baseView({ partner: 'p2', partnerRevealed: true })
+    expect(deducedPartner(view, 'p3')).toBe('p2')
+  })
+
+  it('returns recracker when non-picker recracked', () => {
+    const view = baseView({ recrackerId: 'p2' })
+    expect(deducedPartner(view, 'p3')).toBe('p2')
+  })
+
+  it('does not use recracker when picker recracked (falls through)', () => {
+    const view = baseView({ recrackerId: 'p1' })  // p1 is picker
+    expect(deducedPartner(view, 'p3')).toBeNull()
+  })
+
+  it('returns the unique remaining seat when 3 of 4 non-picker seats ruled out', () => {
+    // Picker = p1. Non-picker seats: p2, p3, p4, p5.
+    // Bot = p3 (self, ruled out). p4 cracker (ruled out). p5 played non-called on called-suit lead.
+    // Only p2 remains → partner.
+    const view = baseView({
+      crackerId: 'p4',
+      currentTrick: [{ userId: 'p5', card: c('KH', 'H', 'K') }],
+    })
+    expect(deducedPartner(view, 'p3')).toBe('p2')
+  })
+
+  it('returns null when only 2 of 4 non-picker seats ruled out', () => {
+    const view = baseView({ crackerId: 'p4' })
+    // p1 picker, p3 self, p4 cracker → 2 ruled out (p3, p4 of the 4 non-picker seats); p2 and p5 remain candidates.
+    expect(deducedPartner(view, 'p3')).toBeNull()
+  })
+
+  it('returns null when no signals fire', () => {
+    const view = baseView()
+    expect(deducedPartner(view, 'p3')).toBeNull()
+  })
+
+  it('returns null when picker goes alone (callMode === alone)', () => {
+    const view = baseView({ callMode: 'alone', calledSuit: null, calledAce: null, recrackerId: 'p2' })
+    expect(deducedPartner(view, 'p3')).toBeNull()
+  })
+
+  it('returns self when bot is the partner (view.partner === userId)', () => {
+    const view = baseView({ partner: 'p2' })
+    expect(deducedPartner(view, 'p2')).toBe('p2')
+  })
+
+  it('leaster: returns null', () => {
+    const view = baseView({ isLeaster: true, picker: null, callMode: null })
+    expect(deducedPartner(view, 'p3')).toBeNull()
+  })
+})

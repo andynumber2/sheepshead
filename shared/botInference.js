@@ -236,6 +236,27 @@ export function knownNonPartners(view, userId) {
   return set
 }
 
+// Returns the partner's userId if known, else null. Resolution order:
+//   1. view.partner if set (engine-revealed, or bot is on picker team).
+//   2. view.recrackerId if set and not the picker (non-picker recrackers are
+//      uniquely the partner per the recrack rule in gameEngine.js).
+//   3. By elimination via knownNonPartners — if the rule-out set covers exactly
+//      3 of the 4 non-picker seats, the remaining seat is the partner.
+//   4. Otherwise, null.
+//
+// Returns null in alone/leaster/no-picker modes regardless of signals.
+export function deducedPartner(view, userId) {
+  if (!view.picker || view.callMode === 'alone' || view.isLeaster) return null
+  if (view.partner) return view.partner
+  if (view.recrackerId && view.recrackerId !== view.picker) return view.recrackerId
+
+  const ruled = knownNonPartners(view, userId)
+  const allIds = Object.keys(view.hands ?? {})
+  const candidates = allIds.filter(id => id !== view.picker && !ruled.has(id))
+  if (candidates.length === 1) return candidates[0]
+  return null
+}
+
 // ─── Schmear detection ────────────────────────────────────────────────────────
 
 // Returns true if the player currently winning the trick is on the same team as userId.
