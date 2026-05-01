@@ -303,9 +303,19 @@ export function decidePlay(view, userId) {
         .filter(c => !isTrump(c) && isGuaranteedWinner(c, view, userId))
         .sort((a, b) => cardPoints(b) - cardPoints(a))
       if (guaranteedFails.length > 0) return guaranteedFails[0].id
-      // Lead strongest trump to win tricks and accumulate points
+      // Lead strongest trump to win tricks and accumulate points.
+      // Partner with 2+ trump: defer to a fail card if the strongest trump is not
+      // a guaranteed winner (preserve trump for later when they can be decisive).
       const best = highestTrump(realCards)
-      if (best) return best.id
+      if (best) {
+        if (userId === partner) {
+          const fails = realCards.filter(c => !isTrump(c))
+          if (realCards.filter(c => isTrump(c)).length >= 2 && fails.length > 0 && !isGuaranteedWinner(best, view, userId)) {
+            return lowestCard(fails).id
+          }
+        }
+        return best.id
+      }
 
       // Partner with no trump: lead called suit if previous trick was low on trump,
       // otherwise lead the lowest-point fail card

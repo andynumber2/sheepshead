@@ -100,7 +100,7 @@ Play the **lowest-value card** always, to avoid winning tricks.
 
 #### Picker-team bot leading
 1. **Cash any guaranteed non-trump winner** (any rank, not just aces): every higher same-suit card must be accounted for AND no opponent can trump it (all trump exhausted, or every other player is known trump-void). The highest-value qualifying card is played first.
-2. **Lead highest trump** to win tricks and accumulate card points.
+2. **Lead highest trump** to win tricks and accumulate card points. Exception for the **partner** holding 2 or more trump: if the strongest trump is not a guaranteed winner (higher-rank trump may still be in opponents' hands) AND the partner holds at least one fail card, lead the lowest-point fail card instead to preserve trump for later. If the partner has only 1 trump, or no fail cards to defer to, lead trump unconditionally.
 3. If no trump, and the bot is the **partner**:
    - If the last trick had 3 or fewer trump played, lead a called-suit card (lowest of that suit).
    - Otherwise, lead the lowest-point fail card.
