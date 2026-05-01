@@ -223,7 +223,7 @@ export function isGuaranteedWinner(card, view, userId) {
     if (!noTrumpElsewhere) {
       const voids = deducedTrumpVoids(view)
       const otherPlayerIds = Object.keys(view.hands).filter(id => id !== userId)
-      const allOthersVoid = otherPlayerIds.every(id => voids.has(id))
+      const allOthersVoid = otherPlayerIds.length > 0 && otherPlayerIds.every(id => voids.has(id))
       if (!allOthersVoid) return false
     }
 

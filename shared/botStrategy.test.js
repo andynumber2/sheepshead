@@ -549,3 +549,408 @@ describe('decidePlay — regression: no behavior change when no deduction signal
     expect(decidePlay(view, 'u4')).toBe('7H')
   })
 })
+
+// ─── Call Site 1: picker-team leading ─────────────────────────────────────────
+// The new code uses isGuaranteedWinner instead of trumpRemainingElsewhere <= 2.
+// This means the bot can now cash guaranteed non-trump winners beyond just aces
+// (e.g. a 10 when its ace has been played and all trump are accounted for).
+
+describe('decidePlay — picker-team leading: guaranteed fail cards (call site 1)', () => {
+  // Build a view where the picker team bot is leading.
+  // bot = u1 (picker). partner = u3.
+  // 14 trump = QC,QS,QH,QD,JC,JS,JH,JD,AD,10D,KD,9D,8D,7D
+  // We place 12 trump in a completed trick (others play them); bot holds 2 (7D, 8D).
+  // trumpRemainingElsewhere = 14 - 2 (bot) - 12 (tricks) = 0.
+  function pickerLeadingAllTrumpSeenView(hand) {
+    return {
+      phase: 'playing',
+      hands: {
+        u1: hand,
+        u2: [], u3: [], u4: [], u5: [],
+      },
+      currentTrick: [],
+      tricks: [
+        {
+          plays: [
+            { userId: 'u2', card: c('QC', 'C', 'Q') },
+            { userId: 'u3', card: c('QS', 'S', 'Q') },
+            { userId: 'u4', card: c('QH', 'H', 'Q') },
+            { userId: 'u5', card: c('QD', 'D', 'Q') },
+            { userId: 'u1', card: c('JC', 'C', 'J') },
+          ],
+        },
+        {
+          plays: [
+            { userId: 'u2', card: c('JS', 'S', 'J') },
+            { userId: 'u3', card: c('JH', 'H', 'J') },
+            { userId: 'u4', card: c('JD', 'D', 'J') },
+            { userId: 'u5', card: c('AD', 'D', 'A') },
+            { userId: 'u1', card: c('10D', 'D', '10') },
+          ],
+        },
+        {
+          plays: [
+            { userId: 'u2', card: c('KD', 'D', 'K') },
+            { userId: 'u3', card: c('9D', 'D', '9') },
+          ],
+        },
+      ],
+      // Also place AC (ace of clubs) in a completed trick so 10C is guaranteed top of suit
+      // (No — we need AC played too; let's add it to tricks[2])
+      picker: 'u1',
+      partner: 'u3',
+      partnerRevealed: true,
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      isLeaster: false,
+      lastTrick: [],
+    }
+  }
+
+  it('cashes a fail 10 (not just ace) when its ace has been played and all trump are accounted for', () => {
+    // Bot holds 10C (fail 10 clubs, 10 pts) + 7D + 8D (low trump).
+    // AC was played in a completed trick → 10C is top of clubs.
+    // All 14 trump accounted for (12 in tricks above + 7D + 8D in bot's hand).
+    // isGuaranteedWinner(10C) should be true → bot cashes it.
+    const hand = [
+      c('10C', 'C', '10'),
+      c('7D', 'D', '7'),
+      c('8D', 'D', '8'),
+    ]
+    const view = pickerLeadingAllTrumpSeenView(hand)
+    // Add AC played in an earlier trick so 10C is top of clubs
+    view.tricks[2].plays.push({ userId: 'u4', card: c('AC', 'C', 'A') })
+    expect(decidePlay(view, 'u1')).toBe('10C')
+  })
+
+  it('does NOT cash a fail 10 when trump remains elsewhere (falls back to highest trump)', () => {
+    // Bot holds 10C + 7D + 8D. AC has been played so 10C is top of clubs.
+    // But only 10 trump are in tricks (not all 14 accounted for) → not guaranteed.
+    // Trump remains = 14 - 2 (bot) - 10 (tricks) = 2 → NOT zero → not guaranteed.
+    // Falls back to highestTrump(realCards) = 8D.
+    const hand = [
+      c('10C', 'C', '10'),
+      c('7D', 'D', '7'),
+      c('8D', 'D', '8'),
+    ]
+    const view = {
+      phase: 'playing',
+      hands: { u1: hand, u2: [], u3: [], u4: [], u5: [] },
+      currentTrick: [],
+      tricks: [
+        {
+          plays: [
+            { userId: 'u2', card: c('QC', 'C', 'Q') },
+            { userId: 'u3', card: c('QS', 'S', 'Q') },
+            { userId: 'u4', card: c('QH', 'H', 'Q') },
+            { userId: 'u5', card: c('QD', 'D', 'Q') },
+            { userId: 'u1', card: c('JC', 'C', 'J') },
+          ],
+        },
+        {
+          plays: [
+            { userId: 'u2', card: c('JS', 'S', 'J') },
+            { userId: 'u3', card: c('JH', 'H', 'J') },
+            { userId: 'u4', card: c('JD', 'D', 'J') },
+            // Only 9 trump in tricks + 2 in bot = 11, leaving 3 elsewhere
+            { userId: 'u5', card: c('AC', 'C', 'A') }, // AC played but trump not yet exhausted
+          ],
+        },
+      ],
+      picker: 'u1',
+      partner: 'u3',
+      partnerRevealed: true,
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      isLeaster: false,
+      lastTrick: [],
+    }
+    // trumpRemainingElsewhere = 14 - 2(bot) - 9(tricks) = 3 → not zero
+    // deducedTrumpVoids won't help because u2..u5 played trump in the trump-led trick
+    // → not void. So isGuaranteedWinner(10C) = false.
+    // Next branch: highestTrump(realCards) = 8D.
+    expect(decidePlay(view, 'u1')).toBe('8D')
+  })
+
+  it('cashes a fail ace when trumpRemainingElsewhere is 0', () => {
+    // Classic case: bot holds AC (ace of clubs, 11 pts) + 2 low trump.
+    // All 12 other trump are in completed tricks → all accounted for.
+    // isGuaranteedWinner(AC) = true (suitRank 0, all trump seen).
+    const hand = [
+      c('AC', 'C', 'A'),
+      c('7D', 'D', '7'),
+      c('8D', 'D', '8'),
+    ]
+    const view = pickerLeadingAllTrumpSeenView(hand)
+    expect(decidePlay(view, 'u1')).toBe('AC')
+  })
+})
+
+// ─── Call Site 2: opponent-team leading ───────────────────────────────────────
+// The new code uses isGuaranteedWinner instead of trumpRemainingElsewhere === 0.
+// Bot can now cash guaranteed non-trump winners including fail 10s (not just aces).
+
+describe('decidePlay — opponent-team leading: guaranteed fail cards (call site 2)', () => {
+  // Bot = u2 (opponent). Picker = u1. Partner = u3 (but unknown to u2; partner: null).
+  // All 14 trump accounted for (12 in tricks + 2 in bot's hand via 7D, 8D).
+  function oppLeadingAllTrumpSeenView(hand) {
+    return {
+      phase: 'playing',
+      hands: {
+        u1: [], u2: hand, u3: [], u4: [], u5: [],
+      },
+      currentTrick: [],
+      tricks: [
+        {
+          plays: [
+            { userId: 'u1', card: c('QC', 'C', 'Q') },
+            { userId: 'u3', card: c('QS', 'S', 'Q') },
+            { userId: 'u4', card: c('QH', 'H', 'Q') },
+            { userId: 'u5', card: c('QD', 'D', 'Q') },
+            { userId: 'u2', card: c('JC', 'C', 'J') },
+          ],
+        },
+        {
+          plays: [
+            { userId: 'u1', card: c('JS', 'S', 'J') },
+            { userId: 'u3', card: c('JH', 'H', 'J') },
+            { userId: 'u4', card: c('JD', 'D', 'J') },
+            { userId: 'u5', card: c('AD', 'D', 'A') },
+            { userId: 'u2', card: c('10D', 'D', '10') },
+          ],
+        },
+        {
+          plays: [
+            { userId: 'u1', card: c('KD', 'D', 'K') },
+            { userId: 'u3', card: c('9D', 'D', '9') },
+          ],
+        },
+      ],
+      picker: 'u1',
+      partner: null,   // masked from opponent view
+      partnerRevealed: false,
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: null,
+      recrackerId: null,
+      isLeaster: false,
+      lastTrick: [],
+    }
+  }
+
+  it('cashes a fail 10 when its ace has been played and all trump are accounted for', () => {
+    // Bot holds 10C + 7D + 8D. AC played in a completed trick → 10C is guaranteed.
+    // All 14 trump seen. Opponent leads → bot should cash 10C.
+    const hand = [
+      c('10C', 'C', '10'),
+      c('7D', 'D', '7'),
+      c('8D', 'D', '8'),
+    ]
+    const view = oppLeadingAllTrumpSeenView(hand)
+    view.tricks[2].plays.push({ userId: 'u4', card: c('AC', 'C', 'A') })
+    expect(decidePlay(view, 'u2')).toBe('10C')
+  })
+
+  it('does NOT cash the called card even when it appears guaranteed (called card excluded from leading)', () => {
+    // Defensive test: artificially place the called card (AH) in the bot's hand.
+    // Even if AH were a guaranteed winner, the call-site filter excludes the called card.
+    // This guards the `c.id !== calledCardId` filter in the new code.
+    // Note: this is an artificial scenario — in a real game the called card is held
+    // by the partner, not an opponent.
+    const hand = [
+      c('AH', 'H', 'A'),  // the called card itself — must NOT be cashed
+      c('10C', 'C', '10'),
+      c('7D', 'D', '7'),
+      c('8D', 'D', '8'),
+    ]
+    const view = oppLeadingAllTrumpSeenView(hand)
+    // Put AC in tricks so 10C is also guaranteed, giving the bot a valid alternative
+    view.tricks[2].plays.push({ userId: 'u4', card: c('AC', 'C', 'A') })
+    // AH is in bot's hand so it cannot be played (calledCard restriction when !partnerRevealed)
+    // Expect 10C (the other guaranteed card), NOT AH
+    const played = decidePlay(view, 'u2')
+    expect(played).not.toBe('AH')
+    expect(played).toBe('10C')
+  })
+
+  it('does NOT cash a guaranteed fail card when trump remains elsewhere', () => {
+    // Bot holds AC + 7D + 8D. Only 9 trump in tricks → trumpRemainingElsewhere = 3.
+    // Opponents not all trump-void (they played trump in trick 0).
+    // isGuaranteedWinner(AC) = false → skip guaranteed-cash branch.
+    // Falls through: deducedPartner is null (no signals) → lead called-suit-to-flush.
+    // Bot holds no hearts → no called-suit cards → falls to lowest non-trump = AC (11pts)
+    // since no other fail card. Actually: last branch is lowestCard(nonTrump).
+    const hand = [
+      c('AC', 'C', 'A'),
+      c('7D', 'D', '7'),
+      c('8D', 'D', '8'),
+    ]
+    const view = {
+      phase: 'playing',
+      hands: { u1: [], u2: hand, u3: [], u4: [], u5: [] },
+      currentTrick: [],
+      tricks: [
+        {
+          plays: [
+            { userId: 'u1', card: c('QC', 'C', 'Q') },
+            { userId: 'u3', card: c('QS', 'S', 'Q') },
+            { userId: 'u4', card: c('QH', 'H', 'Q') },
+            { userId: 'u5', card: c('QD', 'D', 'Q') },
+            { userId: 'u2', card: c('JC', 'C', 'J') },
+          ],
+        },
+        {
+          plays: [
+            { userId: 'u1', card: c('JS', 'S', 'J') },
+            { userId: 'u3', card: c('JH', 'H', 'J') },
+            { userId: 'u4', card: c('JD', 'D', 'J') },
+            // Only 9 trump in tricks + 2 in bot = 11, leaving 3 elsewhere
+          ],
+        },
+      ],
+      picker: 'u1',
+      partner: null,
+      partnerRevealed: false,
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: null,
+      recrackerId: null,
+      isLeaster: false,
+      lastTrick: [],
+    }
+    // trumpRemainingElsewhere = 14 - 2 - 9 = 3 → not zero → isGuaranteedWinner = false
+    // Falls through to called-suit flush logic (no hearts in hand → no calledSuitCards)
+    // → lowestCard(nonTrump) = AC (only non-trump card)
+    expect(decidePlay(view, 'u2')).toBe('AC')
+  })
+})
+
+// ─── Call Site 3: picker-team following ────────────────────────────────────────
+// New code: use isGuaranteedWinner(bestNonTrumpWin) instead of
+// trumpRemainingElsewhere === 0 to decide whether to play high or low.
+
+describe('decidePlay — picker-team following: guaranteed non-trump win (call site 3)', () => {
+  // Picker = u1. Partner = u3. Bot = u1 (picker, following a fail-led trick).
+  // Trick led by u2 (opponent) with a low club. Bot holds 10C (wins the trick)
+  // and KS (also wins because it's higher than what's been played).
+
+  it('plays highest-value non-trump winner when that card is a guaranteed winner', () => {
+    // Trick: u2 led 9C, u4 played 7C. Bot u1 must follow clubs.
+    // Bot holds 10C (10pts) and 8C (0pts) — both beat everything in the trick.
+    // AC has been played, so 10C is the guaranteed top club.
+    // All trump accounted for (12 in tricks + 2 in bot hand = 14).
+    // → bestNonTrumpWin = 10C, isGuaranteedWinner(10C) = true → return 10C.
+    const botHand = [
+      c('10C', 'C', '10'),
+      c('8C', 'C', '8'),
+      c('7D', 'D', '7'),
+      c('8D', 'D', '8'),
+    ]
+    const view = {
+      phase: 'playing',
+      hands: {
+        u1: botHand, u2: [], u3: [], u4: [], u5: [],
+      },
+      currentTrick: [
+        { userId: 'u2', card: c('9C', 'C', '9') },
+        { userId: 'u4', card: c('7C', 'C', '7') },
+      ],
+      tricks: [
+        {
+          plays: [
+            { userId: 'u2', card: c('QC', 'C', 'Q') },
+            { userId: 'u3', card: c('QS', 'S', 'Q') },
+            { userId: 'u4', card: c('QH', 'H', 'Q') },
+            { userId: 'u5', card: c('QD', 'D', 'Q') },
+            { userId: 'u1', card: c('JC', 'C', 'J') },
+          ],
+        },
+        {
+          plays: [
+            { userId: 'u2', card: c('JS', 'S', 'J') },
+            { userId: 'u3', card: c('JH', 'H', 'J') },
+            { userId: 'u4', card: c('JD', 'D', 'J') },
+            { userId: 'u5', card: c('AD', 'D', 'A') },
+            { userId: 'u1', card: c('10D', 'D', '10') },
+          ],
+        },
+        {
+          plays: [
+            { userId: 'u2', card: c('KD', 'D', 'K') },
+            { userId: 'u3', card: c('9D', 'D', '9') },
+            { userId: 'u4', card: c('AC', 'C', 'A') }, // AC played → 10C is top of clubs
+          ],
+        },
+      ],
+      picker: 'u1',
+      partner: 'u3',
+      partnerRevealed: true,
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      isLeaster: false,
+      lastTrick: [],
+    }
+    // trumpRemainingElsewhere = 14 - 2(bot) - 12(tricks) = 0
+    // isGuaranteedWinner(10C) = true → safeFromTrumpIn = true → return highestValueCard = 10C
+    expect(decidePlay(view, 'u1')).toBe('10C')
+  })
+
+  it('falls back to lowest non-trump winner when not guaranteed and opponents remain', () => {
+    // Trick: u2 led 7C. Bot holds 10C (10pts, best) and KC (4pts) — both beat 7C.
+    // AC has been played, so 10C is top of clubs.
+    // But trump NOT exhausted: only 9 trump in tricks + 2 in bot = 11 (3 remain elsewhere).
+    // Opponent u5 still to play → opponentsRemainingNT = 1 > 0.
+    // isGuaranteedWinner(10C) = false (trump remains, opponents not all trump-void).
+    // safeFromTrumpIn = false → lowestCard([10C, KC]) = KC (4pts < 10pts).
+    const botHand = [
+      c('10C', 'C', '10'),
+      c('KC', 'C', 'K'),
+      c('7D', 'D', '7'),
+      c('8D', 'D', '8'),
+    ]
+    const view = {
+      phase: 'playing',
+      hands: {
+        u1: botHand, u2: [], u3: [], u4: [], u5: [],
+      },
+      currentTrick: [
+        { userId: 'u2', card: c('7C', 'C', '7') },
+      ],
+      tricks: [
+        {
+          plays: [
+            { userId: 'u2', card: c('QC', 'C', 'Q') },
+            { userId: 'u3', card: c('QS', 'S', 'Q') },
+            { userId: 'u4', card: c('QH', 'H', 'Q') },
+            { userId: 'u5', card: c('QD', 'D', 'Q') },
+            { userId: 'u1', card: c('JC', 'C', 'J') },
+          ],
+        },
+        {
+          plays: [
+            { userId: 'u2', card: c('JS', 'S', 'J') },
+            { userId: 'u3', card: c('JH', 'H', 'J') },
+            { userId: 'u4', card: c('JD', 'D', 'J') },
+            { userId: 'u5', card: c('AC', 'C', 'A') }, // AC played → 10C is top of clubs
+          ],
+        },
+        // Only 9 trump in tricks (+ 2 in bot = 11); trumpRemainingElsewhere = 3
+      ],
+      picker: 'u1',
+      partner: 'u3',
+      partnerRevealed: true,
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      isLeaster: false,
+      lastTrick: [],
+    }
+    // u5 is in view.hands and hasn't played in currentTrick → opponentsRemainingNT = 1
+    // trumpRemainingElsewhere = 3 → isGuaranteedWinner(10C) = false (trump elsewhere)
+    // safeFromTrumpIn = false → lowestCard([10C, KC]) = KC (4pts < 10pts)
+    expect(decidePlay(view, 'u1')).toBe('KC')
+  })
+})

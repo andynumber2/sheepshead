@@ -544,4 +544,21 @@ describe('isGuaranteedWinner – non-trump extension', () => {
     // Both AC (rank 0) and 10C (rank 1) seen in tricks; all opponents are trump-void.
     expect(isGuaranteedWinner(kingOfClubs, view, 'p1')).toBe(true)
   })
+
+  it('degenerate view with no other players in hands → returns false even when trumpRemainingElsewhere > 0', () => {
+    // Regression guard: when view.hands only contains the bot's entry (e.g. some test helpers
+    // only populate the bot's hand), otherPlayerIds is [] and [].every(...) is vacuously true.
+    // isGuaranteedWinner must NOT claim the card is unbeatable in that case.
+    const aceOfClubs = { id: 'AC', suit: 'C', rank: 'A' }
+    const view = baseView({
+      // Only the bot's own hand — no other player entries
+      hands: { p1: [aceOfClubs] },
+      tricks: [],
+      currentTrick: [],
+      buried: [],
+    })
+    // trumpRemainingElsewhere = 14 - ownTrump(0) - tricksTrump(0) - buriedTrump(0) = 14
+    // With the vacuous-truth bug this returned true; with the fix it returns false.
+    expect(isGuaranteedWinner(aceOfClubs, view, 'p1')).toBe(false)
+  })
 })
