@@ -3173,16 +3173,15 @@ describe('decidePlay — defender force-take to enable called-suit lead-back', (
     expect(decidePlay(view, 'p3')).toBe('7D')
   })
 
-  it('current trick led with called suit → existing trump-in branch fires (not new branch)', () => {
+  it('current trick led with called suit → force-take branch does not fire (predicted-win trump-in does)', () => {
     // Called = hearts, p2 led 9♥ (the called suit itself). Bot p3 defender, partner unrevealed.
-    // Bot is void in hearts; has trump. Existing logic: trump in with lowest trump.
-    // Bot hand: Q♣, J♦, 8♣. Void in hearts → realCards is full hand.
-    // Existing line 480 branch: "Trump in on called suit if picker team currently winning"
-    // Currently p2 is winning with 9♥. p2 is unknown role from defender POV (partner unrevealed).
-    // The check at line 484 is `winner.userId !== picker && winner.userId !== partner`
-    //   → with partner=null and winner=p2, opponentWinning = (p2 !== p1) && (p2 !== null) = true.
-    // opponentWinning=true → DOES NOT trump in. Falls through to default lowestCard(nonTrump) = 8♣.
-    // This test confirms the new branch is correctly gated to non-called-suit-led tricks.
+    // Bot is void in hearts; has trump. The force-take branch is gated on
+    // `!ledThisTrickIsCalled`, so it does NOT fire here. The trump-in branch's
+    // predicted-win extension does fire: called suit led, partner unrevealed, no
+    // trump played yet → the partner is forced to play the called ace later this
+    // trick, taking it for the picker team. Bot trumps in via schmear priority.
+    // Trump priority order (A, 10, K, 9, 8, 7, J, Q) → among J♦ and Q♣, J wins;
+    // J♦ is the only J. Expected: JD.
     const view = makeForceTakeView({
       userId: 'p3',
       picker: 'p1',
@@ -3192,6 +3191,6 @@ describe('decidePlay — defender force-take to enable called-suit lead-back', (
       handCards: [c('Q','C'), c('J','D'), c('8','C')],
       playedSeq: [{ userId: 'p2', card: c('9','H') }],
     })
-    expect(decidePlay(view, 'p3')).toBe('8C')
+    expect(decidePlay(view, 'p3')).toBe('JD')
   })
 })
