@@ -309,9 +309,8 @@ export function decidePlay(view, userId) {
       const best = highestTrump(realCards)
       if (best) {
         if (userId === partner) {
-          const trumps = realCards.filter(c => isTrump(c))
           const fails = realCards.filter(c => !isTrump(c))
-          if (trumps.length >= 2 && fails.length > 0 && !isGuaranteedWinner(best, view, userId)) {
+          if (realCards.filter(c => isTrump(c)).length >= 2 && fails.length > 0 && !isGuaranteedWinner(best, view, userId)) {
             return lowestCard(fails).id
           }
         }
