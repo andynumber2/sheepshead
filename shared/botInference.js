@@ -232,7 +232,7 @@ function knownTeammateCards(view, userId) {
 //
 // For trump cards: every trump with a strictly lower trumpRank index (i.e. higher
 //   strength) must be accounted for (visible in own hand, played tricks, current
-//   trick, or bury).
+//   trick, bury, or known to be in a teammate's hand via knownLocations).
 //
 // For non-trump (fail) cards: BOTH conditions must hold:
 //   1. Every same-suit non-trump card with a lower suitRank index (i.e. higher
@@ -243,7 +243,8 @@ function knownTeammateCards(view, userId) {
 //         accounted for after subtracting known teammate trump from knownLocations), OR
 //      b. Every other player is in the deducedTrumpVoids set.
 //
-// Unseen higher trump / higher same-suit cards are always treated as opponent-held.
+// Unseen higher trump / higher same-suit cards not in a known teammate's hand are
+// treated as opponent-held.
 //
 // NOTE — currentTrick is included in the "seen" sources. Callers should use this
 // function either (a) when leading (currentTrick is empty) or (b) when `card` is
@@ -325,7 +326,8 @@ export function isGuaranteedWinner(card, view, userId) {
   for (const play of (view.currentTrick ?? [])) noteIfHigherTrump(play.card)
   for (const c of (view.buried ?? [])) noteIfHigherTrump(c)
 
-  // Also treat trump in a known teammate's hand as accounted for
+  // Also treat trump in a known teammate's hand as accounted for.
+  // No played/buried filter needed: seenRanks is a Set so double-adding a rank is harmless.
   for (const c of knownTeammateCards(view, userId)) noteIfHigherTrump(c)
 
   // Every rank strictly lower than myRank must be seen somewhere.
