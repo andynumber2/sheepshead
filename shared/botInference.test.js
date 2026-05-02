@@ -888,57 +888,54 @@ describe('isGuaranteedWinner – blitz inference (trump case)', () => {
 })
 
 describe('isGuaranteedWinner – blitz inference (fail case, condition 2)', () => {
-  it('partner holds AH; 1 trump unaccounted for but known to be in picker hand via blitz → true', () => {
-    // Setup: 13 of 14 trump accounted for in tricks/own hand/buried; the 14th (QC) is the
-    // picker's black-blitzed card. trumpRemainingElsewhere = 1, but it is a teammate's card.
-    // Condition 1 (no higher same-suit card): AH is an ace → always satisfied.
-    // Condition 2 with blitz: knownTeammateTrump = 1, so 1 - 1 = 0 opponent trump → true.
+  it('partner holds AH; all trump accounted for except QC+QS (both in picker hand via blitz) → true', () => {
+    // Consistent state: p1 (picker) holds QC+QS (black blitz). p2 (partner) holds AH with 0 trump.
+    // 10 trump in tricks + 2 buried = 12. trumpRemainingElsewhere = 14 - 0 - 10 - 2 = 2 (QC+QS).
+    // knownTeammateTrump = 2 (both unplayed). 2 - 2 = 0 → no opponent trump → true.
     const ah = { id: 'AH', rank: 'A', suit: 'H' }
-    const qs = { id: 'QS', rank: 'Q', suit: 'S' }
     const view = {
       picker: 'p1',
       partner: 'p2',
-      blitzes: [{ userId: 'p1', type: 'black' }], // QC + QS known to p1
+      blitzes: [{ userId: 'p1', type: 'black' }],
       hands: {
-        p1: [{ id: 'HIDDEN', hidden: true }],
-        p2: [ah, qs],  // p2 holds AH (tested card) and QS (1 own trump)
+        p1: [{ id: 'HIDDEN', hidden: true }, { id: 'HIDDEN', hidden: true }],
+        p2: [ah],
         p3: [], p4: [], p5: [],
       },
-      tricks: [
-        {
-          plays: [
-            { userId: 'p3', card: { id: 'QH', rank: 'Q', suit: 'H' } },
-            { userId: 'p4', card: { id: 'QD', rank: 'Q', suit: 'D' } },
-            { userId: 'p5', card: { id: 'JC', rank: 'J', suit: 'C' } },
-            { userId: 'p1', card: { id: 'JS', rank: 'J', suit: 'S' } },
-            { userId: 'p2', card: { id: 'JH', rank: 'J', suit: 'H' } },
-          ],
-        },
-        {
-          plays: [
-            { userId: 'p3', card: { id: 'JD', rank: 'J', suit: 'D' } },
-            { userId: 'p4', card: { id: 'AD', rank: 'A', suit: 'D' } },
-            { userId: 'p5', card: { id: '10D', rank: '10', suit: 'D' } },
-            { userId: 'p1', card: { id: 'KD', rank: 'K', suit: 'D' } },
-            { userId: 'p2', card: { id: '9D', rank: '9', suit: 'D' } },
-          ],
-        },
-      ],
-      // Trump accounting for p2:
-      // ownTrump = 1 (QS). tricksPlayed = 10 (QH,QD,JC,JS,JH,JD,AD,10D,KD,9D). buried = 2 (8D,7D).
-      // trumpRemainingElsewhere = 14 - 1 - 10 - 2 = 1 (that 1 is QC, in picker's hand via blitz)
+      tricks: [{
+        plays: [
+          { userId: 'p3', card: { id: 'QH', rank: 'Q', suit: 'H' } },
+          { userId: 'p4', card: { id: 'QD', rank: 'Q', suit: 'D' } },
+          { userId: 'p5', card: { id: 'JC', rank: 'J', suit: 'C' } },
+          { userId: 'p1', card: { id: 'JS', rank: 'J', suit: 'S' } },
+          { userId: 'p2', card: { id: 'JH', rank: 'J', suit: 'H' } },
+        ],
+      }, {
+        plays: [
+          { userId: 'p3', card: { id: 'JD', rank: 'J', suit: 'D' } },
+          { userId: 'p4', card: { id: 'AD', rank: 'A', suit: 'D' } },
+          { userId: 'p5', card: { id: '10D', rank: '10', suit: 'D' } },
+          { userId: 'p1', card: { id: 'KD', rank: 'K', suit: 'D' } },
+          { userId: 'p2', card: { id: '9D', rank: '9', suit: 'D' } },
+        ],
+      }],
       currentTrick: [],
       buried: [{ id: '8D', rank: '8', suit: 'D' }, { id: '7D', rank: '7', suit: 'D' }],
       isLeaster: false,
     }
-    // Plain view: 1 trump remaining, not all others trump-void → false
+    // Plain view: 2 trump remaining (QC+QS), not all others trump-void → false
     expect(isGuaranteedWinner(ah, view, 'p2')).toBe(false)
-    // Enriched view: that 1 trump is in teammate's hand → 0 opponent trump → true
+    // Enriched view: QC+QS known in teammate's hand, 2-2=0 opponent trump → true
     const rv = resolveView(view, 'p2')
     expect(isGuaranteedWinner(ah, rv, 'p2')).toBe(true)
   })
 
-  it('opponent bot does NOT benefit: same scenario, p3 holding AH → false even with resolveView', () => {
+  it('played blitzed queen is filtered out — AH is still NOT a guaranteed winner when opponent holds residual trump', () => {
+    // p1 black-blitzed (QC+QS). QC was played by p1 into a completed trick.
+    // QS is still in p1's hand. Some opponent holds 8D (unaccounted).
+    // trumpRemainingElsewhere = 14 - 0 - 10(tricks) - 2(buried) = 2 (QS + 8D)
+    // knownTeammateTrump = 1 (QC filtered because it's in tricks; QS unplayed → counts)
+    // 2 - 1 = 1 ≠ 0 → check voids → not all others void → false
     const ah = { id: 'AH', rank: 'A', suit: 'H' }
     const view = {
       picker: 'p1',
@@ -946,36 +943,70 @@ describe('isGuaranteedWinner – blitz inference (fail case, condition 2)', () =
       blitzes: [{ userId: 'p1', type: 'black' }],
       hands: {
         p1: [{ id: 'HIDDEN', hidden: true }],
+        p2: [ah],
+        p3: [], p4: [], p5: [],
+      },
+      tricks: [{
+        plays: [
+          { userId: 'p1', card: { id: 'QC', rank: 'Q', suit: 'C' } }, // picker plays blitzed QC
+          { userId: 'p3', card: { id: 'QH', rank: 'Q', suit: 'H' } },
+          { userId: 'p4', card: { id: 'QD', rank: 'Q', suit: 'D' } },
+          { userId: 'p5', card: { id: 'JC', rank: 'J', suit: 'C' } },
+          { userId: 'p2', card: { id: 'JS', rank: 'J', suit: 'S' } },
+        ],
+      }, {
+        plays: [
+          { userId: 'p3', card: { id: 'JH', rank: 'J', suit: 'H' } },
+          { userId: 'p4', card: { id: 'JD', rank: 'J', suit: 'D' } },
+          { userId: 'p5', card: { id: 'AD', rank: 'A', suit: 'D' } },
+          { userId: 'p1', card: { id: '10D', rank: '10', suit: 'D' } },
+          { userId: 'p2', card: { id: 'KD', rank: 'K', suit: 'D' } },
+        ],
+      }],
+      // 10 trump played. buried: 9D, 7D. trumpRemainingElsewhere = 14-0-10-2 = 2 (QS + 8D)
+      currentTrick: [],
+      buried: [{ id: '9D', rank: '9', suit: 'D' }, { id: '7D', rank: '7', suit: 'D' }],
+      isLeaster: false,
+    }
+    const rv = resolveView(view, 'p2')
+    // QC already in tricks (filtered); QS not played (counted); 2-1=1 opponent trump remains → false
+    expect(isGuaranteedWinner(ah, rv, 'p2')).toBe(false)
+  })
+
+  it('opponent bot does NOT benefit: AH held by p3 → false even with resolveView', () => {
+    const ah = { id: 'AH', rank: 'A', suit: 'H' }
+    const view = {
+      picker: 'p1',
+      partner: 'p2',
+      blitzes: [{ userId: 'p1', type: 'black' }],
+      hands: {
+        p1: [{ id: 'HIDDEN', hidden: true }, { id: 'HIDDEN', hidden: true }],
         p2: [],
-        p3: [ah, { id: 'QS', rank: 'Q', suit: 'S' }],
+        p3: [ah],
         p4: [], p5: [],
       },
-      tricks: [
-        {
-          plays: [
-            { userId: 'p3', card: { id: 'QH', rank: 'Q', suit: 'H' } },
-            { userId: 'p4', card: { id: 'QD', rank: 'Q', suit: 'D' } },
-            { userId: 'p5', card: { id: 'JC', rank: 'J', suit: 'C' } },
-            { userId: 'p1', card: { id: 'JS', rank: 'J', suit: 'S' } },
-            { userId: 'p2', card: { id: 'JH', rank: 'J', suit: 'H' } },
-          ],
-        },
-        {
-          plays: [
-            { userId: 'p3', card: { id: 'JD', rank: 'J', suit: 'D' } },
-            { userId: 'p4', card: { id: 'AD', rank: 'A', suit: 'D' } },
-            { userId: 'p5', card: { id: '10D', rank: '10', suit: 'D' } },
-            { userId: 'p1', card: { id: 'KD', rank: 'K', suit: 'D' } },
-            { userId: 'p2', card: { id: '9D', rank: '9', suit: 'D' } },
-          ],
-        },
-      ],
+      tricks: [{
+        plays: [
+          { userId: 'p3', card: { id: 'QH', rank: 'Q', suit: 'H' } },
+          { userId: 'p4', card: { id: 'QD', rank: 'Q', suit: 'D' } },
+          { userId: 'p5', card: { id: 'JC', rank: 'J', suit: 'C' } },
+          { userId: 'p1', card: { id: 'JS', rank: 'J', suit: 'S' } },
+          { userId: 'p2', card: { id: 'JH', rank: 'J', suit: 'H' } },
+        ],
+      }, {
+        plays: [
+          { userId: 'p3', card: { id: 'JD', rank: 'J', suit: 'D' } },
+          { userId: 'p4', card: { id: 'AD', rank: 'A', suit: 'D' } },
+          { userId: 'p5', card: { id: '10D', rank: '10', suit: 'D' } },
+          { userId: 'p1', card: { id: 'KD', rank: 'K', suit: 'D' } },
+          { userId: 'p2', card: { id: '9D', rank: '9', suit: 'D' } },
+        ],
+      }],
       currentTrick: [],
       buried: [{ id: '8D', rank: '8', suit: 'D' }, { id: '7D', rank: '7', suit: 'D' }],
       isLeaster: false,
     }
     const rv = resolveView(view, 'p3')
-    // p3 is opponent; QC in picker's hand is an opponent threat → still false
     expect(isGuaranteedWinner(ah, rv, 'p3')).toBe(false)
   })
 })

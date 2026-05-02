@@ -215,6 +215,17 @@ export function deducedTrumpVoids(view) {
   return voids
 }
 
+// Returns the array of cards known (via public announcement) to be in the bot's teammate's hand.
+// Returns [] if bot is not on picker team, partner is unknown, or no knownLocations present.
+function knownTeammateCards(view, userId) {
+  if (!view.knownLocations) return []
+  const onPickerTeam = userId === view.picker || userId === view.partner
+  if (!onPickerTeam) return []
+  const teammateId = userId === view.picker ? view.partner : view.picker
+  if (!teammateId) return []
+  return view.knownLocations.get(teammateId) ?? []
+}
+
 // ─── Guaranteed-winner inference ──────────────────────────────────────────────
 
 // Returns true iff `card` cannot be beaten by any opponent:
@@ -277,17 +288,16 @@ export function isGuaranteedWinner(card, view, userId) {
     }
 
     // ── Condition 2: no opponent can trump it ─────────────────────────────────
-    let knownTeammateTrump = 0
-    if (view.knownLocations) {
-      const onPickerTeam = userId === view.picker || userId === view.partner
-      if (onPickerTeam) {
-        const teammateId = userId === view.picker ? view.partner : view.picker
-        if (teammateId) {
-          knownTeammateTrump = (view.knownLocations.get(teammateId) ?? []).filter(c => isTrump(c)).length
-        }
-      }
+    const playedOrBuriedIds = new Set()
+    for (const t of (view.tricks ?? [])) {
+      for (const p of t.plays) { if (p.card?.id) playedOrBuriedIds.add(p.card.id) }
     }
-    const noTrumpElsewhere = trumpRemainingElsewhere(view, userId) - knownTeammateTrump <= 0
+    for (const p of (view.currentTrick ?? [])) { if (p.card?.id) playedOrBuriedIds.add(p.card.id) }
+    for (const c of (view.buried ?? [])) { if (c?.id) playedOrBuriedIds.add(c.id) }
+    const knownTeammateTrump = knownTeammateCards(view, userId)
+      .filter(c => isTrump(c) && !playedOrBuriedIds.has(c.id))
+      .length
+    const noTrumpElsewhere = trumpRemainingElsewhere(view, userId) - knownTeammateTrump === 0
     if (!noTrumpElsewhere) {
       const voids = deducedTrumpVoids(view)
       const otherPlayerIds = Object.keys(view.hands).filter(id => id !== userId)
@@ -315,15 +325,7 @@ export function isGuaranteedWinner(card, view, userId) {
   for (const c of (view.buried ?? [])) noteIfHigherTrump(c)
 
   // Also treat trump in a known teammate's hand as accounted for
-  if (view.knownLocations) {
-    const onPickerTeam = userId === view.picker || userId === view.partner
-    if (onPickerTeam) {
-      const teammateId = userId === view.picker ? view.partner : view.picker
-      if (teammateId) {
-        for (const c of (view.knownLocations.get(teammateId) ?? [])) noteIfHigherTrump(c)
-      }
-    }
-  }
+  for (const c of knownTeammateCards(view, userId)) noteIfHigherTrump(c)
 
   // Every rank strictly lower than myRank must be seen somewhere.
   for (let r = 0; r < myRank; r++) {
