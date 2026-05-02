@@ -36,16 +36,17 @@ describe('decidePlay — trump in on partner-revealing called-suit lead', () => 
     expect(decidePlay(view, 'u2')).toBe('AD')
   })
 
-  it('plays highest trump (force-up) on called-suit lead once partner has been revealed', () => {
-    // Partner already revealed → schmear specialization does not apply.
-    // Falls into the general force-up case: highest trump = QC (Q♣ tops trumpRank).
+  it('schmears A♦ on called-suit lead once partner has been revealed', () => {
+    // Partner already revealed → schmear priority still applies uniformly.
+    // winningTrump = [AD, QC] (both beat the non-trump lead). Schmear priority:
+    // A rank first → AD (11 pts captured, QC preserved for future trump battles).
     const hand = [
       c('AD', 'D', 'A'), c('QC', 'C', 'Q'),
       c('KS', 'S', 'K'), c('9S', 'S', '9'),
       c('7C', 'C', '7'), c('8C', 'C', '8'),
     ]
     const view = trumpInOnCalledSuitView({ hand, partnerRevealed: true })
-    expect(decidePlay(view, 'u2')).toBe('QC')
+    expect(decidePlay(view, 'u2')).toBe('AD')
   })
 
   it('still trumps in (schmear) when only Js/Qs are available with partner unrevealed', () => {
@@ -61,9 +62,11 @@ describe('decidePlay — trump in on partner-revealing called-suit lead', () => 
     expect(['QC', 'QS', 'JC', 'JS', 'JH', 'JD']).toContain(played)
   })
 
-  it('plays highest trump on a non-called fail lead when picker is winning (force-up)', () => {
+  it('schmears A♦ on a non-called fail lead when picker is winning', () => {
     // Picker leads 9♠ (spades, NOT the called suit). Bot is void in spades and
-    // holds trump. Picker is currently winning → trump in with highest trump.
+    // holds trump. Picker is currently winning → trump in via schmear priority.
+    // winningTrump = [AD, QC]. Schmear priority: A rank first → AD (11 pts
+    // captured, QC preserved for future trump battles).
     const view = {
       phase: 'playing',
       hands: {
@@ -87,7 +90,7 @@ describe('decidePlay — trump in on partner-revealing called-suit lead', () => 
       isLeaster: false,
       lastTrick: [],
     }
-    expect(decidePlay(view, 'u2')).toBe('QC')
+    expect(decidePlay(view, 'u2')).toBe('AD')
   })
 
   it('does not trump in when a fellow opponent is already winning the trick', () => {
@@ -264,15 +267,13 @@ describe('decidePlay — opponent schmears via deduced partner from elimination'
 })
 
 describe('decidePlay — opponent identifies picker-team winner via deducedPartner', () => {
-  it('after recrack, opponent trumps in to contest when deduced partner is winning', () => {
+  it('after recrack, opponent trumps in via schmear priority when deduced partner is winning', () => {
     // Setup: ace call on hearts. u3 recracked → u3 is the deduced partner (picker team).
     // Trick: u1 leads 9♠ (non-called fail). u3 (deduced partner) plays A♠ — picker team
     // is currently winning the trick.
-    // Bot is u4 (opponent), void in spades, holds Q♣ (top trump) and other cards.
-    // Pre-fix: pickerTeamWinning consults view.partner (null) → false → predicted-win
-    //   branch doesn't fire → bot falls to lowestCard = 7C.
-    // Post-fix: pickerTeamWinning sees u3 = deducedPartner → true → predicted-win
-    //   trump-in branch fires → bot plays QC (top trump) to steal the trick.
+    // Bot is u4 (opponent), void in spades. Trump in hand: QC, AD, KD.
+    // All three beat non-trump A♠. Schmear priority: A rank first → AD (11 pts captured,
+    // QC and KD preserved for future trump battles).
     const view = {
       phase: 'playing',
       hands: {
@@ -302,7 +303,7 @@ describe('decidePlay — opponent identifies picker-team winner via deducedPartn
       isLeaster: false,
       lastTrick: [],
     }
-    expect(decidePlay(view, 'u4')).toBe('QC')
+    expect(decidePlay(view, 'u4')).toBe('AD')
   })
 })
 
@@ -1380,10 +1381,11 @@ describe('decidePlay — opponent plays cheapest trump when picker-team winner i
     expect(decidePlay(view, 'u4')).toBe('JD')
   })
 
-  it('still plays highest trump when it can beat the picker-team winner', () => {
+  it('schmears weakest winning trump (JH) not strongest (QS) when it can beat the picker-team winner', () => {
     // Fail led (9H). Picker u2 already played JD (rank 7, lowest trump).
     // Bot u4 (opponent) is void in hearts, holds QS (rank 3) and JH (rank 5).
-    // Both QS and JH beat JD. winningTrump = [QS, JH] → highestTrump = QS.
+    // Both QS and JH beat JD. Schmear priority: J rank before Q → JH (weakest
+    // J by trump rank). QS preserved for future hard trump battles.
     const view = {
       phase: 'playing',
       hands: {
@@ -1412,7 +1414,44 @@ describe('decidePlay — opponent plays cheapest trump when picker-team winner i
       isLeaster: false,
       lastTrick: [],
     }
-    expect(decidePlay(view, 'u4')).toBe('QS')
+    expect(decidePlay(view, 'u4')).toBe('JH')
+  })
+
+  it('uses 7♦ not Q♥ when partner reveals mid-trick by playing called card', () => {
+    // Called suit H led (8H). Partner u2 plays AH (revealing themselves).
+    // Bot u3 (opponent) is void in hearts, holds QH (trump rank 2), JH (trump
+    // rank 6), 7D (trump rank 13). All three beat non-trump AH.
+    // Schmear priority on winningTrump: A/10/K/9/8/7 before J/Q → 7D.
+    // QH and JH preserved for future trump battles.
+    const view = {
+      phase: 'playing',
+      hands: {
+        u1: [], u2: [],
+        u3: [
+          c('QH', 'H', 'Q'), c('JH', 'H', 'J'), c('7D', 'D', '7'),
+          c('KS', 'S', 'K'), c('AC', 'C', 'A'), c('7C', 'C', '7'),
+        ],
+        u4: [], u5: [],
+      },
+      currentTrick: [
+        { userId: 'u1', card: c('8H', 'H', '8') },
+        { userId: 'u2', card: c('AH', 'H', 'A') },
+      ],
+      tricks: [],
+      picker: 'u4',
+      partner: 'u2',
+      partnerRevealed: true,
+      callMode: 'ace',
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: null,
+      recrackerId: null,
+      isLeaster: false,
+      lastTrick: [],
+    }
+    expect(decidePlay(view, 'u3')).toBe('7D')
   })
 })
 

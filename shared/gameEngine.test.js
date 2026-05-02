@@ -3214,14 +3214,15 @@ describe('decidePlay — defender force-take to enable called-suit lead-back', (
     expect(decidePlay(view, 'p3')).toBe('8C')
   })
 
-  it('lead-back force-take is skipped when partner is already revealed; force-up branch trumps in', () => {
+  it('lead-back force-take is skipped when partner is already revealed; force-up branch schmears trump', () => {
     // partnerRevealed=true → schmearOpp does not fire (picker p1 winning), and the
     // lead-back force-take branch is skipped (it gates on !partnerRevealed). Falls
     // through to the general force-up branch: ledSuit S is fail, picker team is
-    // currently winning, bot is void in spades and holds trump → highest trump.
+    // currently winning, bot is void in spades and holds trump → schmear priority.
     //
     // Bot hand [Q♣, J♦, A♥]. A♥ is called card; ledSuit S ≠ called H, so A♥ is
-    // excluded from realCards. realCards = [Q♣, J♦]. Both trump. highestTrump = Q♣.
+    // excluded from realCards. realCards = [Q♣, J♦]. Both trump. Schmear priority:
+    // J rank before Q → J♦. Q♣ preserved for future hard trump battles.
     const view = makeForceTakeView({
       userId: 'p3',
       picker: 'p1',
@@ -3231,7 +3232,7 @@ describe('decidePlay — defender force-take to enable called-suit lead-back', (
       handCards: [c('Q','C'), c('J','D'), c('A','H')],
       playedSeq: [{ userId: 'p1', card: c('8','S') }],
     })
-    expect(decidePlay(view, 'p3')).toBe('QC')
+    expect(decidePlay(view, 'p3')).toBe('JD')
   })
 
   it('strategy skipped when bot has no winning cards', () => {

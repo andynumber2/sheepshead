@@ -633,10 +633,9 @@ export function decidePlay(view, userId) {
         }
       }
     }
-    // Trump in to contest a picker-team-winning fail-led trick. Goal: force the
-    // picker up — make them play their strongest trump to retake the lead — or
-    // simply steal the trick if the picker has already played. The picker-team-
-    // winning gate naturally excludes the case where another opponent has
+    // Trump in to contest a picker-team-winning fail-led trick. Goal: capture
+    // the trick and accumulate card points via schmear priority. The picker-
+    // team-winning gate naturally excludes the case where another opponent has
     // already trumped in (then the bot's teammate is winning, handled above).
     //
     // Predicted-win extension: when the called suit was led, the called card
@@ -648,10 +647,12 @@ export function decidePlay(view, userId) {
     // has already trumped in (their trump beats the forced card, so the picker
     // team will not win).
     //
-    // Specialization: when the called suit was led and the called card has not
-    // yet been played this trick, the partner is forced to play it on this
-    // trick, so cash A/10/K of trump via the schmear priority to capture those
-    // points along with the partner's high card.
+    // Card choice: schmear priority (A/10/K before pips; Js/Qs reserved) on the
+    // filtered set of trump that can beat the current winner. This applies
+    // uniformly — whether the partner was unrevealed at trick start, revealed
+    // mid-trick, or the picker won via a different fail — because the principle
+    // is the same: when your trump takes the trick, maximize the points captured
+    // while preserving your strongest trump for future battles.
     if (!isTrump(currentTrick[0].card)) {
       const winner = currentWinner(currentTrick)
       const deducedForPredicted = rv.resolvedPartner
@@ -663,15 +664,12 @@ export function decidePlay(view, userId) {
       if (pickerTeamWinning || pickerTeamWillWin) {
         const trumpCards = realCards.filter(c => isTrump(c))
         if (trumpCards.length > 0) {
-          if (calledSuitLedUnrevealed) {
-            const fullHand = view.hands[userId] ?? []
-            const pick = pickBySchmearPriority(trumpCards, 'trump', fullHand)
-            return (pick ?? lowestCard(trumpCards)).id
-          }
+          const fullHand = view.hands[userId] ?? []
           const winningTrump = trumpCards.filter(card =>
             currentTrick.every(play => beats(card, play.card, ledSuit))
           )
-          if (winningTrump.length > 0) return highestTrump(winningTrump).id
+          if (winningTrump.length > 0)
+            return (pickBySchmearPriority(winningTrump, 'trump', fullHand) ?? lowestCard(winningTrump)).id
           // No trump can beat the current winner — fall through to lowestCard
         }
       }
