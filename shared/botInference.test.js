@@ -559,7 +559,7 @@ describe('isGuaranteedWinner – non-trump extension', () => {
     })
     // trumpRemainingElsewhere = 14 - ownTrump(0) - tricksTrump(0) - buriedTrump(0) = 14
     // With the vacuous-truth bug this returned true; with the fix it returns false.
-    expect(isGuaranteedWinner(aceOfClubs, view, 'p1')).toBe(false)
+    expect(isGuaranteedWinner(aceOfClubs, resolveView(view, 'p1'), 'p1')).toBe(false)
   })
 })
 
