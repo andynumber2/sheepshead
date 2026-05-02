@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { knownNonPartners, deducedPartner, deducedTrumpVoids, isGuaranteedWinner, deducedNonTrumpVoids } from './botInference.js'
+import { knownNonPartners, deducedPartner, deducedTrumpVoids, isGuaranteedWinner, deducedNonTrumpVoids, knownCardLocations, resolveView } from './botInference.js'
 
 const c = (id, suit, rank) => ({ id, suit, rank })
 
@@ -716,5 +716,61 @@ describe('deducedNonTrumpVoids', () => {
     expect(result['p2']).toBeUndefined()   // hidden → no deduction
     expect(result['p3'] instanceof Set).toBe(true)
     expect(result['p3'].has('C')).toBe(true)
+  })
+})
+
+describe('knownCardLocations', () => {
+  it('no blitzes → empty Map', () => {
+    const view = { blitzes: [] }
+    expect(knownCardLocations(view).size).toBe(0)
+  })
+
+  it('black blitz → picker entry contains QC and QS card objects', () => {
+    const view = { blitzes: [{ userId: 'p1', type: 'black' }] }
+    const result = knownCardLocations(view)
+    expect(result.has('p1')).toBe(true)
+    const ids = result.get('p1').map(c => c.id)
+    expect(ids).toContain('QC')
+    expect(ids).toContain('QS')
+    expect(ids).toHaveLength(2)
+  })
+
+  it('red blitz → picker entry contains QH and QD card objects', () => {
+    const view = { blitzes: [{ userId: 'p1', type: 'red' }] }
+    const result = knownCardLocations(view)
+    expect(result.has('p1')).toBe(true)
+    const ids = result.get('p1').map(c => c.id)
+    expect(ids).toContain('QH')
+    expect(ids).toContain('QD')
+    expect(ids).toHaveLength(2)
+  })
+
+  it('missing blitzes field → empty Map', () => {
+    expect(knownCardLocations({}).size).toBe(0)
+  })
+})
+
+describe('resolveView', () => {
+  it('returns view with knownLocations populated from blitzes', () => {
+    const view = { blitzes: [{ userId: 'p1', type: 'black' }], hands: { p1: [], p2: [] } }
+    const rv = resolveView(view, 'p2')
+    expect(rv.knownLocations).toBeDefined()
+    expect(rv.knownLocations.has('p1')).toBe(true)
+    const ids = rv.knownLocations.get('p1').map(c => c.id)
+    expect(ids).toContain('QC')
+    expect(ids).toContain('QS')
+  })
+
+  it('other view fields are unchanged', () => {
+    const view = { blitzes: [], hands: { p1: [], p2: [] }, picker: 'p1' }
+    const rv = resolveView(view, 'p2')
+    expect(rv.picker).toBe('p1')
+    expect(rv.hands).toBe(view.hands)
+  })
+
+  it('no blitzes → knownLocations is an empty Map', () => {
+    const view = { blitzes: [], hands: {} }
+    const rv = resolveView(view, 'p1')
+    expect(rv.knownLocations.size).toBe(0)
   })
 })

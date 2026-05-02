@@ -4,6 +4,30 @@
 
 import { isTrump, cardPoints, schwanzerCardPoints, effectiveSuit, trumpRank, suitRank } from './gameEngine.js'
 
+// ─── Public knowledge ─────────────────────────────────────────────────────────
+
+// Card objects for each blitz type. Blitz publicly reveals which queens the picker holds.
+const BLITZ_CARDS = {
+  black: [{ id: 'QC', rank: 'Q', suit: 'C' }, { id: 'QS', rank: 'Q', suit: 'S' }],
+  red:   [{ id: 'QH', rank: 'Q', suit: 'H' }, { id: 'QD', rank: 'Q', suit: 'D' }],
+}
+
+// Returns Map<userId, Array<card>> of cards known by public announcement to be in a player's hand.
+// Phase 1: populated from view.blitzes only.
+export function knownCardLocations(view) {
+  const map = new Map()
+  for (const { userId, type } of (view.blitzes ?? [])) {
+    map.set(userId, [...(BLITZ_CARDS[type] ?? [])])
+  }
+  return map
+}
+
+// Pre-computation wrapper. Returns { ...view, knownLocations } for use by all inference calls
+// in a single play decision. _userId is unused in Phase 1; included for Phase 2 API symmetry.
+export function resolveView(view, _userId) {
+  return { ...view, knownLocations: knownCardLocations(view) }
+}
+
 // ─── Trump tracking ───────────────────────────────────────────────────────────
 
 // Count trump cards visible in completed tricks and the current trick.
