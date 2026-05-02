@@ -17,6 +17,7 @@ import {
   isGuaranteedWinner,
   cheapestGuaranteedWin,  // NEW
   pickBySchmearPriority,
+  resolveView,
 } from './botInference.js'
 
 const c = (rank, suit) => ({ id: `${rank}${suit}`, rank, suit })
@@ -2584,7 +2585,7 @@ describe('isGuaranteedWinner', () => {
       hand: [c('A','C')],
       trick: [],
     })
-    expect(isGuaranteedWinner(c('A','C'), view, 'p1')).toBe(false)
+    expect(isGuaranteedWinner(c('A','C'), resolveView(view, 'p1'), 'p1')).toBe(false)
   })
 
   it('counts visible buried trump (picker view)', () => {

@@ -23,10 +23,17 @@ export function knownCardLocations(view) {
   return map
 }
 
-// Pre-computation wrapper. Returns { ...view, knownLocations } for use by all inference calls
-// in a single play decision. _userId is unused in Phase 1; included for Phase 2 API symmetry.
-export function resolveView(view, _userId) {
-  return { ...view, knownLocations: knownCardLocations(view) }
+// Pre-computation wrapper. Runs four inference helpers once and attaches their results
+// so downstream consumers in a single play decision can read them as property lookups.
+export function resolveView(view, userId) {
+  return {
+    ...view,
+    knownLocations: knownCardLocations(view),
+    resolvedPartner: deducedPartner(view, userId),
+    resolvedTrumpVoids: deducedTrumpVoids(view),
+    resolvedNonTrumpVoids: deducedNonTrumpVoids(view),
+    resolvedTrumpRemaining: trumpRemainingElsewhere(view, userId),
+  }
 }
 
 // ─── Trump tracking ───────────────────────────────────────────────────────────
@@ -251,6 +258,11 @@ function knownTeammateCards(view, userId) {
 // the currently-winning card in the trick, so that including currentTrick cards in
 // the accounting does not conflate the question "can this card be beaten?" with
 // cards already played against it.
+//
+// NOTE — For non-trump cards, Condition 2 reads `view.resolvedTrumpRemaining` and
+// `view.resolvedTrumpVoids` directly. `view` must be a resolved view produced by
+// `resolveView(rawView, userId)` — plain views will crash on non-trump cards.
+// The trump branch does not read these fields and is safe with plain views.
 export function isGuaranteedWinner(card, view, userId) {
   if (!isTrump(card)) {
     // ── Condition 1: no higher same-suit card is unaccounted for ─────────────
@@ -299,9 +311,9 @@ export function isGuaranteedWinner(card, view, userId) {
     const knownTeammateTrump = knownTeammateCards(view, userId)
       .filter(c => isTrump(c) && !playedOrBuriedIds.has(c.id))
       .length
-    const noTrumpElsewhere = trumpRemainingElsewhere(view, userId) - knownTeammateTrump === 0
+    const noTrumpElsewhere = view.resolvedTrumpRemaining - knownTeammateTrump === 0
     if (!noTrumpElsewhere) {
-      const voids = deducedTrumpVoids(view)
+      const voids = view.resolvedTrumpVoids
       const otherPlayerIds = Object.keys(view.hands).filter(id => id !== userId)
       const allOthersVoid = otherPlayerIds.length > 0 && otherPlayerIds.every(id => voids.has(id))
       if (!allOthersVoid) return false

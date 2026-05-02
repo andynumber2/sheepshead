@@ -6,7 +6,7 @@
 import {
   isTrump, cardPoints, effectiveSuit, trumpRank, suitRank, schwanzerCardPoints,
 } from './gameEngine.js'
-import { currentWinner, beats, handScore, bestVoidBury, teammateWinning, isGuaranteedWinner, cheapestGuaranteedWin, pickBySchmearPriority, deducedPartner, deducedNonTrumpVoids, resolveView } from './botInference.js'
+import { currentWinner, beats, handScore, bestVoidBury, teammateWinning, isGuaranteedWinner, cheapestGuaranteedWin, pickBySchmearPriority, resolveView } from './botInference.js'
 
 // ─── Legal card helper ────────────────────────────────────────────────────────
 // Mirrors getLegalCardIds from the frontend; computes which cards can be played.
@@ -344,7 +344,7 @@ export function decidePlay(view, userId) {
       {
         const allIds = Object.keys(view.hands)
         const opponentIds = allIds.filter(id => id !== picker && id !== partner)
-        const nonTrumpVoids = deducedNonTrumpVoids(rv)
+        const nonTrumpVoids = rv.resolvedNonTrumpVoids
         const failCards = realCards.filter(c => !isTrump(c))
         const safeFails = failCards.filter(card => {
           const suit = effectiveSuit(card)
@@ -367,7 +367,7 @@ export function decidePlay(view, userId) {
       // skipped if partner identity is already known from public information (crack/recrack/elimination).
       const { calledSuit } = view
       const nonTrump = realCards.filter(c => !isTrump(c))
-      if (deducedPartner(rv, userId) === null && calledSuit) {
+      if (rv.resolvedPartner === null && calledSuit) {
         const calledSuitCards = nonTrump.filter(c => effectiveSuit(c) === calledSuit)
         if (calledSuitCards.length > 0) return lowestCard(calledSuitCards).id
       }
@@ -377,9 +377,9 @@ export function decidePlay(view, userId) {
       {
         const { calledAce: ca, calledTen: ct, calledKing: ck } = view
         const calledCardId = ca?.aceId ?? ct?.tenId ?? ck?.kingId
-        const knownPartner = deducedPartner(rv, userId)
+        const knownPartner = rv.resolvedPartner
         if (knownPartner !== null) {
-          const nonTrumpVoids = deducedNonTrumpVoids(rv)
+          const nonTrumpVoids = rv.resolvedNonTrumpVoids
           const pickerTeamIds = [picker, knownPartner].filter(Boolean)
           // Candidate fail cards: non-trump, not the called card
           const failLeads = nonTrump.filter(c => c.id !== calledCardId)
@@ -543,7 +543,7 @@ export function decidePlay(view, userId) {
       const playedIdsOpp = new Set(currentTrick.map(p => p.userId))
       const allIdsOpp = Object.keys(view.hands)
       // From opponent POV, "threats" (could overtake teammate) = picker + partner still to play.
-      const deducedOpp = deducedPartner(rv, userId)
+      const deducedOpp = rv.resolvedPartner
       const threatsRemaining = allIdsOpp.filter(id =>
         !playedIdsOpp.has(id) && id !== userId && (id === picker || id === deducedOpp)
       ).length
@@ -596,7 +596,7 @@ export function decidePlay(view, userId) {
 
       // Skipped if partner has already been deduced from public information —
       // the lead-back goal (flush the unknown partner) is then moot.
-      if (deducedPartner(rv, userId) === null && !ledThisTrickIsCalled && hasCalledSuitFailInHand) {
+      if (rv.resolvedPartner === null && !ledThisTrickIsCalled && hasCalledSuitFailInHand) {
         const winningSet = realCards.filter(card => {
           for (const play of currentTrick) {
             if (!beats(card, play.card, ledSuit)) return false
@@ -654,7 +654,7 @@ export function decidePlay(view, userId) {
     // points along with the partner's high card.
     if (!isTrump(currentTrick[0].card)) {
       const winner = currentWinner(currentTrick)
-      const deducedForPredicted = deducedPartner(rv, userId)
+      const deducedForPredicted = rv.resolvedPartner
       const pickerTeamWinning = winner && (winner.userId === picker || winner.userId === deducedForPredicted)
       const { calledSuit, partnerRevealed } = view
       const calledSuitLedUnrevealed = !partnerRevealed && !!calledSuit && ledSuit === calledSuit
