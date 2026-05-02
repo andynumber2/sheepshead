@@ -1641,7 +1641,7 @@ describe('teammateWinning', () => {
     const view = {
       currentTrick: [{ userId: 'p1', card: c('Q','C') }],
       picker: 'p1',
-      partner: 'p2',
+      resolvedPartner: 'p2',
     }
     expect(teammateWinning(view, 'p2')).toBe(true)
   })
@@ -1650,7 +1650,7 @@ describe('teammateWinning', () => {
     const view = {
       currentTrick: [{ userId: 'p2', card: c('Q','C') }],
       picker: 'p1',
-      partner: 'p2',
+      resolvedPartner: 'p2',
     }
     expect(teammateWinning(view, 'p1')).toBe(true)
   })
@@ -1659,7 +1659,7 @@ describe('teammateWinning', () => {
     const view = {
       currentTrick: [{ userId: 'p3', card: c('Q','C') }],
       picker: 'p1',
-      partner: 'p2',
+      resolvedPartner: 'p2',
     }
     expect(teammateWinning(view, 'p1')).toBe(false)
   })
@@ -1668,7 +1668,7 @@ describe('teammateWinning', () => {
     const view = {
       currentTrick: [{ userId: 'p4', card: c('Q','C') }],
       picker: 'p1',
-      partner: 'p2',
+      resolvedPartner: 'p2',
     }
     expect(teammateWinning(view, 'p3')).toBe(true)
   })
@@ -1677,7 +1677,7 @@ describe('teammateWinning', () => {
     const view = {
       currentTrick: [{ userId: 'p4', card: c('Q','C') }],
       picker: 'p1',
-      partner: null,
+      resolvedPartner: null,
     }
     expect(teammateWinning(view, 'p3')).toBe(false)
   })
@@ -1686,7 +1686,7 @@ describe('teammateWinning', () => {
     const view = {
       currentTrick: [{ userId: 'p3', card: c('A','S') }],
       picker: 'p1',
-      partner: null,
+      resolvedPartner: null,
       goingAlone: true,
       isLeaster: false,
     }
@@ -1698,7 +1698,7 @@ describe('teammateWinning', () => {
     const view = {
       currentTrick: [{ userId: 'p1', card: c('Q','C') }],
       picker: 'p1',
-      partner: null,
+      resolvedPartner: null,
       goingAlone: true,
       isLeaster: false,
     }
@@ -1710,7 +1710,7 @@ describe('teammateWinning', () => {
     const view = {
       currentTrick: [],
       picker: 'p1',
-      partner: 'p2',
+      resolvedPartner: 'p2',
     }
     expect(teammateWinning(view, 'p1')).toBe(false)
   })
