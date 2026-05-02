@@ -197,7 +197,7 @@ of bot team.
 | Function | Purpose |
 |---|---|
 | `knownCardLocations` | Returns `Map<userId, Array<card>>` of card objects known by public announcement to be in a player's hand. Phase 1: populated from `view.blitzes` — black blitz → picker holds QC + QS; red blitz → picker holds QH + QD. |
-| `resolveView` | Pre-computation wrapper called once per play decision in `decidePlay`. Returns `{ ...view, knownLocations }`. All downstream inference calls receive the enriched view. Phase 2 (#176) will add more pre-computed fields. |
+| `resolveView` | Pre-computation wrapper called once per play decision in `decidePlay`. Returns the view enriched with: `knownLocations` (card locations from blitz declarations), `resolvedPartner` (inferred partner userId or null — distinct from engine-set `view.partner`), `resolvedTrumpVoids` (Set of userIds with no trump remaining), `resolvedNonTrumpVoids` (map of userId → Set of fail suits they cannot follow), and `resolvedTrumpRemaining` (integer count of trump still held by other players). All downstream inference calls receive the enriched view. |
 | `countTrumpPlayed` | Count visible trump in completed tricks and the current trick |
 | `trumpRemainingElsewhere` | Estimate trump still held by other players: `14 − own trump − seen trump − buried trump` |
 | `handScore` | Combined pick-quality score: `schwanzerPts × 4 + 3×(non-trump aces) + 2×(non-trump tens) + 5 if QC held` |
