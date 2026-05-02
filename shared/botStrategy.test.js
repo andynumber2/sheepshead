@@ -1038,7 +1038,7 @@ describe('decidePlay — Wire 2: opponent leads into picker-team void to flush t
     // Picker (u2) followed all suits normally — no void in spades.
     // Partner (u3, deduced via recrack) is void in spades.
     // Bot holds: KS (spades, partner void) and 8H (hearts, no void).
-    // Wire 2 should fire because pickerTeamIds.some(id => nonTrumpVoids[id]?.has('S'))
+    // Wire 2 should fire because pickerTeamIds.some(id => nonTrumpVoids.get(id)?.has('S'))
     // is satisfied by u3 (partner), even though u2 (picker) is not void.
     const tricks = [{
       plays: [
@@ -1054,7 +1054,7 @@ describe('decidePlay — Wire 2: opponent leads into picker-team void to flush t
       c('8H', 'H', '8'),   // hearts (no picker-team void)
     ]
     const view = wire2BaseView({ hand, tricks })
-    // deducedPartner = u3 (recrack). nonTrumpVoids[u3] has 'S'. Picker u2 NOT void.
+    // deducedPartner = u3 (recrack). nonTrumpVoids.get(u3) has 'S'. Picker u2 NOT void.
     // Wire 2 fires on 'S'. voidSuitCards = [KS]. lowestCard([KS]) = KS.
     expect(decidePlay(view, 'u4')).toBe('KS')
   })
@@ -1115,7 +1115,7 @@ describe('decidePlay — Wire 2: opponent leads into picker-team void to flush t
     // knownNonPartners: u2 (picker), u4 (self), u1 (played non-called before AH), u3 (same)
     // → 4 ruled out of 5 non-picker seats? Wait: 5 seats total, picker=u2, non-picker = u1,u3,u4,u5.
     // ruled = {u2, u4, u1, u3} → candidates = [u5] → deducedPartner = u5.
-    // nonTrumpVoids[u5] has 'S'. pickerTeamIds = [u2, u5]. Wire 2 fires on KS.
+    // nonTrumpVoids.get(u5) has 'S'. pickerTeamIds = [u2, u5]. Wire 2 fires on KS.
     expect(decidePlay(view, 'u4')).toBe('KS')
   })
 })
