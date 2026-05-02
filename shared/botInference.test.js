@@ -1009,4 +1009,50 @@ describe('isGuaranteedWinner – blitz inference (fail case, condition 2)', () =
     const rv = resolveView(view, 'p3')
     expect(isGuaranteedWinner(ah, rv, 'p3')).toBe(false)
   })
+
+  it('picker holds fail ace; partner known-trump accounts for all remaining trump → true', () => {
+    // Exercises the picker-as-bot path in knownTeammateCards (teammateId = view.partner).
+    // Using artificial partner blitz (invalid in real games) to populate knownLocations for p2.
+    // p1 (picker) holds AC. p2's "blitz" puts QH+QD in knownLocations.
+    // All other trump accounted for in tricks. trumpRemainingElsewhere = 2 (QH+QD in partner hand).
+    // knownTeammateTrump = 2 → 2-2=0 → true.
+    const ac = { id: 'AC', rank: 'A', suit: 'C' }
+    const view = {
+      picker: 'p1',
+      partner: 'p2',
+      blitzes: [{ userId: 'p2', type: 'red' }], // artificial: partner declares red blitz (QH+QD)
+      hands: {
+        p1: [ac],
+        p2: [{ id: 'HIDDEN', hidden: true }, { id: 'HIDDEN', hidden: true }],
+        p3: [], p4: [], p5: [],
+      },
+      tricks: [{
+        plays: [
+          { userId: 'p3', card: { id: 'QC', rank: 'Q', suit: 'C' } },
+          { userId: 'p4', card: { id: 'QS', rank: 'Q', suit: 'S' } },
+          { userId: 'p5', card: { id: 'JC', rank: 'J', suit: 'C' } },
+          { userId: 'p1', card: { id: 'JS', rank: 'J', suit: 'S' } },
+          { userId: 'p2', card: { id: 'JH', rank: 'J', suit: 'H' } },
+        ],
+      }, {
+        plays: [
+          { userId: 'p3', card: { id: 'JD', rank: 'J', suit: 'D' } },
+          { userId: 'p4', card: { id: 'AD', rank: 'A', suit: 'D' } },
+          { userId: 'p5', card: { id: '10D', rank: '10', suit: 'D' } },
+          { userId: 'p1', card: { id: 'KD', rank: 'K', suit: 'D' } },
+          { userId: 'p2', card: { id: '9D', rank: '9', suit: 'D' } },
+        ],
+      }],
+      // Own trump (p1): 0. Tricks: 10. Buried: 2.
+      // trumpRemainingElsewhere = 14 - 0 - 10 - 2 = 2 (QH+QD in p2's known hand).
+      // knownTeammateCards(p1) → knownLocations.get(view.partner='p2') → [QH, QD].
+      // QH and QD not in tricks/buried → knownTeammateTrump = 2. 2-2=0 → true.
+      currentTrick: [],
+      buried: [{ id: '8D', rank: '8', suit: 'D' }, { id: '7D', rank: '7', suit: 'D' }],
+      isLeaster: false,
+    }
+    const rv = resolveView(view, 'p1')
+    expect(isGuaranteedWinner(ac, view, 'p1')).toBe(false)  // plain view: 2 trump remaining → false
+    expect(isGuaranteedWinner(ac, rv, 'p1')).toBe(true)     // enriched: partner holds those 2 → true
+  })
 })

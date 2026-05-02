@@ -239,7 +239,8 @@ function knownTeammateCards(view, userId) {
 //      strength) must be accounted for in: own hand, completed tricks (non-hidden),
 //      current trick (non-hidden), or bury (non-hidden).
 //   2. No opponent can trump it — satisfied if either:
-//      a. trumpRemainingElsewhere(view, userId) === 0 (all trump accounted for), OR
+//      a. trumpRemainingElsewhere(view, userId) − knownTeammateTrump === 0 (all trump
+//         accounted for after subtracting known teammate trump from knownLocations), OR
 //      b. Every other player is in the deducedTrumpVoids set.
 //
 // Unseen higher trump / higher same-suit cards are always treated as opponent-held.
