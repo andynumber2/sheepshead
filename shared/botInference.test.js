@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { knownNonPartners, deducedPartner, deducedTrumpVoids, isGuaranteedWinner, deducedNonTrumpVoids, knownCardLocations, resolveView, trumpRemainingElsewhere } from './botInference.js'
+import { knownNonPartners, isGuaranteedWinner, knownCardLocations, resolveView, trumpRemainingElsewhere } from './botInference.js'
 
 const c = (id, suit, rank) => ({ id, suit, rank })
 
@@ -117,17 +117,17 @@ describe('knownNonPartners', () => {
 describe('deducedPartner', () => {
   it('returns view.partner when set (engine-revealed)', () => {
     const view = baseView({ partner: 'p2', partnerRevealed: true })
-    expect(deducedPartner(view, 'p3')).toBe('p2')
+    expect(resolveView(view, 'p3').resolvedPartner).toBe('p2')
   })
 
   it('returns recracker when non-picker recracked', () => {
     const view = baseView({ recrackerId: 'p2' })
-    expect(deducedPartner(view, 'p3')).toBe('p2')
+    expect(resolveView(view, 'p3').resolvedPartner).toBe('p2')
   })
 
   it('does not use recracker when picker recracked (falls through)', () => {
     const view = baseView({ recrackerId: 'p1' })  // p1 is picker
-    expect(deducedPartner(view, 'p3')).toBeNull()
+    expect(resolveView(view, 'p3').resolvedPartner).toBeNull()
   })
 
   it('returns the unique remaining seat when 3 of 4 non-picker seats ruled out', () => {
@@ -138,33 +138,33 @@ describe('deducedPartner', () => {
       crackerId: 'p4',
       currentTrick: [{ userId: 'p5', card: c('KH', 'H', 'K') }],
     })
-    expect(deducedPartner(view, 'p3')).toBe('p2')
+    expect(resolveView(view, 'p3').resolvedPartner).toBe('p2')
   })
 
   it('returns null when only 2 of 4 non-picker seats ruled out', () => {
     const view = baseView({ crackerId: 'p4' })
     // p1 picker, p3 self, p4 cracker → 2 ruled out (p3, p4 of the 4 non-picker seats); p2 and p5 remain candidates.
-    expect(deducedPartner(view, 'p3')).toBeNull()
+    expect(resolveView(view, 'p3').resolvedPartner).toBeNull()
   })
 
   it('returns null when no signals fire', () => {
     const view = baseView()
-    expect(deducedPartner(view, 'p3')).toBeNull()
+    expect(resolveView(view, 'p3').resolvedPartner).toBeNull()
   })
 
   it('returns null when picker goes alone (goingAlone === true)', () => {
     const view = baseView({ goingAlone: true, calledSuit: null, calledAce: null, recrackerId: 'p2' })
-    expect(deducedPartner(view, 'p3')).toBeNull()
+    expect(resolveView(view, 'p3').resolvedPartner).toBeNull()
   })
 
   it('returns self when bot is the partner (view.partner === userId)', () => {
     const view = baseView({ partner: 'p2' })
-    expect(deducedPartner(view, 'p2')).toBe('p2')
+    expect(resolveView(view, 'p2').resolvedPartner).toBe('p2')
   })
 
   it('leaster: returns null', () => {
     const view = baseView({ isLeaster: true, picker: null, callMode: null })
-    expect(deducedPartner(view, 'p3')).toBeNull()
+    expect(resolveView(view, 'p3').resolvedPartner).toBeNull()
   })
 })
 
@@ -184,7 +184,7 @@ const fail9 = (suit) => ({ id: `9${suit}`, suit, rank: '9' })
 describe('deducedTrumpVoids', () => {
   it('empty tricks → empty set', () => {
     const view = baseView({ tricks: [] })
-    expect(deducedTrumpVoids(view)).toEqual(new Set())
+    expect(resolveView(view, 'p1').resolvedTrumpVoids).toEqual(new Set())
   })
 
   it('trump led, one player played fail → that player in set', () => {
@@ -200,7 +200,7 @@ describe('deducedTrumpVoids', () => {
         ],
       }],
     })
-    const voids = deducedTrumpVoids(view)
+    const voids = resolveView(view, 'p1').resolvedTrumpVoids
     expect(voids.has('p3')).toBe(true)
     expect(voids.has('p4')).toBe(true)
     expect(voids.has('p5')).toBe(true)
@@ -217,7 +217,7 @@ describe('deducedTrumpVoids', () => {
         ],
       }],
     })
-    const voids = deducedTrumpVoids(view)
+    const voids = resolveView(view, 'p1').resolvedTrumpVoids
     expect(voids.has('p2')).toBe(false)
   })
 
@@ -231,7 +231,7 @@ describe('deducedTrumpVoids', () => {
         ],
       }],
     })
-    const voids = deducedTrumpVoids(view)
+    const voids = resolveView(view, 'p1').resolvedTrumpVoids
     expect(voids.has('p2')).toBe(false)
   })
 
@@ -244,7 +244,7 @@ describe('deducedTrumpVoids', () => {
         ],
       }],
     })
-    const voids = deducedTrumpVoids(view)
+    const voids = resolveView(view, 'p1').resolvedTrumpVoids
     expect(voids.has('p2')).toBe(false)
   })
 
@@ -258,7 +258,7 @@ describe('deducedTrumpVoids', () => {
         { userId: 'p2', card: { id: 'AC', suit: 'C', rank: 'A' } },   // fail — but in-progress
       ],
     })
-    const voids = deducedTrumpVoids(view)
+    const voids = resolveView(view, 'p1').resolvedTrumpVoids
     expect(voids.has('p2')).toBe(false)
   })
 
@@ -273,7 +273,7 @@ describe('deducedTrumpVoids', () => {
         ],
       }],
     })
-    const voids = deducedTrumpVoids(view)
+    const voids = resolveView(view, 'p1').resolvedTrumpVoids
     expect(voids.has('p2')).toBe(false)   // hidden — no deduction
     expect(voids.has('p3')).toBe(true)    // visible fail — deduced void
   })
@@ -569,7 +569,7 @@ describe('isGuaranteedWinner – non-trump extension', () => {
 describe('deducedNonTrumpVoids', () => {
   it('empty tricks → empty Map (no voids)', () => {
     const view = baseView({ tricks: [] })
-    const result = deducedNonTrumpVoids(view)
+    const result = resolveView(view, 'p1').resolvedNonTrumpVoids
     expect(result).toEqual(new Map())
   })
 
@@ -587,7 +587,7 @@ describe('deducedNonTrumpVoids', () => {
         ],
       }],
     })
-    const result = deducedNonTrumpVoids(view)
+    const result = resolveView(view, 'p1').resolvedNonTrumpVoids
     expect(result.get('p2') instanceof Set).toBe(true)
     expect(result.get('p2').has('C')).toBe(true)
     expect(result.get('p3')).toBeUndefined()
@@ -606,7 +606,7 @@ describe('deducedNonTrumpVoids', () => {
         ],
       }],
     })
-    const result = deducedNonTrumpVoids(view)
+    const result = resolveView(view, 'p1').resolvedNonTrumpVoids
     expect(result.get('p2')).toBeUndefined()
     expect(result.get('p3')).toBeUndefined()
   })
@@ -622,7 +622,7 @@ describe('deducedNonTrumpVoids', () => {
         ],
       }],
     })
-    const result = deducedNonTrumpVoids(view)
+    const result = resolveView(view, 'p1').resolvedNonTrumpVoids
     expect(result.get('p2') instanceof Set).toBe(true)
     expect(result.get('p2').has('H')).toBe(true)
     expect(result.get('p3') instanceof Set).toBe(true)
@@ -641,7 +641,7 @@ describe('deducedNonTrumpVoids', () => {
         ],
       }],
     })
-    const result = deducedNonTrumpVoids(view)
+    const result = resolveView(view, 'p1').resolvedNonTrumpVoids
     expect(result.get('p2')).toBeUndefined()
     expect(result.get('p3')).toBeUndefined()
   })
@@ -655,7 +655,7 @@ describe('deducedNonTrumpVoids', () => {
         ],
       }],
     })
-    const result = deducedNonTrumpVoids(view)
+    const result = resolveView(view, 'p1').resolvedNonTrumpVoids
     expect(result.get('p2')).toBeUndefined()
   })
 
@@ -680,7 +680,7 @@ describe('deducedNonTrumpVoids', () => {
         },
       ],
     })
-    const result = deducedNonTrumpVoids(view)
+    const result = resolveView(view, 'p1').resolvedNonTrumpVoids
     expect(result.get('p2') instanceof Set).toBe(true)
     expect(result.get('p2').has('C')).toBe(true)
     expect(result.get('p2').has('H')).toBe(false)   // p2 followed hearts in trick 2
@@ -698,7 +698,7 @@ describe('deducedNonTrumpVoids', () => {
         { userId: 'p2', card: { id: 'KH', suit: 'H', rank: 'K' } },  // would imply void
       ],
     })
-    const result = deducedNonTrumpVoids(view)
+    const result = resolveView(view, 'p1').resolvedNonTrumpVoids
     expect(result.get('p2')).toBeUndefined()
   })
 
@@ -712,7 +712,7 @@ describe('deducedNonTrumpVoids', () => {
         ],
       }],
     })
-    const result = deducedNonTrumpVoids(view)
+    const result = resolveView(view, 'p1').resolvedNonTrumpVoids
     expect(result.get('p2')).toBeUndefined()   // hidden → no deduction
     expect(result.get('p3') instanceof Set).toBe(true)
     expect(result.get('p3').has('C')).toBe(true)
@@ -801,22 +801,22 @@ describe('resolveView pre-computed inference fields', () => {
     buried: [],
   })
 
-  it('resolvedPartner equals deducedPartner(view, userId)', () => {
+  it('resolvedPartner is null when no partner signals are present', () => {
     const view = buildView()
     const rv = resolveView(view, 'p2')
-    expect(rv.resolvedPartner).toBe(deducedPartner(view, 'p2'))
+    expect(rv.resolvedPartner).toBeNull()
   })
 
-  it('resolvedTrumpVoids equals deducedTrumpVoids(view)', () => {
+  it('resolvedTrumpVoids is an empty Set when no completed tricks', () => {
     const view = buildView()
     const rv = resolveView(view, 'p2')
-    expect(rv.resolvedTrumpVoids).toEqual(deducedTrumpVoids(view))
+    expect(rv.resolvedTrumpVoids).toEqual(new Set())
   })
 
-  it('resolvedNonTrumpVoids equals deducedNonTrumpVoids(view)', () => {
+  it('resolvedNonTrumpVoids is an empty Map when no completed tricks', () => {
     const view = buildView()
     const rv = resolveView(view, 'p2')
-    expect(rv.resolvedNonTrumpVoids).toEqual(deducedNonTrumpVoids(view))
+    expect(rv.resolvedNonTrumpVoids).toEqual(new Map())
   })
 
   it('resolvedTrumpRemaining equals trumpRemainingElsewhere(view, userId)', () => {
