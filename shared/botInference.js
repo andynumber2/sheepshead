@@ -17,7 +17,8 @@ const BLITZ_CARDS = {
 export function knownCardLocations(view) {
   const map = new Map()
   for (const { userId, type } of (view.blitzes ?? [])) {
-    map.set(userId, [...(BLITZ_CARDS[type] ?? [])])
+    const cards = BLITZ_CARDS[type]
+    if (cards) map.set(userId, [...cards])
   }
   return map
 }

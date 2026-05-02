@@ -748,6 +748,18 @@ describe('knownCardLocations', () => {
   it('missing blitzes field → empty Map', () => {
     expect(knownCardLocations({}).size).toBe(0)
   })
+
+  it('multiple blitzes → separate entries per userId', () => {
+    const view = { blitzes: [
+      { userId: 'p1', type: 'black' },
+      { userId: 'p2', type: 'red' },
+    ] }
+    const result = knownCardLocations(view)
+    expect(result.has('p1')).toBe(true)
+    expect(result.has('p2')).toBe(true)
+    expect(result.get('p1').map(c => c.id)).toContain('QC')
+    expect(result.get('p2').map(c => c.id)).toContain('QH')
+  })
 })
 
 describe('resolveView', () => {
