@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { knownNonPartners, deducedPartner, deducedTrumpVoids, isGuaranteedWinner, deducedNonTrumpVoids, knownCardLocations, resolveView } from './botInference.js'
+import { knownNonPartners, deducedPartner, deducedTrumpVoids, isGuaranteedWinner, deducedNonTrumpVoids, knownCardLocations, resolveView, trumpRemainingElsewhere } from './botInference.js'
 
 const c = (id, suit, rank) => ({ id, suit, rank })
 
@@ -784,6 +784,63 @@ describe('resolveView', () => {
     const view = { blitzes: [], hands: {} }
     const rv = resolveView(view, 'p1')
     expect(rv.knownLocations.size).toBe(0)
+  })
+})
+
+describe('resolveView pre-computed inference fields', () => {
+  const buildView = () => ({
+    blitzes: [],
+    picker: 'p1',
+    goingAlone: false,
+    isLeaster: false,
+    partner: null,
+    recrackerId: null,
+    hands: { p1: [], p2: [], p3: [], p4: [], p5: [] },
+    tricks: [],
+    currentTrick: [],
+    buried: [],
+  })
+
+  it('resolvedPartner equals deducedPartner(view, userId)', () => {
+    const view = buildView()
+    const rv = resolveView(view, 'p2')
+    expect(rv.resolvedPartner).toBe(deducedPartner(view, 'p2'))
+  })
+
+  it('trumpVoids equals deducedTrumpVoids(view)', () => {
+    const view = buildView()
+    const rv = resolveView(view, 'p2')
+    expect(rv.trumpVoids).toEqual(deducedTrumpVoids(view))
+  })
+
+  it('nonTrumpVoids equals deducedNonTrumpVoids(view)', () => {
+    const view = buildView()
+    const rv = resolveView(view, 'p2')
+    expect(rv.nonTrumpVoids).toEqual(deducedNonTrumpVoids(view))
+  })
+
+  it('resolvedTrumpRemaining equals trumpRemainingElsewhere(view, userId)', () => {
+    const view = buildView()
+    const rv = resolveView(view, 'p2')
+    expect(rv.resolvedTrumpRemaining).toBe(trumpRemainingElsewhere(view, 'p2'))
+  })
+
+  it('resolvedTrumpRemaining is userId-sensitive — differs between two userIds with different hand contents', () => {
+    const view = {
+      ...buildView(),
+      hands: {
+        p1: [{ id: 'QC', rank: 'Q', suit: 'C', hidden: false }],
+        p2: [],
+        p3: [],
+        p4: [],
+        p5: [],
+      },
+    }
+    const rv1 = resolveView(view, 'p1')
+    const rv2 = resolveView(view, 'p2')
+    expect(rv1.resolvedTrumpRemaining).toBe(trumpRemainingElsewhere(view, 'p1'))
+    expect(rv2.resolvedTrumpRemaining).toBe(trumpRemainingElsewhere(view, 'p2'))
+    expect(rv1.resolvedTrumpRemaining).not.toBe(rv2.resolvedTrumpRemaining)
   })
 })
 

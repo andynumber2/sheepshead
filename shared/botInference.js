@@ -25,8 +25,15 @@ export function knownCardLocations(view) {
 
 // Pre-computation wrapper. Returns { ...view, knownLocations } for use by all inference calls
 // in a single play decision. _userId is unused in Phase 1; included for Phase 2 API symmetry.
-export function resolveView(view, _userId) {
-  return { ...view, knownLocations: knownCardLocations(view) }
+export function resolveView(view, userId) {
+  return {
+    ...view,
+    knownLocations: knownCardLocations(view),
+    resolvedPartner: deducedPartner(view, userId),
+    trumpVoids: deducedTrumpVoids(view),
+    nonTrumpVoids: deducedNonTrumpVoids(view),
+    resolvedTrumpRemaining: trumpRemainingElsewhere(view, userId),
+  }
 }
 
 // ─── Trump tracking ───────────────────────────────────────────────────────────
