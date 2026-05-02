@@ -277,7 +277,17 @@ export function isGuaranteedWinner(card, view, userId) {
     }
 
     // ── Condition 2: no opponent can trump it ─────────────────────────────────
-    const noTrumpElsewhere = trumpRemainingElsewhere(view, userId) === 0
+    let knownTeammateTrump = 0
+    if (view.knownLocations) {
+      const onPickerTeam = userId === view.picker || userId === view.partner
+      if (onPickerTeam) {
+        const teammateId = userId === view.picker ? view.partner : view.picker
+        if (teammateId) {
+          knownTeammateTrump = (view.knownLocations.get(teammateId) ?? []).filter(c => isTrump(c)).length
+        }
+      }
+    }
+    const noTrumpElsewhere = trumpRemainingElsewhere(view, userId) - knownTeammateTrump <= 0
     if (!noTrumpElsewhere) {
       const voids = deducedTrumpVoids(view)
       const otherPlayerIds = Object.keys(view.hands).filter(id => id !== userId)
