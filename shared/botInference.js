@@ -165,7 +165,7 @@ export function bestVoidBury(hand) {
 
 // ─── Void analysis (fail suits) ──────────────────────────────────────────────
 
-// Returns { [userId]: Set<suit> } — a map of player IDs to the set of fail suits
+// Returns Map<userId, Set<suit>> — a map of player IDs to the set of fail suits
 // they are known to be void in, deduced from completed trick history.
 //
 // Logic: for each completed trick where the led card is a visible fail card (not trump),
@@ -174,7 +174,7 @@ export function bestVoidBury(hand) {
 // (both prove void in the led fail suit).
 //
 // Only view.tricks (completed tricks) are scanned — not view.currentTrick.
-export function deducedNonTrumpVoids(view) {
+function deducedNonTrumpVoids(view) {
   const voids = new Map()
   for (const trick of (view.tricks ?? [])) {
     const plays = trick.plays
@@ -205,7 +205,7 @@ export function deducedNonTrumpVoids(view) {
 // in-progress and not yet committed to state. Under-card leads are safe: the
 // under card has hidden: true, so tricks led by the under card are skipped by
 // the existing hidden-led-card guard and never produce false void deductions.
-export function deducedTrumpVoids(view) {
+function deducedTrumpVoids(view) {
   const voids = new Set()
   for (const trick of (view.tricks ?? [])) {
     const plays = trick.plays
@@ -428,7 +428,7 @@ export function knownNonPartners(view, userId) {
 //   4. Otherwise, null.
 //
 // Returns null in alone/leaster/no-picker modes regardless of signals.
-export function deducedPartner(view, userId) {
+function deducedPartner(view, userId) {
   if (!view.picker || view.goingAlone || view.isLeaster) return null
   if (view.partner) return view.partner
   if (view.recrackerId && view.recrackerId !== view.picker) return view.recrackerId
