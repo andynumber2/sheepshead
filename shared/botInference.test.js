@@ -349,7 +349,7 @@ describe('isGuaranteedWinner – non-trump extension', () => {
       currentTrick: [],
       buried: [],
     })
-    expect(isGuaranteedWinner(aceOfClubs, view, 'p1')).toBe(true)
+    expect(isGuaranteedWinner(aceOfClubs, resolveView(view, 'p1'), 'p1')).toBe(true)
   })
 
   it('fail ace, trump still unaccounted for and not all void → returns false', () => {
@@ -361,7 +361,7 @@ describe('isGuaranteedWinner – non-trump extension', () => {
       currentTrick: [],
       buried: [],
     })
-    expect(isGuaranteedWinner(aceOfClubs, view, 'p1')).toBe(false)
+    expect(isGuaranteedWinner(aceOfClubs, resolveView(view, 'p1'), 'p1')).toBe(false)
   })
 
   it('fail ace, trumpRemainingElsewhere === 0 (all trump played) → returns true even without void deduction', () => {
@@ -381,7 +381,7 @@ describe('isGuaranteedWinner – non-trump extension', () => {
         p2: [], p3: [], p4: [], p5: [],
       },
     })
-    expect(isGuaranteedWinner(aceOfClubs, view, 'p1')).toBe(true)
+    expect(isGuaranteedWinner(aceOfClubs, resolveView(view, 'p1'), 'p1')).toBe(true)
   })
 
   it('fail 10 where ace has been played, all others trump-void → returns true', () => {
@@ -415,7 +415,7 @@ describe('isGuaranteedWinner – non-trump extension', () => {
       currentTrick: [],
       buried: [],
     })
-    expect(isGuaranteedWinner(tenOfClubs, view, 'p1')).toBe(true)
+    expect(isGuaranteedWinner(tenOfClubs, resolveView(view, 'p1'), 'p1')).toBe(true)
   })
 
   it('fail 10 where ace NOT yet played → returns false (higher card outstanding)', () => {
@@ -483,7 +483,7 @@ describe('isGuaranteedWinner – non-trump extension', () => {
       currentTrick: [],
       buried: [aceOfClubs],   // AC buried — satisfies condition 1 for 10C
     })
-    expect(isGuaranteedWinner(tenOfClubs, view, 'p1')).toBe(true)
+    expect(isGuaranteedWinner(tenOfClubs, resolveView(view, 'p1'), 'p1')).toBe(true)
   })
 
   it('fail King (suitRank 2) — false when only AC played (10C still outstanding)', () => {
@@ -542,7 +542,7 @@ describe('isGuaranteedWinner – non-trump extension', () => {
       buried: [],
     })
     // Both AC (rank 0) and 10C (rank 1) seen in tricks; all opponents are trump-void.
-    expect(isGuaranteedWinner(kingOfClubs, view, 'p1')).toBe(true)
+    expect(isGuaranteedWinner(kingOfClubs, resolveView(view, 'p1'), 'p1')).toBe(true)
   })
 
   it('degenerate view with no other players in hands → returns false even when trumpRemainingElsewhere > 0', () => {
@@ -981,8 +981,6 @@ describe('isGuaranteedWinner – blitz inference (fail case, condition 2)', () =
       buried: [{ id: '8D', rank: '8', suit: 'D' }, { id: '7D', rank: '7', suit: 'D' }],
       isLeaster: false,
     }
-    // Plain view: 2 trump remaining (QC+QS), not all others trump-void → false
-    expect(isGuaranteedWinner(ah, view, 'p2')).toBe(false)
     // Enriched view: QC+QS known in teammate's hand, 2-2=0 opponent trump → true
     const rv = resolveView(view, 'p2')
     expect(isGuaranteedWinner(ah, rv, 'p2')).toBe(true)
@@ -1111,7 +1109,6 @@ describe('isGuaranteedWinner – blitz inference (fail case, condition 2)', () =
       isLeaster: false,
     }
     const rv = resolveView(view, 'p1')
-    expect(isGuaranteedWinner(ac, view, 'p1')).toBe(false)  // plain view: 2 trump remaining → false
     expect(isGuaranteedWinner(ac, rv, 'p1')).toBe(true)     // enriched: partner holds those 2 → true
   })
 
@@ -1155,8 +1152,6 @@ describe('isGuaranteedWinner – blitz inference (fail case, condition 2)', () =
       buried: [{ id: '8D', rank: '8', suit: 'D' }],
       isLeaster: false,
     }
-    // Without resolveView: trumpRemainingElsewhere=2, not all void → false
-    expect(isGuaranteedWinner(ah, view, 'p2')).toBe(false)
     const rv = resolveView(view, 'p2')
     // With resolveView: QC in currentTrick (filtered), QS unplayed (counted); 2-1=1 opponent trump remains → false.
     // (An opponent still holds 8D — AH is correctly identified as NOT a guaranteed winner.)

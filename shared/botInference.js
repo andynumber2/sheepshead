@@ -306,9 +306,9 @@ export function isGuaranteedWinner(card, view, userId) {
     const knownTeammateTrump = knownTeammateCards(view, userId)
       .filter(c => isTrump(c) && !playedOrBuriedIds.has(c.id))
       .length
-    const noTrumpElsewhere = trumpRemainingElsewhere(view, userId) - knownTeammateTrump === 0
+    const noTrumpElsewhere = view.resolvedTrumpRemaining - knownTeammateTrump === 0
     if (!noTrumpElsewhere) {
-      const voids = deducedTrumpVoids(view)
+      const voids = view.resolvedTrumpVoids
       const otherPlayerIds = Object.keys(view.hands).filter(id => id !== userId)
       const allOthersVoid = otherPlayerIds.length > 0 && otherPlayerIds.every(id => voids.has(id))
       if (!allOthersVoid) return false
