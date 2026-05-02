@@ -74,17 +74,6 @@ Eventually, there will be a mobile app created which will be able to connect alo
 
 Direct pushes to `main` are blocked by a pre-push hook (`.githooks/pre-push`). Always work on a feature branch and open a PR. After merging, local branches tracking deleted remotes are auto-deleted by the post-merge hook.
 
-## Brainstorming ##
-
-When using the brainstorming skill, also do the following:
-When you write the design doc, you will also output a second design document, that a PM or high level manager could read and understand. It should have no or extremely minimal code or function names in it -- they wouldn't understand anyway. It should focus on what is being built and why. Be appropriately verbose about any critical logic that is being implemented. Do not explain algorithms with code. Name this document in the same format as the design/spec, but substitute PMspec, ex: `spec` becomes `PMspec`.
-
-## Github
-
-- When creating, editing, or posting comments on issues, make sure to:
-  - Specify that you did the work.
-  - Use existing tags as appropriate. Do not add new tags unless the user approves.
-
 ## RULES Sync
 
 `docs/RULES.md` contains a plain-English description of the game rules. **Whenever you change game rules in `shared/gameEngine.js`, also update `docs/RULES.md` to match.**
