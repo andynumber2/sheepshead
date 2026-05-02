@@ -1681,6 +1681,30 @@ describe('teammateWinning', () => {
     expect(teammateWinning(view, 'p3')).toBe(false)
   })
 
+  it('returns true when fellow opponent is winning and picker went alone', () => {
+    const view = {
+      currentTrick: [{ userId: 'p3', card: c('A','S') }],
+      picker: 'p1',
+      partner: null,
+      goingAlone: true,
+      isLeaster: false,
+    }
+    // p4 is an opponent; p3 (non-picker) is winning → teammate
+    expect(teammateWinning(view, 'p4')).toBe(true)
+  })
+
+  it('returns false when picker is winning and picker went alone', () => {
+    const view = {
+      currentTrick: [{ userId: 'p1', card: c('Q','C') }],
+      picker: 'p1',
+      partner: null,
+      goingAlone: true,
+      isLeaster: false,
+    }
+    // picker winning → not a teammate for p4
+    expect(teammateWinning(view, 'p4')).toBe(false)
+  })
+
   it('returns false when trick is empty (leading)', () => {
     const view = {
       currentTrick: [],
@@ -1977,6 +2001,24 @@ describe('decidePlay schmearing', () => {
       handCards: [c('A','S'), c('K','S'), c('9','S'), c('A','C')],
     })
     expect(decidePlay(view, 'p3')).toBe('AC')
+  })
+
+  it('opponent schmears 10H to fellow opponent winning when picker went alone', () => {
+    // Picker (p1) went alone. p3 is winning with AC (11 pts, clubs lead).
+    // Bot p4 has 10H (10 pts, fail) and 9S (0 pts, fail) — no clubs, so any card is legal.
+    // teammateWinning should be true (p3 is non-picker → teammate) → schmearOpp → 10H.
+    const view = {
+      ...makeFollowView({
+        userId: 'p4',
+        picker: 'p1',
+        partner: null,
+        trickWinner: 'p3',
+        trickCard: c('A','C'),
+        handCards: [c('10','H'), c('9','S')],
+      }),
+      goingAlone: true,
+    }
+    expect(decidePlay(view, 'p4')).toBe('10H')
   })
 })
 
