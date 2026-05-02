@@ -310,9 +310,7 @@ export function isGuaranteedWinner(card, view, userId) {
     if (onPickerTeam) {
       const teammateId = userId === view.picker ? view.partner : view.picker
       if (teammateId) {
-        for (const c of (view.knownLocations.get(teammateId) ?? [])) {
-          if (isTrump(c)) seenRanks.add(trumpRank(c))
-        }
+        for (const c of (view.knownLocations.get(teammateId) ?? [])) noteIfHigherTrump(c)
       }
     }
   }

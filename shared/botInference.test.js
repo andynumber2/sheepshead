@@ -855,4 +855,34 @@ describe('isGuaranteedWinner – blitz inference (trump case)', () => {
     // QC (rank 0) still unaccounted for → false
     expect(isGuaranteedWinner(qs, rv, 'p1')).toBe(false)
   })
+
+  it('combined blitz — picker black-blitzed and partner red-blitzed: JC is guaranteed winner for picker', () => {
+    // Picker (p1) holds JC (rank 4). QC(0)+QS(1) in p1's hand via own-black-blitz would not appear
+    // in knownLocations since knownLocations tracks the teammate, not self.
+    // But QH(2)+QD(3) are in partner's (p2's) hand via red-blitz → teammate known cards.
+    // QC(0), QS(1) are in p1's own hand (visible), so seenRanks covers them from the hands loop.
+    // QH(2), QD(3) come from knownLocations (teammate p2). All four higher-rank trump accounted for → true.
+    const jc = { id: 'JC', rank: 'J', suit: 'C' }
+    const qc = { id: 'QC', rank: 'Q', suit: 'C' }
+    const qs = { id: 'QS', rank: 'Q', suit: 'S' }
+    const view = {
+      picker: 'p1',
+      partner: 'p2',
+      blitzes: [
+        { userId: 'p1', type: 'black' },
+        { userId: 'p2', type: 'red' },
+      ],
+      hands: {
+        p1: [jc, qc, qs],
+        p2: [{ id: 'HIDDEN', hidden: true }, { id: 'HIDDEN', hidden: true }],
+        p3: [], p4: [], p5: [],
+      },
+      tricks: [],
+      currentTrick: [],
+      buried: [],
+      isLeaster: false,
+    }
+    const rv = resolveView(view, 'p1')
+    expect(isGuaranteedWinner(jc, rv, 'p1')).toBe(true)
+  })
 })
