@@ -786,3 +786,73 @@ describe('resolveView', () => {
     expect(rv.knownLocations.size).toBe(0)
   })
 })
+
+describe('isGuaranteedWinner – blitz inference (trump case)', () => {
+  it('partner holds QH; picker black-blitzed (QC+QS); neither played → true with resolveView', () => {
+    // Without blitz inference: QC and QS are unaccounted for → false.
+    // With resolveView: QC and QS are known to be in teammate's (picker's) hand → true.
+    const qh = { id: 'QH', rank: 'Q', suit: 'H' }
+    const view = {
+      picker: 'p1',
+      partner: 'p2',
+      blitzes: [{ userId: 'p1', type: 'black' }],
+      hands: {
+        p1: [{ id: 'HIDDEN', hidden: true }, { id: 'HIDDEN', hidden: true }],
+        p2: [qh],
+        p3: [], p4: [], p5: [],
+      },
+      tricks: [],
+      currentTrick: [],
+      buried: [],
+      isLeaster: false,
+    }
+    // Plain view: QC (rank 0) and QS (rank 1) unseen → false
+    expect(isGuaranteedWinner(qh, view, 'p2')).toBe(false)
+    // Enriched view: QC and QS known in teammate's hand → true
+    const rv = resolveView(view, 'p2')
+    expect(isGuaranteedWinner(qh, rv, 'p2')).toBe(true)
+  })
+
+  it('opponent bot does NOT benefit from blitz: QH is false for p3 regardless of resolveView', () => {
+    const qh = { id: 'QH', rank: 'Q', suit: 'H' }
+    const view = {
+      picker: 'p1',
+      partner: 'p2',
+      blitzes: [{ userId: 'p1', type: 'black' }],
+      hands: {
+        p1: [{ id: 'HIDDEN', hidden: true }, { id: 'HIDDEN', hidden: true }],
+        p2: [], p3: [qh], p4: [], p5: [],
+      },
+      tricks: [],
+      currentTrick: [],
+      buried: [],
+      isLeaster: false,
+    }
+    const rv = resolveView(view, 'p3')
+    // p3 is an opponent; picker's blitzed queens are opponent threats → still false
+    expect(isGuaranteedWinner(qh, rv, 'p3')).toBe(false)
+  })
+
+  it('picker holds QS; partner red-blitzed (QH+QD in partner hand); QC still unaccounted → QS false for picker', () => {
+    // Picker (p1) holds QS (rank 1). Partner (p2) declared red blitz (QH+QD in p2's hand).
+    // QC (rank 0) is still unaccounted for and NOT in a teammate's known cards → false.
+    const qs = { id: 'QS', rank: 'Q', suit: 'S' }
+    const view = {
+      picker: 'p1',
+      partner: 'p2',
+      blitzes: [{ userId: 'p2', type: 'red' }],
+      hands: {
+        p1: [qs],
+        p2: [{ id: 'HIDDEN', hidden: true }, { id: 'HIDDEN', hidden: true }],
+        p3: [], p4: [], p5: [],
+      },
+      tricks: [],
+      currentTrick: [],
+      buried: [],
+      isLeaster: false,
+    }
+    const rv = resolveView(view, 'p1')
+    // QC (rank 0) still unaccounted for → false
+    expect(isGuaranteedWinner(qs, rv, 'p1')).toBe(false)
+  })
+})

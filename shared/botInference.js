@@ -304,6 +304,19 @@ export function isGuaranteedWinner(card, view, userId) {
   for (const play of (view.currentTrick ?? [])) noteIfHigherTrump(play.card)
   for (const c of (view.buried ?? [])) noteIfHigherTrump(c)
 
+  // Also treat trump in a known teammate's hand as accounted for
+  if (view.knownLocations) {
+    const onPickerTeam = userId === view.picker || userId === view.partner
+    if (onPickerTeam) {
+      const teammateId = userId === view.picker ? view.partner : view.picker
+      if (teammateId) {
+        for (const c of (view.knownLocations.get(teammateId) ?? [])) {
+          if (isTrump(c)) seenRanks.add(trumpRank(c))
+        }
+      }
+    }
+  }
+
   // Every rank strictly lower than myRank must be seen somewhere.
   for (let r = 0; r < myRank; r++) {
     if (!seenRanks.has(r)) return false
