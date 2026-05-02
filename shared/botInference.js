@@ -23,15 +23,15 @@ export function knownCardLocations(view) {
   return map
 }
 
-// Pre-computation wrapper. Returns { ...view, knownLocations } for use by all inference calls
-// in a single play decision. _userId is unused in Phase 1; included for Phase 2 API symmetry.
+// Pre-computation wrapper. Runs four inference helpers once and attaches their results
+// so downstream consumers in a single play decision can read them as property lookups.
 export function resolveView(view, userId) {
   return {
     ...view,
     knownLocations: knownCardLocations(view),
     resolvedPartner: deducedPartner(view, userId),
-    trumpVoids: deducedTrumpVoids(view),
-    nonTrumpVoids: deducedNonTrumpVoids(view),
+    resolvedTrumpVoids: deducedTrumpVoids(view),
+    resolvedNonTrumpVoids: deducedNonTrumpVoids(view),
     resolvedTrumpRemaining: trumpRemainingElsewhere(view, userId),
   }
 }

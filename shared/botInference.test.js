@@ -807,16 +807,16 @@ describe('resolveView pre-computed inference fields', () => {
     expect(rv.resolvedPartner).toBe(deducedPartner(view, 'p2'))
   })
 
-  it('trumpVoids equals deducedTrumpVoids(view)', () => {
+  it('resolvedTrumpVoids equals deducedTrumpVoids(view)', () => {
     const view = buildView()
     const rv = resolveView(view, 'p2')
-    expect(rv.trumpVoids).toEqual(deducedTrumpVoids(view))
+    expect(rv.resolvedTrumpVoids).toEqual(deducedTrumpVoids(view))
   })
 
-  it('nonTrumpVoids equals deducedNonTrumpVoids(view)', () => {
+  it('resolvedNonTrumpVoids equals deducedNonTrumpVoids(view)', () => {
     const view = buildView()
     const rv = resolveView(view, 'p2')
-    expect(rv.nonTrumpVoids).toEqual(deducedNonTrumpVoids(view))
+    expect(rv.resolvedNonTrumpVoids).toEqual(deducedNonTrumpVoids(view))
   })
 
   it('resolvedTrumpRemaining equals trumpRemainingElsewhere(view, userId)', () => {
