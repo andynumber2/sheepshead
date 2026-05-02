@@ -175,7 +175,7 @@ export function bestVoidBury(hand) {
 //
 // Only view.tricks (completed tricks) are scanned — not view.currentTrick.
 export function deducedNonTrumpVoids(view) {
-  const voids = {}
+  const voids = new Map()
   for (const trick of (view.tricks ?? [])) {
     const plays = trick.plays
     if (!plays || plays.length === 0) continue
@@ -188,8 +188,8 @@ export function deducedNonTrumpVoids(view) {
       if (!play.card || play.card.hidden) continue  // can't see this card
       if (effectiveSuit(play.card) !== ledSuit) {
         // Did not follow the led fail suit → void in that suit
-        if (!voids[play.userId]) voids[play.userId] = new Set()
-        voids[play.userId].add(ledSuit)
+        if (!voids.has(play.userId)) voids.set(play.userId, new Set())
+        voids.get(play.userId).add(ledSuit)
       }
     }
   }

@@ -567,10 +567,10 @@ describe('isGuaranteedWinner – non-trump extension', () => {
 // Fail cards: suit ∈ {C,H,S}, rank ≠ Q/J; trump = all Qs, all Js, all diamonds.
 
 describe('deducedNonTrumpVoids', () => {
-  it('empty tricks → empty object (no voids)', () => {
+  it('empty tricks → empty Map (no voids)', () => {
     const view = baseView({ tricks: [] })
     const result = deducedNonTrumpVoids(view)
-    expect(Object.keys(result)).toHaveLength(0)
+    expect(result).toEqual(new Map())
   })
 
   it('fail suit led, one player played a different fail suit → that player void in led suit', () => {
@@ -588,11 +588,11 @@ describe('deducedNonTrumpVoids', () => {
       }],
     })
     const result = deducedNonTrumpVoids(view)
-    expect(result['p2'] instanceof Set).toBe(true)
-    expect(result['p2'].has('C')).toBe(true)
-    expect(result['p3']).toBeUndefined()
-    expect(result['p4']).toBeUndefined()
-    expect(result['p5']).toBeUndefined()
+    expect(result.get('p2') instanceof Set).toBe(true)
+    expect(result.get('p2').has('C')).toBe(true)
+    expect(result.get('p3')).toBeUndefined()
+    expect(result.get('p4')).toBeUndefined()
+    expect(result.get('p5')).toBeUndefined()
   })
 
   it('fail suit led, player followed suit → NOT void in that suit', () => {
@@ -607,8 +607,8 @@ describe('deducedNonTrumpVoids', () => {
       }],
     })
     const result = deducedNonTrumpVoids(view)
-    expect(result['p2']).toBeUndefined()
-    expect(result['p3']).toBeUndefined()
+    expect(result.get('p2')).toBeUndefined()
+    expect(result.get('p3')).toBeUndefined()
   })
 
   it('fail suit led, player trumped in → void in led fail suit', () => {
@@ -623,10 +623,10 @@ describe('deducedNonTrumpVoids', () => {
       }],
     })
     const result = deducedNonTrumpVoids(view)
-    expect(result['p2'] instanceof Set).toBe(true)
-    expect(result['p2'].has('H')).toBe(true)
-    expect(result['p3'] instanceof Set).toBe(true)
-    expect(result['p3'].has('H')).toBe(true)
+    expect(result.get('p2') instanceof Set).toBe(true)
+    expect(result.get('p2').has('H')).toBe(true)
+    expect(result.get('p3') instanceof Set).toBe(true)
+    expect(result.get('p3').has('H')).toBe(true)
   })
 
   it('trump led → no void deduction for any player', () => {
@@ -642,8 +642,8 @@ describe('deducedNonTrumpVoids', () => {
       }],
     })
     const result = deducedNonTrumpVoids(view)
-    expect(result['p2']).toBeUndefined()
-    expect(result['p3']).toBeUndefined()
+    expect(result.get('p2')).toBeUndefined()
+    expect(result.get('p3')).toBeUndefined()
   })
 
   it('hidden led card → skip that trick', () => {
@@ -656,7 +656,7 @@ describe('deducedNonTrumpVoids', () => {
       }],
     })
     const result = deducedNonTrumpVoids(view)
-    expect(result['p2']).toBeUndefined()
+    expect(result.get('p2')).toBeUndefined()
   })
 
   it('multiple tricks accumulate voids across suits', () => {
@@ -681,12 +681,12 @@ describe('deducedNonTrumpVoids', () => {
       ],
     })
     const result = deducedNonTrumpVoids(view)
-    expect(result['p2'] instanceof Set).toBe(true)
-    expect(result['p2'].has('C')).toBe(true)
-    expect(result['p2'].has('H')).toBe(false)   // p2 followed hearts in trick 2
-    expect(result['p3'] instanceof Set).toBe(true)
-    expect(result['p3'].has('H')).toBe(true)
-    expect(result['p3'].has('C')).toBe(false)   // p3 followed clubs in trick 1
+    expect(result.get('p2') instanceof Set).toBe(true)
+    expect(result.get('p2').has('C')).toBe(true)
+    expect(result.get('p2').has('H')).toBe(false)   // p2 followed hearts in trick 2
+    expect(result.get('p3') instanceof Set).toBe(true)
+    expect(result.get('p3').has('H')).toBe(true)
+    expect(result.get('p3').has('C')).toBe(false)   // p3 followed clubs in trick 1
   })
 
   it('currentTrick is ignored — only completed tricks are scanned', () => {
@@ -699,7 +699,7 @@ describe('deducedNonTrumpVoids', () => {
       ],
     })
     const result = deducedNonTrumpVoids(view)
-    expect(result['p2']).toBeUndefined()
+    expect(result.get('p2')).toBeUndefined()
   })
 
   it('hidden non-led play in fail-led trick → skip that play, no void deduction', () => {
@@ -713,9 +713,9 @@ describe('deducedNonTrumpVoids', () => {
       }],
     })
     const result = deducedNonTrumpVoids(view)
-    expect(result['p2']).toBeUndefined()   // hidden → no deduction
-    expect(result['p3'] instanceof Set).toBe(true)
-    expect(result['p3'].has('C')).toBe(true)
+    expect(result.get('p2')).toBeUndefined()   // hidden → no deduction
+    expect(result.get('p3') instanceof Set).toBe(true)
+    expect(result.get('p3').has('C')).toBe(true)
   })
 })
 
