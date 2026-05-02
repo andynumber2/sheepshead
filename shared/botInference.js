@@ -258,6 +258,11 @@ function knownTeammateCards(view, userId) {
 // the currently-winning card in the trick, so that including currentTrick cards in
 // the accounting does not conflate the question "can this card be beaten?" with
 // cards already played against it.
+//
+// NOTE — For non-trump cards, Condition 2 reads `view.resolvedTrumpRemaining` and
+// `view.resolvedTrumpVoids` directly. `view` must be a resolved view produced by
+// `resolveView(rawView, userId)` — plain views will crash on non-trump cards.
+// The trump branch does not read these fields and is safe with plain views.
 export function isGuaranteedWinner(card, view, userId) {
   if (!isTrump(card)) {
     // ── Condition 1: no higher same-suit card is unaccounted for ─────────────
