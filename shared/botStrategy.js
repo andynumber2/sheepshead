@@ -290,12 +290,12 @@ export function decidePlay(view, userId) {
   // Under card is the only option
   if (realCards.length === 0) return 'UNDER_CARD'
 
-  const rv = resolveView(view, userId)
-
   const { currentTrick, picker, partner, isLeaster } = view
 
   // Leaster: minimise trick-taking; play lowest value card
   if (isLeaster) return lowestCard(realCards).id
+
+  const rv = resolveView(view, userId)
 
   const isLeading = !currentTrick || currentTrick.length === 0
   // `view.partner` is set on picker-team views (the picker sees the partner;
