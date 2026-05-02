@@ -450,7 +450,7 @@ export function teammateWinning(view, userId) {
   const { currentTrick, picker } = view
   if (!currentTrick || currentTrick.length === 0) return false
 
-  const partner = deducedPartner(view, userId)
+  const partner = view.resolvedPartner
 
   const winner = currentWinner(currentTrick)
   if (!winner) return false
