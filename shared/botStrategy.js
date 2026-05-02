@@ -348,7 +348,7 @@ export function decidePlay(view, userId) {
         const failCards = realCards.filter(c => !isTrump(c))
         const safeFails = failCards.filter(card => {
           const suit = effectiveSuit(card)
-          return !opponentIds.some(id => nonTrumpVoids[id]?.has(suit))
+          return !opponentIds.some(id => nonTrumpVoids.get(id)?.has(suit))
         })
         if (safeFails.length > 0) return highestValueCard(safeFails).id
         return highestValueCard(realCards).id
@@ -386,7 +386,7 @@ export function decidePlay(view, userId) {
           // Find cards in suits where at least one picker-team member is void
           const voidSuitCards = failLeads.filter(card => {
             const suit = effectiveSuit(card)
-            return pickerTeamIds.some(id => nonTrumpVoids[id]?.has(suit))
+            return pickerTeamIds.some(id => nonTrumpVoids.get(id)?.has(suit))
           })
           if (voidSuitCards.length > 0) return lowestCard(voidSuitCards).id
         }
