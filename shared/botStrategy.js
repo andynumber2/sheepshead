@@ -6,7 +6,7 @@
 import {
   isTrump, cardPoints, effectiveSuit, trumpRank, suitRank, schwanzerCardPoints,
 } from './gameEngine.js'
-import { currentWinner, beats, handScore, bestVoidBury, teammateWinning, isGuaranteedWinner, cheapestGuaranteedWin, pickBySchmearPriority, deducedPartner, deducedNonTrumpVoids } from './botInference.js'
+import { currentWinner, beats, handScore, bestVoidBury, teammateWinning, isGuaranteedWinner, cheapestGuaranteedWin, pickBySchmearPriority, deducedPartner, deducedNonTrumpVoids, resolveView } from './botInference.js'
 
 // ─── Legal card helper ────────────────────────────────────────────────────────
 // Mirrors getLegalCardIds from the frontend; computes which cards can be played.
@@ -295,6 +295,8 @@ export function decidePlay(view, userId) {
   // Leaster: minimise trick-taking; play lowest value card
   if (isLeaster) return lowestCard(realCards).id
 
+  const rv = resolveView(view, userId)
+
   const isLeading = !currentTrick || currentTrick.length === 0
   // `view.partner` is set on picker-team views (the picker sees the partner;
   // the partner sees themselves), so this self-team check is correct as-is.
@@ -306,7 +308,7 @@ export function decidePlay(view, userId) {
     if (isPickerTeam) {
       // Cash any guaranteed non-trump winner: play highest-value first
       const guaranteedFails = realCards
-        .filter(c => !isTrump(c) && isGuaranteedWinner(c, view, userId))
+        .filter(c => !isTrump(c) && isGuaranteedWinner(c, rv, userId))
         .sort((a, b) => cardPoints(b) - cardPoints(a))
       if (guaranteedFails.length > 0) return guaranteedFails[0].id
       // Lead strongest trump to win tricks and accumulate points.
@@ -316,7 +318,7 @@ export function decidePlay(view, userId) {
       if (best) {
         if (userId === partner) {
           const fails = realCards.filter(c => !isTrump(c))
-          if (realCards.filter(c => isTrump(c)).length >= 2 && fails.length > 0 && !isGuaranteedWinner(best, view, userId)) {
+          if (realCards.filter(c => isTrump(c)).length >= 2 && fails.length > 0 && !isGuaranteedWinner(best, rv, userId)) {
             return lowestCard(fails).id
           }
         }
@@ -342,7 +344,7 @@ export function decidePlay(view, userId) {
       {
         const allIds = Object.keys(view.hands)
         const opponentIds = allIds.filter(id => id !== picker && id !== partner)
-        const nonTrumpVoids = deducedNonTrumpVoids(view)
+        const nonTrumpVoids = deducedNonTrumpVoids(rv)
         const failCards = realCards.filter(c => !isTrump(c))
         const safeFails = failCards.filter(card => {
           const suit = effectiveSuit(card)
@@ -357,7 +359,7 @@ export function decidePlay(view, userId) {
         const { calledAce, calledTen, calledKing } = view
         const calledCardId = calledAce?.aceId ?? calledTen?.tenId ?? calledKing?.kingId
         const guaranteedFails = realCards
-          .filter(c => !isTrump(c) && c.id !== calledCardId && isGuaranteedWinner(c, view, userId))
+          .filter(c => !isTrump(c) && c.id !== calledCardId && isGuaranteedWinner(c, rv, userId))
           .sort((a, b) => cardPoints(b) - cardPoints(a))
         if (guaranteedFails.length > 0) return guaranteedFails[0].id
       }
@@ -365,7 +367,7 @@ export function decidePlay(view, userId) {
       // skipped if partner identity is already known from public information (crack/recrack/elimination).
       const { calledSuit } = view
       const nonTrump = realCards.filter(c => !isTrump(c))
-      if (deducedPartner(view, userId) === null && calledSuit) {
+      if (deducedPartner(rv, userId) === null && calledSuit) {
         const calledSuitCards = nonTrump.filter(c => effectiveSuit(c) === calledSuit)
         if (calledSuitCards.length > 0) return lowestCard(calledSuitCards).id
       }
@@ -375,9 +377,9 @@ export function decidePlay(view, userId) {
       {
         const { calledAce: ca, calledTen: ct, calledKing: ck } = view
         const calledCardId = ca?.aceId ?? ct?.tenId ?? ck?.kingId
-        const knownPartner = deducedPartner(view, userId)
+        const knownPartner = deducedPartner(rv, userId)
         if (knownPartner !== null) {
-          const nonTrumpVoids = deducedNonTrumpVoids(view)
+          const nonTrumpVoids = deducedNonTrumpVoids(rv)
           const pickerTeamIds = [picker, knownPartner].filter(Boolean)
           // Candidate fail cards: non-trump, not the called card
           const failLeads = nonTrump.filter(c => c.id !== calledCardId)
@@ -402,7 +404,7 @@ export function decidePlay(view, userId) {
   if (isPickerTeam) {
     // Schmear: dump highest-point non-trump on teammate's winning trick,
     // unless an opponent still to play could trump over the teammate.
-    if (teammateWinning(view, userId)) {
+    if (teammateWinning(rv, userId)) {
       const schmear = () => {
         const nonTrump = realCards.filter(c => !isTrump(c))
         // Pass the bot's full hand (not realCards) so the suit-count tiebreak counts
@@ -419,7 +421,7 @@ export function decidePlay(view, userId) {
       ).length
 
       const teammateSafe = opponentsRemainingLocal === 0 ||
-        isGuaranteedWinner(winnerPlay.card, view, userId)
+        isGuaranteedWinner(winnerPlay.card, rv, userId)
 
       if (teammateSafe) return schmear()
 
@@ -437,7 +439,7 @@ export function decidePlay(view, userId) {
         }
         return true
       })
-      const takeover = cheapestGuaranteedWin(winningLocal, view, userId)
+      const takeover = cheapestGuaranteedWin(winningLocal, rv, userId)
       if (takeover) return takeover.id
       const highTrump = highestTrump(winningLocal)
       if (highTrump) return highTrump.id  // risk reduction
@@ -464,7 +466,7 @@ export function decidePlay(view, userId) {
         // all nonTrumpWins are the same suit, so if the highest-value card isn't
         // guaranteed (a higher same-suit rank is unaccounted for), none of them are.
         const safeFromTrumpIn = opponentsRemainingNT === 0 ||
-          isGuaranteedWinner(bestNonTrumpWin, view, userId)
+          isGuaranteedWinner(bestNonTrumpWin, rv, userId)
         if (safeFromTrumpIn) {
           return bestNonTrumpWin.id
         }
@@ -481,14 +483,14 @@ export function decidePlay(view, userId) {
       if (ledSuit === 'T') {
         // Scenario 1: Trump trick
         if (opponentsRemaining === 0) return cheapestWinningTrump(winning).id
-        const guaranteed = cheapestGuaranteedWin(winning, view, userId)
+        const guaranteed = cheapestGuaranteedWin(winning, rv, userId)
         if (guaranteed) return guaranteed.id
         return highestTrump(winning).id
       }
 
       // Scenario 2: Fail trick, bot is void, playing trump to contest the lead
       if (userId === picker) {
-        const guaranteed = cheapestGuaranteedWin(winning, view, userId)
+        const guaranteed = cheapestGuaranteedWin(winning, rv, userId)
         if (guaranteed) return guaranteed.id
         return highestTrump(winning).id
       }
@@ -505,7 +507,7 @@ export function decidePlay(view, userId) {
         }
         // Exactly 1 trump: only spend it if guaranteed to win the trick.
         const myOnlyTrump = realCards.find(c => isTrump(c))
-        if (myOnlyTrump && isGuaranteedWinner(myOnlyTrump, view, userId)) {
+        if (myOnlyTrump && isGuaranteedWinner(myOnlyTrump, rv, userId)) {
           return myOnlyTrump.id
         }
         return lowestCard(realCards).id
@@ -513,7 +515,7 @@ export function decidePlay(view, userId) {
 
       // Picker has played but is not winning (schmear intercepts picker-winning case).
       if (myTrumpCount > 1) {
-        const guaranteed = cheapestGuaranteedWin(winning, view, userId)
+        const guaranteed = cheapestGuaranteedWin(winning, rv, userId)
         if (guaranteed) return guaranteed.id
         return highestTrump(winning).id
       }
@@ -530,7 +532,7 @@ export function decidePlay(view, userId) {
   } else {
     // Opponent: schmear on confirmed teammate wins — unless picker-team still to play
     // could trump over the teammate, in which case attempt a guaranteed takeover.
-    if (teammateWinning(view, userId)) {
+    if (teammateWinning(rv, userId)) {
       const schmearOpp = () => {
         const nonTrump = realCards.filter(c => !isTrump(c))
         const pick = pickBySchmearPriority(nonTrump, 'fail', view.hands[userId])
@@ -541,13 +543,13 @@ export function decidePlay(view, userId) {
       const playedIdsOpp = new Set(currentTrick.map(p => p.userId))
       const allIdsOpp = Object.keys(view.hands)
       // From opponent POV, "threats" (could overtake teammate) = picker + partner still to play.
-      const deducedOpp = deducedPartner(view, userId)
+      const deducedOpp = deducedPartner(rv, userId)
       const threatsRemaining = allIdsOpp.filter(id =>
         !playedIdsOpp.has(id) && id !== userId && (id === picker || id === deducedOpp)
       ).length
 
       const teammateSafe = threatsRemaining === 0 ||
-        isGuaranteedWinner(winnerPlay.card, view, userId)
+        isGuaranteedWinner(winnerPlay.card, rv, userId)
 
       if (teammateSafe) return schmearOpp()
 
@@ -558,7 +560,7 @@ export function decidePlay(view, userId) {
         }
         return true
       })
-      const takeover = cheapestGuaranteedWin(winningOpp, view, userId)
+      const takeover = cheapestGuaranteedWin(winningOpp, rv, userId)
       if (takeover) return takeover.id
 
       // Predicted-win override (#163): when the called suit was led by a fellow
@@ -594,7 +596,7 @@ export function decidePlay(view, userId) {
 
       // Skipped if partner has already been deduced from public information —
       // the lead-back goal (flush the unknown partner) is then moot.
-      if (deducedPartner(view, userId) === null && !ledThisTrickIsCalled && hasCalledSuitFailInHand) {
+      if (deducedPartner(rv, userId) === null && !ledThisTrickIsCalled && hasCalledSuitFailInHand) {
         const winningSet = realCards.filter(card => {
           for (const play of currentTrick) {
             if (!beats(card, play.card, ledSuit)) return false
@@ -652,7 +654,7 @@ export function decidePlay(view, userId) {
     // points along with the partner's high card.
     if (!isTrump(currentTrick[0].card)) {
       const winner = currentWinner(currentTrick)
-      const deducedForPredicted = deducedPartner(view, userId)
+      const deducedForPredicted = deducedPartner(rv, userId)
       const pickerTeamWinning = winner && (winner.userId === picker || winner.userId === deducedForPredicted)
       const { calledSuit, partnerRevealed } = view
       const calledSuitLedUnrevealed = !partnerRevealed && !!calledSuit && ledSuit === calledSuit

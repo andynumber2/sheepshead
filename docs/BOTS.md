@@ -194,6 +194,8 @@ of bot team.
 
 | Function | Purpose |
 |---|---|
+| `knownCardLocations` | Returns `Map<userId, Array<card>>` of card objects known by public announcement to be in a player's hand. Phase 1: populated from `view.blitzes` — black blitz → picker holds QC + QS; red blitz → picker holds QH + QD. |
+| `resolveView` | Pre-computation wrapper called once per play decision in `decidePlay`. Returns `{ ...view, knownLocations }`. All downstream inference calls receive the enriched view. Phase 2 (#176) will add more pre-computed fields. |
 | `countTrumpPlayed` | Count visible trump in completed tricks and the current trick |
 | `trumpRemainingElsewhere` | Estimate trump still held by other players: `14 − own trump − seen trump − buried trump` |
 | `handScore` | Combined pick-quality score: `schwanzerPts × 4 + 3×(non-trump aces) + 2×(non-trump tens) + 5 if QC held` |
@@ -203,7 +205,7 @@ of bot team.
 | `teammateWinning` | Returns true if the current trick leader is on the same team as the bot |
 | `deducedTrumpVoids` | Returns the set of players known to be void in trump, based on completed trick history. A player is trump-void if they played a non-trump card on a trick where trump was led. |
 | `deducedNonTrumpVoids` | Returns a map of `{ [userId]: Set<suit> }` — the fail suits each player is known void in, deduced from completed trick history. A player is void in a fail suit if, on a trick where that fail suit was led, they played a card of a different suit (including trump). Only scans completed tricks. |
-| `isGuaranteedWinner` | Returns true iff a card cannot be beaten by any opponent. For trump: every higher-rank trump has been seen (own hand, played tricks, current trick, visible bury). For non-trump: every higher same-suit card has been seen AND no opponent can trump (all trump accounted for, or all others are deduced trump-void). |
+| `isGuaranteedWinner` | Returns true iff a card cannot be beaten by any opponent. For trump: every higher-rank trump has been seen (own hand, played tricks, current trick, visible bury) or is known to be in a teammate's hand via `knownLocations`. For non-trump: every higher same-suit card has been seen AND no opponent can trump (`trumpRemainingElsewhere − knownTeammateTrump === 0` after subtracting known unplayed teammate trump, or all others are deduced trump-void). |
 | `cheapestGuaranteedWin` | From a set of candidate cards, returns the lowest-point card that satisfies `isGuaranteedWinner` (tiebreak: weaker trump first). Returns null if none qualify. |
 | `pickBySchmearPriority` | Pick the least-painful winning card to spend, walking a rank-priority list (`A,10,K,9,8,7,J,Q` for trump; `A,10,K,9,8,7` for fail). Trump tiebreak: weakest trump rank. Fail tiebreak: shortest non-trump suit in hand, then alphabetical. |
 | `knownNonPartners` | Returns the set of userIds known not to be the partner from public information: picker, self (if non-picker-team), cracker, players who played non-called on a called-suit-led trick before the called card was played. |

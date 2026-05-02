@@ -4,6 +4,31 @@
 
 import { isTrump, cardPoints, schwanzerCardPoints, effectiveSuit, trumpRank, suitRank } from './gameEngine.js'
 
+// ─── Public knowledge ─────────────────────────────────────────────────────────
+
+// Card objects for each blitz type. Blitz publicly reveals which queens the picker holds.
+const BLITZ_CARDS = {
+  black: [{ id: 'QC', rank: 'Q', suit: 'C' }, { id: 'QS', rank: 'Q', suit: 'S' }],
+  red:   [{ id: 'QH', rank: 'Q', suit: 'H' }, { id: 'QD', rank: 'Q', suit: 'D' }],
+}
+
+// Returns Map<userId, Array<card>> of cards known by public announcement to be in a player's hand.
+// Phase 1: populated from view.blitzes only.
+export function knownCardLocations(view) {
+  const map = new Map()
+  for (const { userId, type } of (view.blitzes ?? [])) {
+    const cards = BLITZ_CARDS[type]
+    if (cards) map.set(userId, [...cards])
+  }
+  return map
+}
+
+// Pre-computation wrapper. Returns { ...view, knownLocations } for use by all inference calls
+// in a single play decision. _userId is unused in Phase 1; included for Phase 2 API symmetry.
+export function resolveView(view, _userId) {
+  return { ...view, knownLocations: knownCardLocations(view) }
+}
+
 // ─── Trump tracking ───────────────────────────────────────────────────────────
 
 // Count trump cards visible in completed tricks and the current trick.
@@ -190,23 +215,36 @@ export function deducedTrumpVoids(view) {
   return voids
 }
 
+// Returns the array of cards known (via public announcement) to be in the bot's teammate's hand.
+// Returns [] if bot is not on picker team, partner is unknown, or no knownLocations present.
+function knownTeammateCards(view, userId) {
+  if (!view.knownLocations) return []
+  const onPickerTeam = userId === view.picker || userId === view.partner
+  if (!onPickerTeam) return []
+  const teammateId = userId === view.picker ? view.partner : view.picker
+  if (!teammateId) return []
+  return view.knownLocations.get(teammateId) ?? []
+}
+
 // ─── Guaranteed-winner inference ──────────────────────────────────────────────
 
 // Returns true iff `card` cannot be beaten by any opponent:
 //
 // For trump cards: every trump with a strictly lower trumpRank index (i.e. higher
 //   strength) must be accounted for (visible in own hand, played tricks, current
-//   trick, or bury).
+//   trick, bury, or known to be in a teammate's hand via knownLocations).
 //
 // For non-trump (fail) cards: BOTH conditions must hold:
 //   1. Every same-suit non-trump card with a lower suitRank index (i.e. higher
 //      strength) must be accounted for in: own hand, completed tricks (non-hidden),
 //      current trick (non-hidden), or bury (non-hidden).
 //   2. No opponent can trump it — satisfied if either:
-//      a. trumpRemainingElsewhere(view, userId) === 0 (all trump accounted for), OR
+//      a. trumpRemainingElsewhere(view, userId) − knownTeammateTrump === 0 (all trump
+//         accounted for after subtracting known teammate trump from knownLocations), OR
 //      b. Every other player is in the deducedTrumpVoids set.
 //
-// Unseen higher trump / higher same-suit cards are always treated as opponent-held.
+// Unseen higher trump / higher same-suit cards not in a known teammate's hand are
+// treated as opponent-held.
 //
 // NOTE — currentTrick is included in the "seen" sources. Callers should use this
 // function either (a) when leading (currentTrick is empty) or (b) when `card` is
@@ -252,7 +290,16 @@ export function isGuaranteedWinner(card, view, userId) {
     }
 
     // ── Condition 2: no opponent can trump it ─────────────────────────────────
-    const noTrumpElsewhere = trumpRemainingElsewhere(view, userId) === 0
+    const playedOrBuriedIds = new Set()
+    for (const t of (view.tricks ?? [])) {
+      for (const p of t.plays) { if (p.card?.id) playedOrBuriedIds.add(p.card.id) }
+    }
+    for (const p of (view.currentTrick ?? [])) { if (p.card?.id) playedOrBuriedIds.add(p.card.id) }
+    for (const c of (view.buried ?? [])) { if (c?.id) playedOrBuriedIds.add(c.id) }
+    const knownTeammateTrump = knownTeammateCards(view, userId)
+      .filter(c => isTrump(c) && !playedOrBuriedIds.has(c.id))
+      .length
+    const noTrumpElsewhere = trumpRemainingElsewhere(view, userId) - knownTeammateTrump === 0
     if (!noTrumpElsewhere) {
       const voids = deducedTrumpVoids(view)
       const otherPlayerIds = Object.keys(view.hands).filter(id => id !== userId)
@@ -278,6 +325,10 @@ export function isGuaranteedWinner(card, view, userId) {
   }
   for (const play of (view.currentTrick ?? [])) noteIfHigherTrump(play.card)
   for (const c of (view.buried ?? [])) noteIfHigherTrump(c)
+
+  // Also treat trump in a known teammate's hand as accounted for.
+  // No played/buried filter needed: seenRanks is a Set so double-adding a rank is harmless.
+  for (const c of knownTeammateCards(view, userId)) noteIfHigherTrump(c)
 
   // Every rank strictly lower than myRank must be seen somewhere.
   for (let r = 0; r < myRank; r++) {
