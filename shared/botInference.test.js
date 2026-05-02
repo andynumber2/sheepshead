@@ -152,8 +152,8 @@ describe('deducedPartner', () => {
     expect(deducedPartner(view, 'p3')).toBeNull()
   })
 
-  it('returns null when picker goes alone (callMode === alone)', () => {
-    const view = baseView({ callMode: 'alone', calledSuit: null, calledAce: null, recrackerId: 'p2' })
+  it('returns null when picker goes alone (goingAlone === true)', () => {
+    const view = baseView({ goingAlone: true, calledSuit: null, calledAce: null, recrackerId: 'p2' })
     expect(deducedPartner(view, 'p3')).toBeNull()
   })
 

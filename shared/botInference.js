@@ -417,7 +417,7 @@ export function knownNonPartners(view, userId) {
 //
 // Returns null in alone/leaster/no-picker modes regardless of signals.
 export function deducedPartner(view, userId) {
-  if (!view.picker || view.callMode === 'alone' || view.isLeaster) return null
+  if (!view.picker || view.goingAlone || view.isLeaster) return null
   if (view.partner) return view.partner
   if (view.recrackerId && view.recrackerId !== view.picker) return view.recrackerId
 
@@ -449,7 +449,11 @@ export function teammateWinning(view, userId) {
   if (onPickerTeam) {
     return winnerId === picker || winnerId === partner
   } else {
-    if (partner === null) return false
+    if (partner === null) {
+      // When picker went alone there is no partner — any non-picker winner is a teammate.
+      if (view.goingAlone) return winnerId !== picker
+      return false  // partner identity unknown — cannot confirm teammate
+    }
     return winnerId !== picker && winnerId !== partner
   }
 }

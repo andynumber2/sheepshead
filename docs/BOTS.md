@@ -140,7 +140,9 @@ A recurring concept below is a **guaranteed winner**: a card the bot holds that 
 3. **Can't win**: on a trump-led trick, shed the *weakest* trump (highest rank index — least future utility), using points as a secondary tiebreak. On a fail-led trick where no card can win, play the lowest card.
 
 #### Opponent bot following
-1. **Schmear** (a confirmed teammate — partner identity is known directly or by deduction — is currently winning):
+1. **Schmear** (a confirmed teammate is currently winning):
+   - Teammate identity rules: (a) if a partner identity has been deduced from public information, any non-picker-team winner is a teammate; (b) if the **picker went alone** (`goingAlone === true`), any non-picker winner is automatically a teammate (there is no partner to flush out); (c) if the partner is still unknown in a normal call, teammate status cannot be confirmed — skip the schmear branch.
+
    - **Safe** (no picker or partner remains to play, or the teammate's winning card is itself a guaranteed winner): dump the highest-priority non-trump per the **schmear priority** (see below). If only trump available, play the lowest card.
    - **Not safe**: if the bot can take the trick with a guaranteed-winning card, play the lowest-point such card. Else, if the **picker-team overtake is forced** (called suit led, called card not yet played this trick, no trump played in this trick yet), fall through to the trump-in branch below — the partner's forced called card will overtake any current fail-suit winner, so schmearing high points just donates them to the picker team. Otherwise schmear anyway — no speculative trump burn when a guaranteed takeover isn't available.
 2. **Force-take to enable called-suit lead-back**: When the partner is **not yet known** (neither revealed nor deducible), the current trick is **not** led with the called suit, the bot holds **at least one non-trump card of the called suit** in hand (a card that can be led back next trick), and the bot can take the current trick:
