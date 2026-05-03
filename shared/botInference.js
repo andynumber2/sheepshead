@@ -152,9 +152,6 @@ export function currentWinner(trick) {
 // ─── Void analysis ────────────────────────────────────────────────────────────
 
 // Returns the array of fail card IDs that must be held (not buried).
-// If the hand holds all three aces, they must be held.
-// If the hand also holds all three tens, they must be held too.
-// If the hand holds all three tens but not all three aces, only aces may be buried.
 export function computeMustHold(hand) {
   const failAces = ['AC', 'AH', 'AS']
   const failTens = ['10C', '10H', '10S']
