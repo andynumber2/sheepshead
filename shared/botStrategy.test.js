@@ -1554,3 +1554,107 @@ describe('decidePlay — shed weakest trump when forced to follow and cannot win
     expect(decidePlay(view, 'u3')).toBe('KD')
   })
 })
+
+describe('decidePlay — schmear falls back to trump A/10/K when no high-point fail (#189)', () => {
+  // Clubs-led trick. Picker (u3) plays QC (unbeatable trump). Partner bot (u5) plays last, void in clubs.
+  function pickerWinningView(partnerHand) {
+    return {
+      phase: 'playing',
+      hands: {
+        u1: [], u2: [], u3: [], u4: [],
+        u5: partnerHand,
+      },
+      currentTrick: [
+        { userId: 'u1', card: c('6C', 'C', '6') },
+        { userId: 'u2', card: c('7C', 'C', '7') },
+        { userId: 'u3', card: c('QC', 'C', 'Q') },
+        { userId: 'u4', card: c('8C', 'C', '8') },
+      ],
+      tricks: [],
+      picker: 'u3',
+      partner: 'u5',
+      partnerRevealed: true,
+      callMode: 'ace',
+      calledSuit: 'S',
+      calledAce: { aceId: 'AS' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: null,
+      recrackerId: null,
+      isLeaster: false,
+      lastTrick: [],
+    }
+  }
+
+  it('partner schmears trump A when no fail A/10/K is available', () => {
+    // Hand has AD (trump) and two 0-pt fail cards. No high-point fail exists.
+    // Pre-fix: bot throws 9S (0 pts). Post-fix: bot schmears AD (11 pts trump).
+    const view = pickerWinningView([
+      c('AD', 'D', 'A'),
+      c('9S', 'S', '9'),
+      c('8H', 'H', '8'),
+    ])
+    expect(decidePlay(view, 'u5')).toBe('AD')
+  })
+
+  it('partner prefers fail over trump even when fail has fewer points', () => {
+    // KS (4 pts fail) is preferred over AD (11 pts trump) — fail always comes first.
+    const view = pickerWinningView([
+      c('AD', 'D', 'A'),
+      c('KS', 'S', 'K'),
+      c('8H', 'H', '8'),
+    ])
+    expect(decidePlay(view, 'u5')).toBe('KS')
+  })
+
+  it('partner never schmears a Jack as trump fallback', () => {
+    // Only trump available is JD (rank J — excluded from trump schmear). Falls to lowest fail.
+    const view = pickerWinningView([
+      c('JD', 'D', 'J'),
+      c('9S', 'S', '9'),
+      c('8H', 'H', '8'),
+    ])
+    expect(decidePlay(view, 'u5')).toBe('9S')
+  })
+})
+
+describe('decidePlay — opponent schmear falls back to trump A/10/K when no high-point fail (#189)', () => {
+  it('opponent schmears trump A when no fail A/10/K is available', () => {
+    // Hearts led (fail). Picker (u2) and partner (u3) have played. Opponent u4 trumped in
+    // with QS (winning). Opponent bot u1 plays last, void in hearts.
+    // Hand has AD (trump) and two 0-pt fail cards. No high-point fail exists.
+    // Pre-fix: bot throws 9S (0 pts). Post-fix: bot schmears AD (11 pts trump).
+    const view = {
+      phase: 'playing',
+      hands: {
+        u2: [], u3: [], u4: [],
+        u1: [
+          c('AD', 'D', 'A'),
+          c('9S', 'S', '9'),
+          c('8C', 'C', '8'),
+        ],
+        u5: [],
+      },
+      currentTrick: [
+        { userId: 'u2', card: c('7H', 'H', '7') },
+        { userId: 'u3', card: c('6H', 'H', '6') },
+        { userId: 'u4', card: c('QS', 'S', 'Q') },
+        { userId: 'u5', card: c('8H', 'H', '8') },
+      ],
+      tricks: [],
+      picker: 'u2',
+      partner: 'u3',
+      partnerRevealed: true,
+      callMode: 'ace',
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: null,
+      recrackerId: null,
+      isLeaster: false,
+      lastTrick: [],
+    }
+    expect(decidePlay(view, 'u1')).toBe('AD')
+  })
+})

@@ -123,7 +123,7 @@ A recurring concept below is a **guaranteed winner**: a card the bot holds that 
 #### Picker-team bot following
 1. **Schmear** (teammate is currently winning):
    - First check whether the teammate's win is **safe**: either no non-picker-team opponents remain to play, or the teammate's winning card is itself a guaranteed winner.
-   - **Safe**: dump the highest-value non-trump card. If only trump are available, play the lowest card (don't burn trump to schmear).
+   - **Safe**: dump the highest-point fail card (A/10/K). If no fail A/10/K is available, fall back to trump A/10/K (never J or Q). If neither exists, play the lowest card.
    - **Not safe, bot is the partner**: schmear anyway. The partner trusts the picker's implied trump strength to clean up any overtake.
    - **Not safe, bot is the picker**: try to secure the trick instead:
      1. If the hand contains a guaranteed-winning card among the cards that would win the trick, play the lowest-point such card.
@@ -143,7 +143,7 @@ A recurring concept below is a **guaranteed winner**: a card the bot holds that 
 1. **Schmear** (a confirmed teammate is currently winning):
    - Teammate identity rules: (a) if a partner identity has been deduced from public information, any non-picker-team winner is a teammate; (b) if the **picker went alone** (`goingAlone === true`), any non-picker winner is automatically a teammate (there is no partner to flush out); (c) if the partner is still unknown in a normal call, teammate status cannot be confirmed — skip the schmear branch.
 
-   - **Safe** (no picker or partner remains to play, or the teammate's winning card is itself a guaranteed winner): dump the highest-priority non-trump per the **schmear priority** (see below). If only trump available, play the lowest card.
+   - **Safe** (no picker or partner remains to play, or the teammate's winning card is itself a guaranteed winner): dump the highest-point fail card (A/10/K). If no fail A/10/K is available, fall back to trump A/10/K (never J or Q). If neither exists, play the lowest card.
    - **Not safe**: if the bot can take the trick with a guaranteed-winning card, play the lowest-point such card. Else, if the **picker-team overtake is forced** (called suit led, called card not yet played this trick, no trump played in this trick yet), fall through to the trump-in branch below — the partner's forced called card will overtake any current fail-suit winner, so schmearing high points just donates them to the picker team. Otherwise schmear anyway — no speculative trump burn when a guaranteed takeover isn't available.
 2. **Force-take to enable called-suit lead-back**: When the partner is **not yet known** (neither revealed nor deducible), the current trick is **not** led with the called suit, the bot holds **at least one non-trump card of the called suit** in hand (a card that can be led back next trick), and the bot can take the current trick:
    - Compute **potential opponents remaining** = count of non-self players still to play this trick. With partner identity not yet deduced, no other defender is confirmed as a teammate, so every yet-to-play seat is treated as a picker-team threat.

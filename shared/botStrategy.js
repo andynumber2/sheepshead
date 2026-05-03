@@ -402,15 +402,28 @@ export function decidePlay(view, userId) {
   const ledSuit = first.declaredSuit ?? effectiveSuit(first.card)
 
   if (isPickerTeam) {
-    // Schmear: dump highest-point non-trump on teammate's winning trick,
+    // Schmear: dump highest-point card on teammate's winning trick,
     // unless an opponent still to play could trump over the teammate.
+    // When safe=true (trick confirmed safe), fall back to trump A/10/K if no high-point fail.
+    // Never schmear J or Q regardless of safety.
     if (teammateWinning(rv, userId)) {
-      const schmear = () => {
+      const schmear = (safe = false) => {
         const nonTrump = realCards.filter(c => !isTrump(c))
-        // Pass the bot's full hand (not realCards) so the suit-count tiebreak counts
-        // suits across the entire remaining hand, not just legal plays.
-        const pick = pickBySchmearPriority(nonTrump, 'fail', view.hands[userId])
-        return (pick ?? lowestCard(realCards)).id  // helper returns null when no non-trump available — don't burn trump
+        const highPointFail = nonTrump.filter(c => c.rank === 'A' || c.rank === '10' || c.rank === 'K')
+        if (highPointFail.length > 0) {
+          // Pass the bot's full hand (not realCards) so the suit-count tiebreak counts
+          // suits across the entire remaining hand, not just legal plays.
+          const pick = pickBySchmearPriority(highPointFail, 'fail', view.hands[userId])
+          if (pick) return pick.id
+        }
+        if (safe) {
+          const trumpFallback = realCards.filter(c => isTrump(c) && (c.rank === 'A' || c.rank === '10' || c.rank === 'K'))
+          if (trumpFallback.length > 0) {
+            const pick = pickBySchmearPriority(trumpFallback, 'trump', view.hands[userId])
+            if (pick) return pick.id
+          }
+        }
+        return lowestCard(realCards).id
       }
 
       const winnerPlay = currentWinner(currentTrick)
@@ -423,7 +436,7 @@ export function decidePlay(view, userId) {
       const teammateSafe = opponentsRemainingLocal === 0 ||
         isGuaranteedWinner(winnerPlay.card, rv, userId)
 
-      if (teammateSafe) return schmear()
+      if (teammateSafe) return schmear(true)
 
       // Not safe — opponent could overtake.
       if (userId === partner) {
@@ -533,10 +546,21 @@ export function decidePlay(view, userId) {
     // Opponent: schmear on confirmed teammate wins — unless picker-team still to play
     // could trump over the teammate, in which case attempt a guaranteed takeover.
     if (teammateWinning(rv, userId)) {
-      const schmearOpp = () => {
+      const schmearOpp = (safe = false) => {
         const nonTrump = realCards.filter(c => !isTrump(c))
-        const pick = pickBySchmearPriority(nonTrump, 'fail', view.hands[userId])
-        return (pick ?? lowestCard(realCards)).id
+        const highPointFail = nonTrump.filter(c => c.rank === 'A' || c.rank === '10' || c.rank === 'K')
+        if (highPointFail.length > 0) {
+          const pick = pickBySchmearPriority(highPointFail, 'fail', view.hands[userId])
+          if (pick) return pick.id
+        }
+        if (safe) {
+          const trumpFallback = realCards.filter(c => isTrump(c) && (c.rank === 'A' || c.rank === '10' || c.rank === 'K'))
+          if (trumpFallback.length > 0) {
+            const pick = pickBySchmearPriority(trumpFallback, 'trump', view.hands[userId])
+            if (pick) return pick.id
+          }
+        }
+        return lowestCard(realCards).id
       }
 
       const winnerPlay = currentWinner(currentTrick)
@@ -551,7 +575,7 @@ export function decidePlay(view, userId) {
       const teammateSafe = threatsRemaining === 0 ||
         isGuaranteedWinner(winnerPlay.card, rv, userId)
 
-      if (teammateSafe) return schmearOpp()
+      if (teammateSafe) return schmearOpp(true)
 
       const ledSuitOpp = currentTrick[0].declaredSuit ?? effectiveSuit(currentTrick[0].card)
       const winningOpp = realCards.filter(card => {
