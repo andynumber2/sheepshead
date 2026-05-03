@@ -1294,6 +1294,31 @@ describe('decidePlay — Case 4: partner trump lead-back timing', () => {
     expect(decidePlay(view, 'u2')).toBe('QC')
   })
 
+  it('leads QS when QC was played in a prior trick (QS becomes guaranteed)', () => {
+    // Partner holds QS (rank 1) + 8D + fail cards. QC (rank 0) was played in trick 1
+    // by an opponent, so it appears in view.tricks and seenRanks picks up rank 0.
+    // isGuaranteedWinner(QS) = true → deferral guard does not fire → leads QS.
+    const hand = [
+      c('QS', 'S', 'Q'),  // trump rank 1 — guaranteed once QC is seen
+      c('8D', 'D', '8'),  // trump rank 12
+      c('KS', 'S', 'K'),  // fail, 4 pts
+      c('7S', 'S', '7'),  // fail, 0 pts
+    ]
+    const tricks = [
+      {
+        plays: [
+          { userId: 'u3', card: c('QC', 'C', 'Q') },  // QC (rank 0) played by opponent
+          { userId: 'u1', card: c('JC', 'C', 'J') },
+          { userId: 'u2', card: c('9H', 'H', '9') },
+          { userId: 'u4', card: c('8H', 'H', '8') },
+          { userId: 'u5', card: c('7H', 'H', '7') },
+        ],
+      },
+    ]
+    const view = partnerLeadView({ hand, tricks })
+    expect(decidePlay(view, 'u2')).toBe('QS')
+  })
+
   it('leads trump unconditionally when partner has exactly 1 trump (even if not guaranteed)', () => {
     // Partner holds 9D (weak trump, not guaranteed) + fail cards.
     // Only 1 trump → lead it unconditionally (no deferral).
