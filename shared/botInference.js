@@ -12,6 +12,15 @@ const BLITZ_CARDS = {
   red:   [{ id: 'QH', rank: 'Q', suit: 'H' }, { id: 'QD', rank: 'Q', suit: 'D' }],
 }
 
+// Add cards to map, creating entry if needed.
+function addToMap(map, userId, ...cards) {
+  if (map.has(userId)) {
+    map.get(userId).push(...cards)
+  } else {
+    map.set(userId, [...cards])
+  }
+}
+
 // Returns Map<userId, Array<card>> of cards known by public announcement to be in a player's hand.
 // Phase 1: populated from view.blitzes.
 // Phase 2: Ten call — picker holds Ace of called suit.
@@ -30,11 +39,7 @@ export function knownCardLocations(view, resolvedPartner = null) {
   if (view.calledTen && view.picker) {
     const suit = view.calledTen.suit
     const card = { id: 'A' + suit, rank: 'A', suit }
-    if (map.has(view.picker)) {
-      map.get(view.picker).push(card)
-    } else {
-      map.set(view.picker, [card])
-    }
+    addToMap(map, view.picker, card)
   }
 
   // Phase 3: King call
@@ -42,11 +47,7 @@ export function knownCardLocations(view, resolvedPartner = null) {
     const suit = view.calledKing.suit
     const ace = { id: 'A' + suit, rank: 'A', suit }
     const ten = { id: '10' + suit, rank: '10', suit }
-    if (map.has(view.picker)) {
-      map.get(view.picker).push(ace, ten)
-    } else {
-      map.set(view.picker, [ace, ten])
-    }
+    addToMap(map, view.picker, ace, ten)
   }
 
   // Phase 4: Partner holds called card
@@ -55,11 +56,7 @@ export function knownCardLocations(view, resolvedPartner = null) {
     if (calledCardId) {
       const rank = calledCardId.startsWith('10') ? '10' : calledCardId[0]
       const card = { id: calledCardId, rank, suit: view.calledSuit }
-      if (map.has(resolvedPartner)) {
-        map.get(resolvedPartner).push(card)
-      } else {
-        map.set(resolvedPartner, [card])
-      }
+      addToMap(map, resolvedPartner, card)
     }
   }
 

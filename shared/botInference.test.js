@@ -784,12 +784,15 @@ describe('knownCardLocations', () => {
     const view = { blitzes: [], picker: 'p1', calledTen: { suit: 'H', tenId: '10H' }, calledSuit: 'H' }
     const result = knownCardLocations(view, 'p2')
     expect(result.get('p2')).toContainEqual({ id: '10H', rank: '10', suit: 'H' })
+    expect(result.get('p1')).toContainEqual({ id: 'AH', rank: 'A', suit: 'H' })
   })
 
   it('known partner with king call: partner entry contains called King', () => {
     const view = { blitzes: [], picker: 'p1', calledKing: { suit: 'C', kingId: 'KC' }, calledSuit: 'C' }
     const result = knownCardLocations(view, 'p2')
     expect(result.get('p2')).toContainEqual({ id: 'KC', rank: 'K', suit: 'C' })
+    expect(result.get('p1')).toContainEqual({ id: 'AC', rank: 'A', suit: 'C' })
+    expect(result.get('p1')).toContainEqual({ id: '10C', rank: '10', suit: 'C' })
   })
 
   it('null partner: no called card added to knownLocations', () => {
@@ -814,6 +817,12 @@ describe('knownCardLocations', () => {
     const result = knownCardLocations(view, 'p2')
     expect(result.has('p2')).toBe(false)
     expect(result.size).toBe(0)
+  })
+
+  it('ace under call: partner entry contains called Ace even when under flag set', () => {
+    const view = { blitzes: [], picker: 'p1', calledAce: { aceId: 'AC', under: true }, calledSuit: 'C' }
+    const result = knownCardLocations(view, 'p2')
+    expect(result.get('p2')).toContainEqual({ id: 'AC', rank: 'A', suit: 'C' })
   })
 })
 
