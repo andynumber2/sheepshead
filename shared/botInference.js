@@ -12,24 +12,65 @@ const BLITZ_CARDS = {
   red:   [{ id: 'QH', rank: 'Q', suit: 'H' }, { id: 'QD', rank: 'Q', suit: 'D' }],
 }
 
+// Add cards to map, creating entry if needed.
+function addToMap(map, userId, ...cards) {
+  if (map.has(userId)) {
+    map.get(userId).push(...cards)
+  } else {
+    map.set(userId, [...cards])
+  }
+}
+
 // Returns Map<userId, Array<card>> of cards known by public announcement to be in a player's hand.
-// Phase 1: populated from view.blitzes only.
-export function knownCardLocations(view) {
+// Phase 1: populated from view.blitzes.
+// Phase 2: Ten call — picker holds Ace of called suit.
+// Phase 3: King call — picker holds Ace and Ten of called suit.
+// Phase 4: Partner holds called card (if resolvedPartner is provided and not going alone).
+export function knownCardLocations(view, resolvedPartner = null) {
   const map = new Map()
+
+  // Phase 1: Blitzes
   for (const { userId, type } of (view.blitzes ?? [])) {
     const cards = BLITZ_CARDS[type]
     if (cards) map.set(userId, [...cards])
   }
+
+  // Phase 2: Ten call
+  if (view.calledTen && view.picker) {
+    const suit = view.calledTen.suit
+    const card = { id: 'A' + suit, rank: 'A', suit }
+    addToMap(map, view.picker, card)
+  }
+
+  // Phase 3: King call
+  if (view.calledKing && view.picker) {
+    const suit = view.calledKing.suit
+    const ace = { id: 'A' + suit, rank: 'A', suit }
+    const ten = { id: '10' + suit, rank: '10', suit }
+    addToMap(map, view.picker, ace, ten)
+  }
+
+  // Phase 4: Partner holds called card
+  if (resolvedPartner && view.calledSuit && !view.goingAlone) {
+    const calledCardId = view.calledAce?.aceId ?? view.calledTen?.tenId ?? view.calledKing?.kingId
+    if (calledCardId) {
+      const rank = calledCardId.startsWith('10') ? '10' : calledCardId[0]
+      const card = { id: calledCardId, rank, suit: view.calledSuit }
+      addToMap(map, resolvedPartner, card)
+    }
+  }
+
   return map
 }
 
 // Pre-computation wrapper. Runs four inference helpers once and attaches their results
 // so downstream consumers in a single play decision can read them as property lookups.
 export function resolveView(view, userId) {
+  const resolvedPartner = deducedPartner(view, userId)
   return {
     ...view,
-    knownLocations: knownCardLocations(view),
-    resolvedPartner: deducedPartner(view, userId),
+    knownLocations: knownCardLocations(view, resolvedPartner),
+    resolvedPartner,
     resolvedTrumpVoids: deducedTrumpVoids(view),
     resolvedNonTrumpVoids: deducedNonTrumpVoids(view),
     resolvedTrumpRemaining: trumpRemainingElsewhere(view, userId),
