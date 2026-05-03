@@ -573,3 +573,12 @@ export function pickBySchmearPriority(candidates, kind, hand) {
 
   return null
 }
+
+// Returns the count of opposing players (not picker team, not self) who haven't
+// yet played in the current trick.
+export function opponentsRemaining(currentTrick, view, userId, picker, partner) {
+  const played = new Set(currentTrick.map(p => p.userId))
+  return Object.keys(view.hands).filter(id =>
+    !played.has(id) && id !== userId && id !== picker && id !== partner
+  ).length
+}

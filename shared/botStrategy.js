@@ -6,7 +6,7 @@
 import {
   isTrump, cardPoints, effectiveSuit, trumpRank, suitRank, schwanzerCardPoints,
 } from './gameEngine.js'
-import { currentWinner, beats, handScore, bestVoidBury, computeMustHold, teammateWinning, isGuaranteedWinner, cheapestGuaranteedWin, pickBySchmearPriority, resolveView, getCalledCardId } from './botInference.js'
+import { currentWinner, beats, handScore, bestVoidBury, computeMustHold, teammateWinning, isGuaranteedWinner, cheapestGuaranteedWin, pickBySchmearPriority, resolveView, getCalledCardId, opponentsRemaining } from './botInference.js'
 
 // ─── Legal card helper ────────────────────────────────────────────────────────
 // Mirrors getLegalCardIds from the frontend; computes which cards can be played.
@@ -309,8 +309,9 @@ export function decidePlay(view, userId) {
       const best = highestTrump(realCards)
       if (best) {
         if (userId === partner) {
+          const myTrumpCount = realCards.filter(c => isTrump(c)).length
           const fails = realCards.filter(c => !isTrump(c))
-          if (realCards.filter(c => isTrump(c)).length >= 2 && fails.length > 0 && !isGuaranteedWinner(best, rv, userId)) {
+          if (myTrumpCount >= 2 && fails.length > 0 && !isGuaranteedWinner(best, rv, userId)) {
             return lowestCard(fails).id
           }
         }
@@ -417,13 +418,9 @@ export function decidePlay(view, userId) {
       }
 
       const winnerPlay = currentWinner(currentTrick)
-      const playedIdsLocal = new Set(currentTrick.map(p => p.userId))
-      const allIdsLocal = Object.keys(view.hands)
-      const opponentsRemainingLocal = allIdsLocal.filter(id =>
-        !playedIdsLocal.has(id) && id !== userId && id !== picker && id !== partner
-      ).length
+      const oppsRemaining = opponentsRemaining(currentTrick, view, userId, picker, partner)
 
-      const teammateSafe = opponentsRemainingLocal === 0 ||
+      const teammateSafe = oppsRemaining === 0 ||
         isGuaranteedWinner(winnerPlay.card, rv, userId)
 
       if (teammateSafe) return schmear(true)
@@ -458,16 +455,12 @@ export function decidePlay(view, userId) {
     if (winning.length > 0) {
       const nonTrumpWins = winning.filter(c => !isTrump(c))
       if (nonTrumpWins.length > 0) {
-        const playedIdsNT = new Set(currentTrick.map(p => p.userId))
-        const allIdsNT = Object.keys(view.hands)
-        const opponentsRemainingNT = allIdsNT.filter(id =>
-          !playedIdsNT.has(id) && id !== userId && id !== picker && id !== partner
-        ).length
+        const oppsRemaining = opponentsRemaining(currentTrick, view, userId, picker, partner)
         const bestNonTrumpWin = highestValueCard(nonTrumpWins)
         // Checking only the best non-trump winner is sufficient: in a fail-led trick
         // all nonTrumpWins are the same suit, so if the highest-value card isn't
         // guaranteed (a higher same-suit rank is unaccounted for), none of them are.
-        const safeFromTrumpIn = opponentsRemainingNT === 0 ||
+        const safeFromTrumpIn = oppsRemaining === 0 ||
           isGuaranteedWinner(bestNonTrumpWin, rv, userId)
         if (safeFromTrumpIn) {
           return bestNonTrumpWin.id
@@ -476,15 +469,11 @@ export function decidePlay(view, userId) {
       }
 
       // Trump wins only — compute how many opposing players have yet to play
-      const playedIds = new Set(currentTrick.map(p => p.userId))
-      const allPlayerIds = Object.keys(view.hands)
-      const opponentsRemaining = allPlayerIds.filter(id =>
-        !playedIds.has(id) && id !== userId && id !== picker && id !== partner
-      ).length
+      const oppsRemaining = opponentsRemaining(currentTrick, view, userId, picker, partner)
 
       if (ledSuit === 'T') {
         // Scenario 1: Trump trick
-        if (opponentsRemaining === 0) return cheapestWinningTrump(winning).id
+        if (oppsRemaining === 0) return cheapestWinningTrump(winning).id
         const guaranteed = cheapestGuaranteedWin(winning, rv, userId)
         if (guaranteed) return guaranteed.id
         return highestTrump(winning).id
@@ -492,7 +481,7 @@ export function decidePlay(view, userId) {
 
       // Scenario 2: Fail trick, bot is void, playing trump to contest the lead
       if (userId === picker) {
-        const safeWinning = opponentsRemaining === 0
+        const safeWinning = oppsRemaining === 0
           ? winning
           : winning.filter(c => isGuaranteedWinner(c, rv, userId))
         if (safeWinning.length > 0) {
@@ -504,8 +493,9 @@ export function decidePlay(view, userId) {
         return highestTrump(winning).id
       }
 
-      // Partner (void in led fail suit). playedIds already defined above.
+      // Partner (void in led fail suit).
       const myTrumpCount = realCards.filter(c => isTrump(c)).length
+      const playedIds = new Set(currentTrick.map(p => p.userId))
       const pickerStillToPlay = picker !== userId && !playedIds.has(picker)
 
       if (pickerStillToPlay) {
