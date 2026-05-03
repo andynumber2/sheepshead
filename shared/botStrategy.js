@@ -503,8 +503,15 @@ export function decidePlay(view, userId) {
 
       // Scenario 2: Fail trick, bot is void, playing trump to contest the lead
       if (userId === picker) {
-        const guaranteed = cheapestGuaranteedWin(winning, rv, userId)
-        if (guaranteed) return guaranteed.id
+        const safeWinning = opponentsRemaining === 0
+          ? winning
+          : winning.filter(c => isGuaranteedWinner(c, rv, userId))
+        if (safeWinning.length > 0) {
+          // Trick is secured — maximize card points with schmear priority
+          const pick = pickBySchmearPriority(safeWinning, 'trump', view.hands[userId])
+          if (pick) return pick.id
+          return highestTrump(safeWinning).id
+        }
         return highestTrump(winning).id
       }
 
