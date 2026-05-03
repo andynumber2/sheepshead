@@ -760,6 +760,61 @@ describe('knownCardLocations', () => {
     expect(result.get('p1').map(c => c.id)).toContain('QC')
     expect(result.get('p2').map(c => c.id)).toContain('QH')
   })
+
+  it('Ten call: picker entry contains Ace of called suit', () => {
+    const view = { blitzes: [], picker: 'p1', calledTen: { suit: 'H', tenId: '10H' }, calledSuit: 'H' }
+    const result = knownCardLocations(view, null)
+    expect(result.get('p1')).toContainEqual({ id: 'AH', rank: 'A', suit: 'H' })
+  })
+
+  it('King call: picker entry contains Ace and Ten of called suit', () => {
+    const view = { blitzes: [], picker: 'p1', calledKing: { suit: 'S', kingId: 'KS' }, calledSuit: 'S' }
+    const result = knownCardLocations(view, null)
+    expect(result.get('p1')).toContainEqual({ id: 'AS', rank: 'A', suit: 'S' })
+    expect(result.get('p1')).toContainEqual({ id: '10S', rank: '10', suit: 'S' })
+  })
+
+  it('known partner with ace call: partner entry contains called Ace', () => {
+    const view = { blitzes: [], picker: 'p1', calledAce: { aceId: 'AH' }, calledSuit: 'H' }
+    const result = knownCardLocations(view, 'p2')
+    expect(result.get('p2')).toContainEqual({ id: 'AH', rank: 'A', suit: 'H' })
+  })
+
+  it('known partner with ten call: partner entry contains called Ten', () => {
+    const view = { blitzes: [], picker: 'p1', calledTen: { suit: 'H', tenId: '10H' }, calledSuit: 'H' }
+    const result = knownCardLocations(view, 'p2')
+    expect(result.get('p2')).toContainEqual({ id: '10H', rank: '10', suit: 'H' })
+  })
+
+  it('known partner with king call: partner entry contains called King', () => {
+    const view = { blitzes: [], picker: 'p1', calledKing: { suit: 'C', kingId: 'KC' }, calledSuit: 'C' }
+    const result = knownCardLocations(view, 'p2')
+    expect(result.get('p2')).toContainEqual({ id: 'KC', rank: 'K', suit: 'C' })
+  })
+
+  it('null partner: no called card added to knownLocations', () => {
+    const view = { blitzes: [], picker: 'p1', calledAce: { aceId: 'AH' }, calledSuit: 'H' }
+    const result = knownCardLocations(view, null)
+    expect(result.has('p2')).toBe(false)
+    expect(result.size).toBe(0)
+  })
+
+  it('Ten call stacks with blitz: picker entry has blitz queens plus Ace', () => {
+    const view = { blitzes: [{ userId: 'p1', type: 'black' }], picker: 'p1', calledTen: { suit: 'H', tenId: '10H' }, calledSuit: 'H' }
+    const result = knownCardLocations(view, null)
+    const ids = result.get('p1').map(c => c.id)
+    expect(ids).toContain('QC')
+    expect(ids).toContain('QS')
+    expect(ids).toContain('AH')
+    expect(result.get('p1')).toHaveLength(3)
+  })
+
+  it('going alone: no called card added for partner', () => {
+    const view = { blitzes: [], picker: 'p1', calledAce: { aceId: 'AH' }, calledSuit: 'H', goingAlone: true }
+    const result = knownCardLocations(view, 'p2')
+    expect(result.has('p2')).toBe(false)
+    expect(result.size).toBe(0)
+  })
 })
 
 describe('resolveView', () => {
@@ -1156,5 +1211,45 @@ describe('isGuaranteedWinner – blitz inference (fail case, condition 2)', () =
     // With resolveView: QC in currentTrick (filtered), QS unplayed (counted); 2-1=1 opponent trump remains → false.
     // (An opponent still holds 8D — AH is correctly identified as NOT a guaranteed winner.)
     expect(isGuaranteedWinner(ah, rv, 'p2')).toBe(false)
+  })
+})
+
+describe('resolveView – extended knownCardLocations', () => {
+  const baseViewWithCards = () => ({
+    phase: 'playing',
+    picker: 'p1',
+    partner: null,
+    partnerRevealed: false,
+    callMode: 'ace',
+    calledSuit: 'H',
+    calledAce: { aceId: 'AH' },
+    calledTen: null,
+    calledKing: null,
+    crackerId: null,
+    recrackerId: null,
+    goingAlone: false,
+    isLeaster: false,
+    hands: { p1: [], p2: [], p3: [], p4: [], p5: [] },
+    tricks: [],
+    currentTrick: [],
+    buried: [],
+    blitzes: [],
+  })
+
+  it('resolveView: Ten call populates picker Ace in knownLocations', () => {
+    const view = baseViewWithCards()
+    view.calledTen = { suit: 'H', tenId: '10H' }
+    view.calledAce = null
+    view.calledKing = null
+    const rv = resolveView(view, 'p3')
+    expect(rv.knownLocations.get('p1')).toContainEqual({ id: 'AH', rank: 'A', suit: 'H' })
+  })
+
+  it('resolveView: recracker known as partner → called card in knownLocations', () => {
+    const view = baseViewWithCards()
+    view.recrackerId = 'p2'
+    view.calledAce = { aceId: 'AH' }
+    const rv = resolveView(view, 'p3')
+    expect(rv.knownLocations.get('p2')).toContainEqual({ id: 'AH', rank: 'A', suit: 'H' })
   })
 })
