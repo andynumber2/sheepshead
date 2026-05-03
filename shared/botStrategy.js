@@ -6,7 +6,7 @@
 import {
   isTrump, cardPoints, effectiveSuit, trumpRank, suitRank, schwanzerCardPoints,
 } from './gameEngine.js'
-import { currentWinner, beats, handScore, bestVoidBury, computeMustHold, teammateWinning, isGuaranteedWinner, cheapestGuaranteedWin, pickBySchmearPriority, resolveView } from './botInference.js'
+import { currentWinner, beats, handScore, bestVoidBury, computeMustHold, teammateWinning, isGuaranteedWinner, cheapestGuaranteedWin, pickBySchmearPriority, resolveView, getCalledCardId } from './botInference.js'
 
 // ─── Legal card helper ────────────────────────────────────────────────────────
 // Mirrors getLegalCardIds from the frontend; computes which cards can be played.
@@ -14,14 +14,14 @@ import { currentWinner, beats, handScore, bestVoidBury, computeMustHold, teammat
 function getLegalCards(state, userId) {
   const hand = state.hands[userId] ?? []
   const {
-    currentTrick, calledAce, calledTen, calledKing, calledSuit,
+    currentTrick, calledSuit,
     partner, partnerRevealed, underCard, picker, pickerForcedPlays = [],
   } = state
 
   const handCards = hand.filter(c => !c.isUnderCard)
   const hasUnderCard = underCard && !underCard.played && userId === picker
 
-  const calledCardId = calledAce?.aceId || calledTen?.tenId || calledKing?.kingId
+  const calledCardId = getCalledCardId(state)
 
   // Leading
   if (!currentTrick || currentTrick.length === 0) {
@@ -348,8 +348,7 @@ export function decidePlay(view, userId) {
     } else {
       // Cash any guaranteed non-trump winner (excluding the called card which can't be led before reveal)
       {
-        const { calledAce, calledTen, calledKing } = view
-        const calledCardId = calledAce?.aceId ?? calledTen?.tenId ?? calledKing?.kingId
+        const calledCardId = rv.calledCardId
         const guaranteedFails = realCards
           .filter(c => !isTrump(c) && c.id !== calledCardId && isGuaranteedWinner(c, rv, userId))
           .sort((a, b) => cardPoints(b) - cardPoints(a))
@@ -367,8 +366,7 @@ export function decidePlay(view, userId) {
       // known fail-suit void to force them to trump or waste a card.
       // Only fires when deducedPartner !== null (otherwise the called-suit flush above handles it).
       {
-        const { calledAce: ca, calledTen: ct, calledKing: ck } = view
-        const calledCardId = ca?.aceId ?? ct?.tenId ?? ck?.kingId
+        const calledCardId = rv.calledCardId
         const knownPartner = rv.resolvedPartner
         if (knownPartner !== null) {
           const nonTrumpVoids = rv.resolvedNonTrumpVoids

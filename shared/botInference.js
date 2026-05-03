@@ -12,6 +12,11 @@ const BLITZ_CARDS = {
   red:   [{ id: 'QH', rank: 'Q', suit: 'H' }, { id: 'QD', rank: 'Q', suit: 'D' }],
 }
 
+// Returns the id of the called card regardless of call mode (Ace/Ten/King).
+export function getCalledCardId(view) {
+  return view.calledAce?.aceId ?? view.calledTen?.tenId ?? view.calledKing?.kingId
+}
+
 // Add cards to map, creating entry if needed.
 function addToMap(map, userId, ...cards) {
   if (map.has(userId)) {
@@ -52,7 +57,7 @@ export function knownCardLocations(view, resolvedPartner = null) {
 
   // Phase 4: Partner holds called card
   if (resolvedPartner && view.calledSuit && !view.goingAlone) {
-    const calledCardId = view.calledAce?.aceId ?? view.calledTen?.tenId ?? view.calledKing?.kingId
+    const calledCardId = getCalledCardId(view)
     if (calledCardId) {
       const rank = calledCardId.startsWith('10') ? '10' : calledCardId[0]
       const card = { id: calledCardId, rank, suit: view.calledSuit }
@@ -69,6 +74,7 @@ export function resolveView(view, userId) {
   const resolvedPartner = deducedPartner(view, userId)
   return {
     ...view,
+    calledCardId: getCalledCardId(view),
     knownLocations: knownCardLocations(view, resolvedPartner),
     resolvedPartner,
     resolvedTrumpVoids: deducedTrumpVoids(view),
@@ -437,8 +443,7 @@ export function knownNonPartners(view, userId) {
   }
   if (view.crackerId) set.add(view.crackerId)
 
-  const calledCardId =
-    view.calledAce?.aceId ?? view.calledTen?.tenId ?? view.calledKing?.kingId
+  const calledCardId = getCalledCardId(view)
   if (!view.calledSuit || !calledCardId) return set
 
   const scanTrick = (plays) => {
