@@ -12,7 +12,6 @@ const BLITZ_CARDS = {
   red:   [{ id: 'QH', rank: 'Q', suit: 'H' }, { id: 'QD', rank: 'Q', suit: 'D' }],
 }
 
-// Returns the id of the called card regardless of call mode (Ace/Ten/King).
 export function getCalledCardId(view) {
   return view.calledAce?.aceId ?? view.calledTen?.tenId ?? view.calledKing?.kingId
 }
