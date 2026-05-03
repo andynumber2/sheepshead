@@ -2422,12 +2422,11 @@ describe('decidePlay trump efficiency — trump trick (Scenario 1)', () => {
 })
 
 describe('decidePlay trump efficiency — fail trick, bot void (Scenario 2)', () => {
-  it('picker plays highest trump to get the lead on a void fail trick', () => {
+  it('picker schmears highest-point trump when trick is secured (all opponents played)', () => {
     // Clubs led. Picker (p1) void in clubs. p3(AC), p4(KC), p5(9C), p2(7S — void in clubs).
     // Current winner: p3 (AC). Picker hand: KD(rank10), JD(rank7), QS(rank1).
-    // All trump beat AC: KD(trump vs non-trump) ✓, JD ✓, QS ✓.
-    // Old lowestCard([KD,JD,QS]): JD=2pts → JD. Bug: picker wants the lead, play strongest.
-    // New: userId===picker → highestTrump(winning) = QS (rank1, lowest index).
+    // All trump beat AC. opponentsRemaining=0 → trick secured → schmear priority applies.
+    // TRUMP_SCHMEAR_PRIORITY: A, 10, K, 9, 8, 7, J, Q → KD(4pts) wins over JD(2pts) and QS(3pts).
     const view = makeTrumpEfficiencyView({
       userId: 'p1', picker: 'p1', partner: 'p2',
       hand: [c('K','D'), c('J','D'), c('Q','S')],
@@ -2438,7 +2437,7 @@ describe('decidePlay trump efficiency — fail trick, bot void (Scenario 2)', ()
         { userId: 'p2', card: c('7','S') },
       ],
     })
-    expect(decidePlay(view, 'p1')).toBe('QS')
+    expect(decidePlay(view, 'p1')).toBe('KD')
   })
 
   it('partner with >1 trump plays highest trump (point diamond) to win and lead back', () => {
