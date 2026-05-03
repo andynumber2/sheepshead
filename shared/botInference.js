@@ -151,6 +151,21 @@ export function currentWinner(trick) {
 
 // ─── Void analysis ────────────────────────────────────────────────────────────
 
+// Returns the array of fail card IDs that must be held (not buried).
+// If the hand holds all three aces, they must be held.
+// If the hand also holds all three tens, they must be held too.
+// If the hand holds all three tens but not all three aces, only aces may be buried.
+export function computeMustHold(hand) {
+  const failAces = ['AC', 'AH', 'AS']
+  const failTens = ['10C', '10H', '10S']
+  const holdsAllAces = failAces.every(id => hand.some(c => c.id === id))
+  const holdsAllTens = failTens.every(id => hand.some(c => c.id === id))
+
+  if (holdsAllAces && holdsAllTens) return [...failAces, ...failTens]
+  if (holdsAllAces) return [...failAces]
+  return []
+}
+
 // Returns 2 card IDs whose burial voids a non-trump suit with combined points >= 11,
 // or null if no qualifying void exists.
 //
@@ -159,14 +174,7 @@ export function currentWinner(trick) {
 // Among qualifying pairs, returns the highest-total pair.
 // Respects mustHold restrictions (same logic as decideBury).
 export function bestVoidBury(hand) {
-  const failAces = ['AC', 'AH', 'AS']
-  const failTens = ['10C', '10H', '10S']
-  const holdsAllAces = failAces.every(id => hand.some(c => c.id === id))
-  const holdsAllTens = failTens.every(id => hand.some(c => c.id === id))
-
-  let mustHold = []
-  if (holdsAllAces && holdsAllTens) mustHold = [...failAces, ...failTens]
-  else if (holdsAllAces) mustHold = [...failAces]
+  const mustHold = computeMustHold(hand)
 
   const eligible = hand.filter(c => !isTrump(c) && !mustHold.includes(c.id))
 

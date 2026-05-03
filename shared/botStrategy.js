@@ -6,7 +6,7 @@
 import {
   isTrump, cardPoints, effectiveSuit, trumpRank, suitRank, schwanzerCardPoints,
 } from './gameEngine.js'
-import { currentWinner, beats, handScore, bestVoidBury, teammateWinning, isGuaranteedWinner, cheapestGuaranteedWin, pickBySchmearPriority, resolveView } from './botInference.js'
+import { currentWinner, beats, handScore, bestVoidBury, computeMustHold, teammateWinning, isGuaranteedWinner, cheapestGuaranteedWin, pickBySchmearPriority, resolveView } from './botInference.js'
 
 // ─── Legal card helper ────────────────────────────────────────────────────────
 // Mirrors getLegalCardIds from the frontend; computes which cards can be played.
@@ -180,15 +180,7 @@ export function decideBury(view, userId) {
   const voidCards = bestVoidBury(hand)
   if (voidCards) return voidCards
 
-  // Replicate mustHold logic from gameEngine.bury to avoid illegal buries
-  const failAces = ['AC', 'AH', 'AS']
-  const failTens = ['10C', '10H', '10S']
-  const holdsAllAces = failAces.every(id => hand.some(c => c.id === id))
-  const holdsAllTens = failTens.every(id => hand.some(c => c.id === id))
-
-  let mustHold = []
-  if (holdsAllAces && holdsAllTens) mustHold = [...failAces, ...failTens]
-  else if (holdsAllAces) mustHold = [...failAces]
+  const mustHold = computeMustHold(hand)
 
   // Bury: non-trump first, then sorted by point value descending
   const candidates = hand
