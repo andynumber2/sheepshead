@@ -435,10 +435,9 @@ export function decidePlay(view, userId) {
       }
 
       // Picker role: try to secure the trick.
-      const ledSuitLocal = currentTrick[0].declaredSuit ?? effectiveSuit(currentTrick[0].card)
       const winningLocal = realCards.filter(card => {
         for (const play of currentTrick) {
-          if (!beats(card, play.card, ledSuitLocal)) return false
+          if (!beats(card, play.card, ledSuit)) return false
         }
         return true
       })
@@ -540,6 +539,7 @@ export function decidePlay(view, userId) {
     }
     return lowestCard(realCards).id
   } else {
+    const noTrumpPlayedYet = !currentTrick.some(p => isTrump(p.card))
     // Opponent: schmear on confirmed teammate wins — unless picker-team still to play
     // could trump over the teammate, in which case attempt a guaranteed takeover.
     if (teammateWinning(rv, userId)) {
@@ -574,10 +574,9 @@ export function decidePlay(view, userId) {
 
       if (teammateSafe) return schmearOpp(true)
 
-      const ledSuitOpp = currentTrick[0].declaredSuit ?? effectiveSuit(currentTrick[0].card)
       const winningOpp = realCards.filter(card => {
         for (const play of currentTrick) {
-          if (!beats(card, play.card, ledSuitOpp)) return false
+          if (!beats(card, play.card, ledSuit)) return false
         }
         return true
       })
@@ -594,7 +593,6 @@ export function decidePlay(view, userId) {
       // in via the trump schmear priority, or returns the lowest card if no
       // trump is held).
       const calledSuitLedUnrevealed = !view.partnerRevealed && !!view.calledSuit && ledSuit === view.calledSuit
-      const noTrumpPlayedYet = !currentTrick.some(p => isTrump(p.card))
       if (!(calledSuitLedUnrevealed && noTrumpPlayedYet)) {
         return schmearOpp()
       }
@@ -680,7 +678,6 @@ export function decidePlay(view, userId) {
       const pickerTeamWinning = winner && (winner.userId === picker || winner.userId === deducedForPredicted)
       const { calledSuit, partnerRevealed } = view
       const calledSuitLedUnrevealed = !partnerRevealed && !!calledSuit && ledSuit === calledSuit
-      const noTrumpPlayedYet = !currentTrick.some(p => isTrump(p.card))
       const pickerTeamWillWin = calledSuitLedUnrevealed && noTrumpPlayedYet
       if (pickerTeamWinning || pickerTeamWillWin) {
         const trumpCards = realCards.filter(c => isTrump(c))
