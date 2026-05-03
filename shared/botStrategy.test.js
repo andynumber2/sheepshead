@@ -1618,6 +1618,109 @@ describe('decidePlay — schmear falls back to trump A/10/K when no high-point f
   })
 })
 
+describe('decidePlay — picker schmears trump when guaranteed to take fail-led trick', () => {
+  // When the picker takes a fail-led trick with trump and the outcome is secured —
+  // either by being last out OR by holding guaranteed-winning trump — they should
+  // maximize card points via schmear priority rather than burn the cheapest trump.
+
+  it('picker plays AD not QC when last out on fail-led trick with opponent winning via trump', () => {
+    // Spades led (fail). Opponent (u3) trumped in with KD. All 4 others have played.
+    // Picker should schmear AD (11 pts) not burn QC (3 pts) — trick is secured.
+    const view = {
+      phase: 'playing',
+      hands: {
+        u1: [
+          c('QC', 'C', 'Q'),
+          c('JS', 'S', 'J'),
+          c('QH', 'H', 'Q'),
+          c('7C', 'C', '7'),
+          c('AD', 'D', 'A'),
+        ],
+        u2: [], u3: [], u4: [], u5: [],
+      },
+      currentTrick: [
+        { userId: 'u2', card: c('10S', 'S', '10') },
+        { userId: 'u3', card: c('KD', 'D', 'K') },
+        { userId: 'u4', card: c('10H', 'H', '10') },
+        { userId: 'u5', card: c('8S', 'S', '8') },
+      ],
+      tricks: [],
+      picker: 'u1',
+      partner: 'u2',
+      partnerRevealed: true,
+      callMode: 'ace',
+      calledSuit: 'S',
+      calledAce: { aceId: 'AS' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: null,
+      recrackerId: null,
+      isLeaster: false,
+      lastTrick: [],
+    }
+    // Pre-fix: bot plays QC (only guaranteed winner per isGuaranteedWinner).
+    // Post-fix: bot schmears AD (11 pts) — trick is secured, maximize points.
+    expect(decidePlay(view, 'u1')).toBe('AD')
+  })
+
+  it('picker schmears AD not QC when both are guaranteed winners and 1 opponent remains', () => {
+    // Hearts led (fail). Opponent (u3) trumped in with KD (rank 10). u5 still to play.
+    // All trump ranks 0-7 seen → both QC and AD are guaranteed winners.
+    // Pre-fix (band-aid only): cheapestGuaranteedWin returns QC (3 pts).
+    // Post-fix: schmear priority returns AD (11 pts) — trick is secured.
+    const view = {
+      phase: 'playing',
+      hands: {
+        u1: [c('QC', 'C', 'Q'), c('AD', 'D', 'A'), c('7C', 'C', '7')],
+        u2: [], u3: [], u4: [], u5: [],
+      },
+      currentTrick: [
+        { userId: 'u2', card: c('7H', 'H', '7') },
+        { userId: 'u3', card: c('KD', 'D', 'K') },
+        { userId: 'u4', card: c('8H', 'H', '8') },
+        // u5 (opponent) still to play, then u1 (picker) still to play
+      ],
+      tricks: [
+        {
+          leader: 'u3',
+          plays: [
+            { userId: 'u3', card: c('QS', 'S', 'Q') },
+            { userId: 'u4', card: c('QH', 'H', 'Q') },
+            { userId: 'u5', card: c('QD', 'D', 'Q') },
+            { userId: 'u1', card: c('JC', 'C', 'J') },
+            { userId: 'u2', card: c('JS', 'S', 'J') },
+          ],
+          winner: 'u3',
+        },
+        {
+          leader: 'u3',
+          plays: [
+            { userId: 'u3', card: c('JH', 'H', 'J') },
+            { userId: 'u4', card: c('JD', 'D', 'J') },
+            { userId: 'u5', card: c('AS', 'S', 'A') },
+            { userId: 'u1', card: c('KS', 'S', 'K') },
+            { userId: 'u2', card: c('KH', 'H', 'K') },
+          ],
+          winner: 'u3',
+        },
+      ],
+      picker: 'u1',
+      partner: 'u2',
+      partnerRevealed: true,
+      callMode: 'ace',
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: null,
+      recrackerId: null,
+      isLeaster: false,
+      lastTrick: [],
+    }
+    expect(decidePlay(view, 'u1')).toBe('AD')
+  })
+})
+
 describe('decidePlay — opponent schmear falls back to trump A/10/K when no high-point fail (#189)', () => {
   it('opponent schmears trump A when no fail A/10/K is available', () => {
     // Hearts led (fail). Picker (u2) and partner (u3) have played. Opponent u4 trumped in
