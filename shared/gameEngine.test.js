@@ -8,12 +8,12 @@ import {
   callAceUnder, crack, recrack,
   playCard, computeScores, resolveLeaster,
   setupLeaster, awardLeasterBlind, getPlayerView,
-  getLegalCards,
+  getLegalCards, beats,
 } from './gameEngine.js'
 import {
   countTrumpPlayed, trumpRemainingElsewhere,
   handScore,
-  beats, currentWinner, teammateWinning,
+  currentWinner, teammateWinning,
   bestVoidBury,
   isGuaranteedWinner,
   cheapestGuaranteedWin,  // NEW

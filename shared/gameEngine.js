@@ -711,7 +711,8 @@ function resolveTrick(plays, ledSuit) {
   return winner.userId
 }
 
-function beats(challenger, current, ledSuit) {
+export function beats(challenger, current, ledSuit) {
+  if (!current || current.hidden || current.faceDown) return true
   const cTrump = isTrump(challenger)
   const wTrump = isTrump(current)
 
