@@ -7,7 +7,7 @@ import {
   isTrump, cardPoints, effectiveSuit, trumpRank, suitRank, schwanzerCardPoints,
   getCalledCardId, beats, getLegalCards,
 } from './gameEngine.js'
-import { currentWinner, handScore, bestVoidBury, computeMustHold, teammateWinning, isGuaranteedWinner, cheapestGuaranteedWin, pickBySchmearPriority, resolveView, opponentsRemaining } from './botInference.js'
+import { currentWinner, handScore, handScoreWith, bestVoidBury, computeMustHold, teammateWinning, isGuaranteedWinner, cheapestGuaranteedWin, pickBySchmearPriority, resolveView, opponentsRemaining } from './botInference.js'
 
 // ─── Card comparison helpers ──────────────────────────────────────────────────
 
@@ -63,6 +63,10 @@ export function pickThreshold(passesSoFar) {
 
 // Parameterized core — used by the simulator to sweep base/discount values.
 export function decidePickWith(view, userId, base, discount) {
+  return decidePickWithAll(view, userId, base, discount, undefined)
+}
+
+export function decidePickWithAll(view, userId, base, discount, scoreWeights) {
   const hand = view.hands[userId]
   const visible = hand.filter(c => !c.hidden)
 
@@ -71,7 +75,7 @@ export function decidePickWith(view, userId, base, discount) {
   if (trumpCount <= 2) return false
 
   const passesSoFar = view.pickIndex ?? 0
-  return handScore(hand) >= base - discount * passesSoFar
+  return handScoreWith(hand, scoreWeights) >= base - discount * passesSoFar
 }
 
 export function decidePick(view, userId) {

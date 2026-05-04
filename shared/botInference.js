@@ -108,16 +108,23 @@ export function trumpRemainingElsewhere(view, userId) {
 // ─── Hand evaluation ──────────────────────────────────────────────────────────
 
 // Combined hand quality score for the pick decision.
-// schwanzerPts × 4 + 3 × failAces + 2 × failTens + (5 if QC).
+// schwanzerPts × 4.4 + 1.1 × failAces + 1 × failTens + (2 if QC).
 // Hidden cards are ignored — handScore is called from decidePick on the bot's own hand,
 // but the hidden filter mirrors the prior implementation for safety.
-export function handScore(hand) {
+export const DEFAULT_HAND_SCORE_WEIGHTS = { schwanzerMult: 4.4, failAcesBonus: 1.1, failTensBonus: 1, qcBonus: 2 }
+
+export function handScoreWith(hand, weights = DEFAULT_HAND_SCORE_WEIGHTS) {
+  const { schwanzerMult, failAcesBonus, failTensBonus, qcBonus } = weights
   const visible = hand.filter(c => !c.hidden)
   const schwanzerPts = visible.reduce((sum, c) => sum + schwanzerCardPoints(c), 0)
   const failAces = visible.filter(c => !isTrump(c) && c.rank === 'A').length
   const failTens = visible.filter(c => !isTrump(c) && c.rank === '10').length
   const hasQC = visible.some(c => c.id === 'QC')
-  return schwanzerPts * 4 + 3 * failAces + 2 * failTens + (hasQC ? 5 : 0)
+  return schwanzerPts * schwanzerMult + failAcesBonus * failAces + failTensBonus * failTens + (hasQC ? qcBonus : 0)
+}
+
+export function handScore(hand) {
+  return handScoreWith(hand, DEFAULT_HAND_SCORE_WEIGHTS)
 }
 
 // ─── Trick evaluation ─────────────────────────────────────────────────────────
