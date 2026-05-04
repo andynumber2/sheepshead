@@ -12,6 +12,10 @@ const BLITZ_CARDS = {
   red:   [{ id: 'QH', rank: 'Q', suit: 'H' }, { id: 'QD', rank: 'Q', suit: 'D' }],
 }
 
+export function getCalledCardId(view) {
+  return view.calledAce?.aceId ?? view.calledTen?.tenId ?? view.calledKing?.kingId
+}
+
 // Add cards to map, creating entry if needed.
 function addToMap(map, userId, ...cards) {
   if (map.has(userId)) {
@@ -52,7 +56,7 @@ export function knownCardLocations(view, resolvedPartner = null) {
 
   // Phase 4: Partner holds called card
   if (resolvedPartner && view.calledSuit && !view.goingAlone) {
-    const calledCardId = view.calledAce?.aceId ?? view.calledTen?.tenId ?? view.calledKing?.kingId
+    const calledCardId = getCalledCardId(view)
     if (calledCardId) {
       const rank = calledCardId.startsWith('10') ? '10' : calledCardId[0]
       const card = { id: calledCardId, rank, suit: view.calledSuit }
@@ -69,6 +73,7 @@ export function resolveView(view, userId) {
   const resolvedPartner = deducedPartner(view, userId)
   return {
     ...view,
+    calledCardId: getCalledCardId(view),
     knownLocations: knownCardLocations(view, resolvedPartner),
     resolvedPartner,
     resolvedTrumpVoids: deducedTrumpVoids(view),
@@ -151,6 +156,18 @@ export function currentWinner(trick) {
 
 // ─── Void analysis ────────────────────────────────────────────────────────────
 
+// Returns the array of fail card IDs that must be held (not buried).
+export function computeMustHold(hand) {
+  const failAces = ['AC', 'AH', 'AS']
+  const failTens = ['10C', '10H', '10S']
+  const holdsAllAces = failAces.every(id => hand.some(c => c.id === id))
+  const holdsAllTens = failTens.every(id => hand.some(c => c.id === id))
+
+  if (holdsAllAces && holdsAllTens) return [...failAces, ...failTens]
+  if (holdsAllAces) return [...failAces]
+  return []
+}
+
 // Returns 2 card IDs whose burial voids a non-trump suit with combined points >= 11,
 // or null if no qualifying void exists.
 //
@@ -159,14 +176,7 @@ export function currentWinner(trick) {
 // Among qualifying pairs, returns the highest-total pair.
 // Respects mustHold restrictions (same logic as decideBury).
 export function bestVoidBury(hand) {
-  const failAces = ['AC', 'AH', 'AS']
-  const failTens = ['10C', '10H', '10S']
-  const holdsAllAces = failAces.every(id => hand.some(c => c.id === id))
-  const holdsAllTens = failTens.every(id => hand.some(c => c.id === id))
-
-  let mustHold = []
-  if (holdsAllAces && holdsAllTens) mustHold = [...failAces, ...failTens]
-  else if (holdsAllAces) mustHold = [...failAces]
+  const mustHold = computeMustHold(hand)
 
   const eligible = hand.filter(c => !isTrump(c) && !mustHold.includes(c.id))
 
@@ -432,8 +442,7 @@ export function knownNonPartners(view, userId) {
   }
   if (view.crackerId) set.add(view.crackerId)
 
-  const calledCardId =
-    view.calledAce?.aceId ?? view.calledTen?.tenId ?? view.calledKing?.kingId
+  const calledCardId = getCalledCardId(view)
   if (!view.calledSuit || !calledCardId) return set
 
   const scanTrick = (plays) => {
@@ -563,4 +572,13 @@ export function pickBySchmearPriority(candidates, kind, hand) {
   }
 
   return null
+}
+
+// Returns the count of opposing players (not picker team, not self) who haven't
+// yet played in the current trick.
+export function opponentsRemaining(currentTrick, view, userId, picker, partner) {
+  const played = new Set(currentTrick.map(p => p.userId))
+  return Object.keys(view.hands).filter(id =>
+    !played.has(id) && id !== userId && id !== picker && id !== partner
+  ).length
 }
