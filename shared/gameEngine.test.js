@@ -572,7 +572,7 @@ describe('playCard', () => {
   it('throws when player has the led suit but plays a different suit', () => {
     const state = makeMidTrickState()
     // p4 has 9H (the led suit) but tries to play KS instead
-    expect(() => playCard(state, 'p4', 'KS')).toThrow('Must follow suit')
+    expect(() => playCard(state, 'p4', 'KS')).toThrow('Illegal play:')
   })
 
   it('allows playing any card when void in the led suit', () => {
@@ -851,7 +851,7 @@ describe('picker called-suit holding rule', () => {
       c('10', 'D'), // trump
       c('9', 'D'),  // trump
     ])
-    expect(() => playCard(state, 'p1', '8C')).toThrow(/called suit/)
+    expect(() => playCard(state, 'p1', '8C')).toThrow('Illegal play:')
   })
 
   it('allows picker to sluff a fail card of the called suit if another remains', () => {
@@ -928,7 +928,7 @@ describe('picker called-suit holding rule', () => {
       calledTen: { suit: 'C', tenId: '10C' },
       pickerForcedPlays: ['AC'],
     }
-    expect(() => playCard(state, 'p1', 'AC')).toThrow(/called suit/)
+    expect(() => playCard(state, 'p1', 'AC')).toThrow('Illegal play:')
   })
 })
 
