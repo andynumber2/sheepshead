@@ -551,6 +551,10 @@ export function currentPlayer(state) {
   return null
 }
 
+export function getCalledCardId(state) {
+  return state.calledAce?.aceId ?? state.calledTen?.tenId ?? state.calledKing?.kingId
+}
+
 // Determine the led suit for the current trick. When the under card is the lead,
 // the picker has declared the called suit, so we use that instead of the (hidden) card's suit.
 function getLedSuit(trick, state) {
