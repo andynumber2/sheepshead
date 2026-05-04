@@ -8,11 +8,12 @@ import {
   callAceUnder, crack, recrack,
   playCard, computeScores, resolveLeaster,
   setupLeaster, awardLeasterBlind, getPlayerView,
+  getLegalCards, beats,
 } from './gameEngine.js'
 import {
   countTrumpPlayed, trumpRemainingElsewhere,
   handScore,
-  beats, currentWinner, teammateWinning,
+  currentWinner, teammateWinning,
   bestVoidBury,
   isGuaranteedWinner,
   cheapestGuaranteedWin,  // NEW
@@ -571,7 +572,7 @@ describe('playCard', () => {
   it('throws when player has the led suit but plays a different suit', () => {
     const state = makeMidTrickState()
     // p4 has 9H (the led suit) but tries to play KS instead
-    expect(() => playCard(state, 'p4', 'KS')).toThrow('Must follow suit')
+    expect(() => playCard(state, 'p4', 'KS')).toThrow('Illegal play:')
   })
 
   it('allows playing any card when void in the led suit', () => {
@@ -850,7 +851,7 @@ describe('picker called-suit holding rule', () => {
       c('10', 'D'), // trump
       c('9', 'D'),  // trump
     ])
-    expect(() => playCard(state, 'p1', '8C')).toThrow(/called suit/)
+    expect(() => playCard(state, 'p1', '8C')).toThrow('Illegal play:')
   })
 
   it('allows picker to sluff a fail card of the called suit if another remains', () => {
@@ -927,7 +928,7 @@ describe('picker called-suit holding rule', () => {
       calledTen: { suit: 'C', tenId: '10C' },
       pickerForcedPlays: ['AC'],
     }
-    expect(() => playCard(state, 'p1', 'AC')).toThrow(/called suit/)
+    expect(() => playCard(state, 'p1', 'AC')).toThrow('Illegal play:')
   })
 })
 
@@ -3274,5 +3275,110 @@ describe('decidePlay — defender force-take to enable called-suit lead-back', (
       playedSeq: [{ userId: 'p2', card: c('9','H') }],
     })
     expect(decidePlay(view, 'p3')).toBe('JD')
+  })
+})
+
+// ─── getLegalCards ────────────────────────────────────────────────────────────
+
+// Minimal state factory — only the fields getLegalCards reads.
+function lcs(overrides = {}) {
+  return {
+    hands: { p1: [] },
+    currentTrick: [],
+    calledSuit: null,
+    partner: null,
+    partnerRevealed: false,
+    underCard: null,
+    picker: null,
+    pickerForcedPlays: [],
+    calledAce: null,
+    calledTen: null,
+    calledKing: null,
+    ...overrides,
+  }
+}
+
+describe('getLegalCards', () => {
+  it('leading with no restrictions — all hand cards are legal', () => {
+    const state = lcs({
+      hands: { p1: [c('A','H'), c('K','C')] },
+      currentTrick: null,
+    })
+    expect(getLegalCards(state, 'p1').map(c => c.id)).toEqual(['AH', 'KC'])
+  })
+
+  it('leading as partner — cannot lead called suit except with the called card', () => {
+    const state = lcs({
+      hands: { p1: [c('A','H'), c('9','H'), c('K','C')] },
+      currentTrick: null,
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH', suit: 'H' },
+      partner: 'p1',
+      partnerRevealed: false,
+    })
+    const ids = getLegalCards(state, 'p1').map(c => c.id)
+    expect(ids).toContain('AH')
+    expect(ids).not.toContain('9H')
+    expect(ids).toContain('KC')
+  })
+
+  it('following — must follow led suit when possible', () => {
+    const state = lcs({
+      hands: { p1: [c('A','H'), c('K','H'), c('K','C')] },
+      currentTrick: [{ userId: 'p2', card: c('7','H') }],
+    })
+    const ids = getLegalCards(state, 'p1').map(c => c.id)
+    expect(ids).toContain('AH')
+    expect(ids).toContain('KH')
+    expect(ids).not.toContain('KC')
+  })
+
+  it('following — any card legal when cannot follow suit', () => {
+    const state = lcs({
+      hands: { p1: [c('A','H'), c('K','C')] },
+      currentTrick: [{ userId: 'p2', card: c('7','S') }],
+    })
+    const ids = getLegalCards(state, 'p1').map(c => c.id)
+    expect(ids).toContain('AH')
+    expect(ids).toContain('KC')
+  })
+
+  it('following — partner must play called card when called suit is led', () => {
+    const state = lcs({
+      hands: { p1: [c('A','H'), c('9','H')] },
+      currentTrick: [{ userId: 'p2', card: c('K','H') }],
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH', suit: 'H' },
+      partner: 'p1',
+      partnerRevealed: false,
+    })
+    expect(getLegalCards(state, 'p1').map(c => c.id)).toEqual(['AH'])
+  })
+
+  it('following — called card cannot be played unless called suit is led', () => {
+    const state = lcs({
+      hands: { p1: [c('A','H'), c('K','C')] },
+      currentTrick: [{ userId: 'p2', card: c('9','C') }],
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH', suit: 'H' },
+    })
+    const ids = getLegalCards(state, 'p1').map(c => c.id)
+    expect(ids).not.toContain('AH')
+    expect(ids).toContain('KC')
+  })
+
+  it('following — picker must keep last called-suit card until called suit is led', () => {
+    // p1 (picker) has KH (last H, NOT the called card) and KC. C is led.
+    // The holding rule blocks KH — playing it would leave no H in hand before H is led.
+    // (AH is the called card but p1 doesn't hold it.)
+    const state = lcs({
+      hands: { p1: [c('K','H'), c('K','C')] },
+      currentTrick: [{ userId: 'p2', card: c('9','C') }],
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH', suit: 'H' },
+      picker: 'p1',
+      partnerRevealed: false,
+    })
+    expect(getLegalCards(state, 'p1').map(c => c.id)).toEqual(['KC'])
   })
 })

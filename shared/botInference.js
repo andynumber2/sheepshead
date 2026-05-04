@@ -2,7 +2,7 @@
 // Pure functions that derive facts from a player's view (own hand + played cards).
 // No decisions, no side effects. All functions receive a getPlayerView-redacted view.
 
-import { isTrump, cardPoints, schwanzerCardPoints, effectiveSuit, trumpRank, suitRank } from './gameEngine.js'
+import { isTrump, cardPoints, schwanzerCardPoints, effectiveSuit, trumpRank, suitRank, getCalledCardId, beats } from './gameEngine.js'
 
 // ─── Public knowledge ─────────────────────────────────────────────────────────
 
@@ -10,10 +10,6 @@ import { isTrump, cardPoints, schwanzerCardPoints, effectiveSuit, trumpRank, sui
 const BLITZ_CARDS = {
   black: [{ id: 'QC', rank: 'Q', suit: 'C' }, { id: 'QS', rank: 'Q', suit: 'S' }],
   red:   [{ id: 'QH', rank: 'Q', suit: 'H' }, { id: 'QD', rank: 'Q', suit: 'D' }],
-}
-
-export function getCalledCardId(view) {
-  return view.calledAce?.aceId ?? view.calledTen?.tenId ?? view.calledKing?.kingId
 }
 
 // Add cards to map, creating entry if needed.
@@ -125,22 +121,6 @@ export function handScore(hand) {
 }
 
 // ─── Trick evaluation ─────────────────────────────────────────────────────────
-
-// Returns true if challenger beats current card given the led suit.
-export function beats(challenger, current, ledSuit) {
-  if (!current || current.hidden || current.faceDown) return true
-  const cTrump = isTrump(challenger)
-  const wTrump = isTrump(current)
-  if (cTrump && !wTrump) return true
-  if (!cTrump && wTrump) return false
-  if (cTrump && wTrump) return trumpRank(challenger) < trumpRank(current)
-  const cIsLed = challenger.suit === ledSuit
-  const wIsLed = current.suit === ledSuit
-  if (cIsLed && !wIsLed) return true
-  if (!cIsLed && wIsLed) return false
-  if (challenger.suit !== current.suit) return false
-  return suitRank(challenger) < suitRank(current)
-}
 
 // Returns the play object currently winning the trick (array of {userId, card}).
 export function currentWinner(trick) {

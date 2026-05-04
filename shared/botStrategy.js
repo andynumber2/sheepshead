@@ -5,94 +5,9 @@
 
 import {
   isTrump, cardPoints, effectiveSuit, trumpRank, suitRank, schwanzerCardPoints,
+  getCalledCardId, beats, getLegalCards,
 } from './gameEngine.js'
-import { currentWinner, beats, handScore, bestVoidBury, computeMustHold, teammateWinning, isGuaranteedWinner, cheapestGuaranteedWin, pickBySchmearPriority, resolveView, getCalledCardId, opponentsRemaining } from './botInference.js'
-
-// ─── Legal card helper ────────────────────────────────────────────────────────
-// Mirrors getLegalCardIds from the frontend; computes which cards can be played.
-// Returns an array of card objects (not just IDs) so strategy code can inspect them.
-function getLegalCards(state, userId) {
-  const hand = state.hands[userId] ?? []
-  const {
-    currentTrick, calledSuit,
-    partner, partnerRevealed, underCard, picker, pickerForcedPlays = [],
-  } = state
-
-  const handCards = hand.filter(c => !c.isUnderCard)
-  const hasUnderCard = underCard && !underCard.played && userId === picker
-
-  const calledCardId = getCalledCardId(state)
-
-  // Leading
-  if (!currentTrick || currentTrick.length === 0) {
-    if (calledCardId && userId === partner && !partnerRevealed) {
-      const cards = handCards.filter(c => effectiveSuit(c) !== calledSuit || c.id === calledCardId)
-      if (hasUnderCard) cards.push({ id: 'UNDER_CARD', isUnderCard: true })
-      return cards
-    }
-    const cards = [...handCards]
-    if (hasUnderCard) cards.push({ id: 'UNDER_CARD', isUnderCard: true })
-    return cards
-  }
-
-  const first = currentTrick[0]
-  const ledSuit = first.declaredSuit ?? effectiveSuit(first.card)
-
-  // Picker with under card must play it when called suit is led
-  if (userId === picker && hasUnderCard && ledSuit === calledSuit) {
-    return [{ id: 'UNDER_CARD', isUnderCard: true }]
-  }
-
-  // Partner must play called card when called suit is led
-  if (calledCardId && userId === partner && !partnerRevealed && ledSuit === calledSuit) {
-    if (handCards.some(c => c.id === calledCardId)) {
-      return handCards.filter(c => c.id === calledCardId)
-    }
-  }
-
-  // Picker forced plays (Situation A / King case)
-  if (userId === picker && pickerForcedPlays.length > 0 && ledSuit === calledSuit) {
-    const heldForced = pickerForcedPlays.filter(cid => handCards.some(c => c.id === cid))
-    if (heldForced.length > 0) return handCards.filter(c => heldForced.includes(c.id))
-  }
-
-  // Called card cannot be played unless the called suit is led (mirrors gameEngine restriction)
-  let playableCards = (
-    calledCardId &&
-    ledSuit !== calledSuit &&
-    handCards.some(c => c.id !== calledCardId)
-  )
-    ? handCards.filter(c => c.id !== calledCardId)
-    : handCards
-
-  // Picker called-suit holding rule: until the called suit is led, the picker
-  // must keep ≥1 card of the called suit in hand (plus any pickerForcedPlays
-  // cards in ten/king calls). Mirrors gameEngine validatePlay.
-  if (
-    userId === picker &&
-    calledSuit &&
-    !partnerRevealed &&
-    ledSuit !== calledSuit &&
-    playableCards.length > 1
-  ) {
-    const filtered = playableCards.filter(card => {
-      if (pickerForcedPlays.includes(card.id)) return false
-      if (effectiveSuit(card) === calledSuit) {
-        const remaining = playableCards.filter(
-          c => c.id !== card.id && effectiveSuit(c) === calledSuit
-        ).length
-        if (remaining === 0) return false
-      }
-      return true
-    })
-    if (filtered.length > 0) playableCards = filtered
-  }
-
-  const hasSuit = playableCards.some(c => effectiveSuit(c) === ledSuit)
-  return hasSuit
-    ? playableCards.filter(c => effectiveSuit(c) === ledSuit)
-    : playableCards
-}
+import { currentWinner, handScore, bestVoidBury, computeMustHold, teammateWinning, isGuaranteedWinner, cheapestGuaranteedWin, pickBySchmearPriority, resolveView, opponentsRemaining } from './botInference.js'
 
 // ─── Card comparison helpers ──────────────────────────────────────────────────
 

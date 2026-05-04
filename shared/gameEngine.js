@@ -551,6 +551,93 @@ export function currentPlayer(state) {
   return null
 }
 
+export function getCalledCardId(state) {
+  return state.calledAce?.aceId ?? state.calledTen?.tenId ?? state.calledKing?.kingId
+}
+
+// Returns the legal cards a player can play given the current game state.
+// Mirrors getLegalCardIds in the frontend — these rules must stay in sync.
+export function getLegalCards(state, userId) {
+  const hand = state.hands[userId] ?? []
+  const {
+    currentTrick, calledSuit,
+    partner, partnerRevealed, underCard, picker, pickerForcedPlays = [],
+  } = state
+
+  const handCards = hand.filter(c => !c.isUnderCard)
+  const hasUnderCard = underCard && !underCard.played && userId === picker
+
+  const calledCardId = getCalledCardId(state)
+
+  // Leading
+  if (!currentTrick || currentTrick.length === 0) {
+    if (calledCardId && userId === partner && !partnerRevealed) {
+      const cards = handCards.filter(c => effectiveSuit(c) !== calledSuit || c.id === calledCardId)
+      if (hasUnderCard) cards.push({ id: UNDER_CARD_ID, isUnderCard: true })
+      return cards
+    }
+    const cards = [...handCards]
+    if (hasUnderCard) cards.push({ id: UNDER_CARD_ID, isUnderCard: true })
+    return cards
+  }
+
+  const first = currentTrick[0]
+  const ledSuit = first.declaredSuit ?? effectiveSuit(first.card)
+
+  // Picker with under card must play it when called suit is led
+  if (userId === picker && hasUnderCard && ledSuit === calledSuit) {
+    return [{ id: UNDER_CARD_ID, isUnderCard: true }]
+  }
+
+  // Partner must play called card when called suit is led
+  if (calledCardId && userId === partner && !partnerRevealed && ledSuit === calledSuit) {
+    if (handCards.some(c => c.id === calledCardId)) {
+      return handCards.filter(c => c.id === calledCardId)
+    }
+  }
+
+  // Picker forced plays (Situation A / King case)
+  if (userId === picker && pickerForcedPlays.length > 0 && ledSuit === calledSuit) {
+    const heldForced = pickerForcedPlays.filter(cid => handCards.some(c => c.id === cid))
+    if (heldForced.length > 0) return handCards.filter(c => heldForced.includes(c.id))
+  }
+
+  // Called card cannot be played unless the called suit is led
+  let playableCards = (
+    calledCardId &&
+    ledSuit !== calledSuit &&
+    handCards.some(c => c.id !== calledCardId)
+  )
+    ? handCards.filter(c => c.id !== calledCardId)
+    : handCards
+
+  // Picker must keep ≥1 called-suit card until the called suit is led
+  if (
+    userId === picker &&
+    calledSuit &&
+    !partnerRevealed &&
+    ledSuit !== calledSuit &&
+    playableCards.length > 1
+  ) {
+    const filtered = playableCards.filter(card => {
+      if (pickerForcedPlays.includes(card.id)) return false
+      if (effectiveSuit(card) === calledSuit) {
+        const remaining = playableCards.filter(
+          c => c.id !== card.id && effectiveSuit(c) === calledSuit
+        ).length
+        if (remaining === 0) return false
+      }
+      return true
+    })
+    if (filtered.length > 0) playableCards = filtered
+  }
+
+  const hasSuit = playableCards.some(c => effectiveSuit(c) === ledSuit)
+  return hasSuit
+    ? playableCards.filter(c => effectiveSuit(c) === ledSuit)
+    : playableCards
+}
+
 // Determine the led suit for the current trick. When the under card is the lead,
 // the picker has declared the called suit, so we use that instead of the (hidden) card's suit.
 function getLedSuit(trick, state) {
@@ -561,116 +648,9 @@ function getLedSuit(trick, state) {
 }
 
 function validatePlay(state, userId, card) {
-  const trick = state.currentTrick
-
-  // Partner cannot lead the called suit unless they lead with the called card
-  if (trick.length === 0) {
-    const calledCardId =
-      state.calledAce?.aceId || state.calledTen?.tenId || state.calledKing?.kingId
-    if (
-      calledCardId &&
-      userId === state.partner &&
-      !state.partnerRevealed &&
-      effectiveSuit(card) === state.calledSuit &&
-      card.id !== calledCardId
-    ) {
-      throw new Error(`Partner cannot lead the called suit without playing ${calledCardId}.`)
-    }
-    return
-  }
-
-  const ledSuit = getLedSuit(trick, state)
-  const hand = state.hands[userId]
-
-  // If the picker still has an under card and the called suit is led, they MUST play the under card
-  if (
-    userId === state.picker &&
-    state.underCard &&
-    !state.underCard.played &&
-    ledSuit === state.calledSuit
-  ) {
-    throw new Error('Picker must play the under card when the called suit is led.')
-  }
-
-  const hasSuit = hand.some(c => effectiveSuit(c) === ledSuit)
-
-  // Must follow suit if possible
-  if (hasSuit && effectiveSuit(card) !== ledSuit) {
-    throw new Error(`Must follow suit (${ledSuit}).`)
-  }
-
-  // Partner must play the called card (ace/ten/king) when called suit is led
-  const calledCardId =
-    state.calledAce?.aceId || state.calledTen?.tenId || state.calledKing?.kingId
-  if (
-    calledCardId &&
-    userId === state.partner &&
-    !state.partnerRevealed &&
-    ledSuit === state.calledSuit
-  ) {
-    const hasCalled = hand.some(c => c.id === calledCardId)
-    if (hasCalled && card.id !== calledCardId) {
-      throw new Error(`Partner must play ${calledCardId} when the called suit is led.`)
-    }
-  }
-
-  // Called card cannot be played unless the called suit is led
-  // (except when it's the player's only remaining card)
-  if (
-    calledCardId &&
-    card.id === calledCardId &&
-    ledSuit !== state.calledSuit &&
-    hand.some(c => c.id !== calledCardId)
-  ) {
-    throw new Error(`Cannot play ${calledCardId} unless the called suit is led.`)
-  }
-
-  // Picker forced plays (Situation A / King case): when called suit led, picker must
-  // play one of the still-held forced cards (Ace, or Ace/Ten in either order).
-  if (
-    userId === state.picker &&
-    state.pickerForcedPlays?.length > 0 &&
-    ledSuit === state.calledSuit
-  ) {
-    const heldForced = state.pickerForcedPlays.filter(cid => hand.some(c => c.id === cid))
-    if (heldForced.length > 0 && !heldForced.includes(card.id)) {
-      throw new Error(
-        `Picker must play ${heldForced.join(' or ')} when the called suit is led.`
-      )
-    }
-  }
-
-  // Picker called-suit holding rule: until the called suit is led (signalled by
-  // partnerRevealed, which flips the moment the partner plays the called card),
-  // the picker must keep at least one card of the called suit in hand for the
-  // eventual called-suit trick. In ten/king calls, each forced-play card is a
-  // required hold. Only lifts on the last trick when no alternative card exists.
-  if (
-    userId === state.picker &&
-    state.calledSuit &&
-    !state.partnerRevealed &&
-    ledSuit !== state.calledSuit
-  ) {
-    const alternatives = hand.filter(c => c.id !== card.id)
-    const isForcedPlay = (state.pickerForcedPlays ?? []).includes(card.id)
-    const isCalledSuitFail = effectiveSuit(card) === state.calledSuit
-    if (alternatives.length > 0) {
-      if (isForcedPlay) {
-        throw new Error(
-          `Picker must keep ${card.id} for when the called suit is led.`
-        )
-      }
-      if (isCalledSuitFail) {
-        const remainingCalledSuit = alternatives.filter(
-          c => effectiveSuit(c) === state.calledSuit
-        ).length
-        if (remainingCalledSuit === 0) {
-          throw new Error(
-            `Picker must keep a card of the called suit (${state.calledSuit}) until it is led.`
-          )
-        }
-      }
-    }
+  const legal = getLegalCards(state, userId).filter(c => !c.isUnderCard)
+  if (!legal.some(c => c.id === card.id)) {
+    throw new Error(`Illegal play: ${card.id} is not a legal card for ${userId}.`)
   }
 }
 
@@ -707,7 +687,8 @@ function resolveTrick(plays, ledSuit) {
   return winner.userId
 }
 
-function beats(challenger, current, ledSuit) {
+export function beats(challenger, current, ledSuit) {
+  if (!current || current.hidden || current.faceDown) return true
   const cTrump = isTrump(challenger)
   const wTrump = isTrump(current)
 
