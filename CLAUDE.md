@@ -72,7 +72,8 @@ Eventually, there will be a mobile app created which will be able to connect alo
 
 ## Branching Rules
 
-Direct pushes to `main` are blocked by a pre-push hook (`.githooks/pre-push`). Always work on a feature branch and open a PR. After merging, local branches tracking deleted remotes are auto-deleted by the post-merge hook.
+**Never commit directly to main — not even for trivial changes.** Always create a feature branch first. Direct pushes to `main` are blocked by a pre-push hook (`.githooks/pre-push`). After merging, local branches tracking deleted remotes are auto-deleted by the post-merge hook.
+
 
 ## RULES Sync
 
