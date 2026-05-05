@@ -483,21 +483,23 @@ export function decidePlay(view, userId) {
 
       if (teammateSafe) return schmearOpp(true)
 
-      const winningOpp = realCards.filter(card => {
-        for (const play of currentTrick) {
-          if (!beats(card, play.card, ledSuit)) return false
-        }
-        return true
-      })
-      const takeover = cheapestGuaranteedWin(winningOpp, rv, userId)
-      if (takeover) return takeover.id
-
-      // #163: called suit led + partner forced to play called card + no trump yet →
-      // fall through to trump-in branch (guaranteed win; pickBySchmearPriority applies).
+      // #205: calledSuitLedUnrevealed must be checked BEFORE cheapestGuaranteedWin.
+      // QC is always a guaranteed winner (rank 0), so cheapestGuaranteedWin would return
+      // QC immediately if checked first — bypassing the fall-through to Branch 3's schmear
+      // priority, which picks a cheaper trump (e.g. 10D) and preserves QC for later.
       const calledSuitLedUnrevealed = !view.partnerRevealed && !!view.calledSuit && ledSuit === view.calledSuit
       if (calledSuitLedUnrevealed && noTrumpPlayedYet) {
         // fall through to predicted-win / lead-back branches below
       } else {
+        const winningOpp = realCards.filter(card => {
+          for (const play of currentTrick) {
+            if (!beats(card, play.card, ledSuit)) return false
+          }
+          return true
+        })
+        const takeover = cheapestGuaranteedWin(winningOpp, rv, userId)
+        if (takeover) return takeover.id
+
         // #165 case 2: void in led fail + winning trump available → trump in with cheapest winner.
         // Forces picker to spend more trump or steals the trick outright.
         const voidInFail = !isTrump(currentTrick[0].card) && realCards.some(c => isTrump(c))

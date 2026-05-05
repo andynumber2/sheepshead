@@ -209,10 +209,11 @@ Only trump can win — fail-led trick, bot is partner (void in led suit), picker
   - Fail A/10/K available → dump highest-point fail A/10/K
   - No fail A/10/K → dump trump A/10/K (never J or Q)
   - Neither → play lowest card
-- Not safe AND bot can win with a guaranteed card → play lowest-point guaranteed winning card
 - Not safe AND picker-team overtake is forced (called suit led AND called card not yet played AND no trump in trick yet) → exit Branch 1; [Branch 3](#opp-trump-in) fires via its predicted-win path
   - Partner is forced to play called card on this trick, overtaking any fail winner; schmearing would donate those points to the picker team
   - Branch 2 is also skipped (it requires the called suit was NOT led); Branch 3 is the landing point
+  - Checked before guaranteed-takeover: Branch 3's schmear priority picks a better trump (e.g. 10D over QC) than cheapestGuaranteedWin would
+- Not safe AND bot can win with a guaranteed card → play lowest-point guaranteed winning card
 - Not safe AND bot void in led fail suit AND has trump that beats current winner → trump in with cheapest winning trump
   - Forces picker to spend a higher trump to retake the trick, or steals the trick outright; preserves premium trump (J/Q) for later
 - Not safe AND all other cases → play lowest non-trump (lowest card if only trump remain); do not schmear
