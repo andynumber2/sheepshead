@@ -224,14 +224,11 @@ describe('decidePlay — predicted picker-team win on called-suit lead by an opp
 })
 
 describe('decidePlay — opponent schmears via deduced partner from elimination', () => {
-  it('schmears 10S onto opp2 trump-in when partner is deduced by elimination', () => {
-    // 5 seats: u1=opp1 (led KH), u2=picker, u3=opp2 (trumped in QC), u4=bot (opp3),
-    // u5=partner (still to play, holds AH). Ace call on hearts.
-    // u4 is void in hearts, holds 10S among other cards.
-    // Deductions: u1 played non-called on called-suit lead → not partner;
-    //             u3 played non-called → not partner; u2 picker. So u5 is partner,
-    //             and u3 is a confirmed teammate currently winning the trick.
-    // Expected: schmear 10S (highest fail) onto QC.
+  it('safe schmear when deduced opponent teammate wins with guaranteed trump (QC)', () => {
+    // u3 wins with QC (rank 0 — strongest trump; nothing can beat it). u5 deduced as partner via elimination
+    // (u1/u2/u3/u4 all ruled out after u1 and u2 played H without the called AH, u3 trumped in proving void in H).
+    // teammateSafe = true (isGuaranteedWinner(QC) → true via rank-0 shortcut).
+    // Safe schmear path fires unchanged by #165: schmearOpp(true) → highest-point fail = 10S.
     const view = {
       phase: 'playing',
       hands: {
@@ -1759,5 +1756,173 @@ describe('decidePlay — opponent schmear falls back to trump A/10/K when no hig
       lastTrick: [],
     }
     expect(decidePlay(view, 'u1')).toBe('AD')
+  })
+})
+
+describe('decidePlay — opponent bot: void in led fail + winning trump → trump in with cheapest winner (#165)', () => {
+  // When a confirmed teammate is winning but not safe (picker still to play),
+  // and the bot is void in the led suit with trump that can beat the current winner,
+  // the bot plays the cheapest winning trump rather than schmearing high fail.
+
+  it('plays cheapest winning trump (not high fail) when void in led fail with pip trump available', () => {
+    // u1 leads 9S (spades, fail). Teammate u3 plays KS. Bot u4 void in S.
+    // Bot holds 8D (0-pt trump that beats KS) and 10H (10-pt fail from another suit).
+    // Picker u2 still to play. Partner deduced by recrack: u5 recracked → u5 is partner.
+    // u4 deduced: u1 cracked, u5 recracked → u5 is partner; u1, u3, u4 are opponents.
+    // u3 (teammate confirmed) wins with KS. u2 (picker) and u5 (partner) still to play.
+    const view = {
+      phase: 'playing',
+      hands: {
+        u1: [], u2: [],
+        u3: [],
+        u4: [
+          c('8D', 'D', '8'),   // trump, 0 pts — beats KS (trump > fail)
+          c('10H', 'H', '10'), // fail, 10 pts
+        ],
+        u5: [],
+      },
+      currentTrick: [
+        { userId: 'u1', card: c('9S', 'S', '9') },
+        { userId: 'u3', card: c('KS', 'S', 'K') },
+      ],
+      tricks: [],
+      picker: 'u2',
+      partner: null,
+      partnerRevealed: false,
+      callMode: 'ace',
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: 'u1',     // u1 cracked
+      recrackerId: 'u5',   // u5 recracked → u5 is partner (picker team)
+      isLeaster: false,
+      lastTrick: [],
+    }
+    // u5 recracked → u5 is partner (picker team). u1 cracked → confirmed non-partner.
+    // u3 is current winner → confirmed teammate.
+    // Threats: u2 (picker) + u5 (partner, deduced via recrack) still to play → not safe.
+    // winningTrump = [8D] (beats KS, not guaranteed). cheapestGuaranteedWin = null.
+    // Case 2: play lowestCard([8D]) = 8D, not 10H (old schmear).
+    expect(decidePlay(view, 'u4')).toBe('8D')
+  })
+
+  it('plays cheapest winning trump when teammate is winning with trump (not only fail)', () => {
+    // u1 leads 9S. Teammate u3 trumps in with 7D (lowest trump). Bot u4 void in S.
+    // Bot holds 9D (0-pt trump, beats 7D) and KH (4-pt fail).
+    // Picker u2 and partner (deduced u5) still to play.
+    const view = {
+      phase: 'playing',
+      hands: {
+        u1: [], u2: [],
+        u3: [],
+        u4: [
+          c('9D', 'D', '9'),  // trump, 0 pts, beats 7D
+          c('KH', 'H', 'K'),  // fail, 4 pts
+        ],
+        u5: [],
+      },
+      currentTrick: [
+        { userId: 'u1', card: c('9S', 'S', '9') },
+        { userId: 'u3', card: c('7D', 'D', '7') },
+      ],
+      tricks: [],
+      picker: 'u2',
+      partner: null,
+      partnerRevealed: false,
+      callMode: 'ace',
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: 'u1',
+      recrackerId: 'u5',
+      isLeaster: false,
+      lastTrick: [],
+    }
+    // u3 winning with 7D (trump). 9D beats 7D. Not guaranteed (picker has higher trump).
+    // Case 2: play 9D, not KH.
+    expect(decidePlay(view, 'u4')).toBe('9D')
+  })
+})
+
+describe('decidePlay — opponent bot: unsafe fallback plays lowest non-trump, not schmear (#165)', () => {
+
+  it('plays lowest fail (not A) when must-follow in led suit and teammate winning unsafe', () => {
+    // u1 leads 9H (hearts, fail). Teammate u3 plays KH. Bot u4 must follow hearts.
+    // Bot holds AH (11 pts) and 7H (0 pts). Picker u2 and deduced partner u5 still to play.
+    // Old: schmear AH. New: play 7H.
+    const view = {
+      phase: 'playing',
+      hands: {
+        u1: [], u2: [],
+        u3: [],
+        u4: [
+          c('AH', 'H', 'A'),  // must-follow, 11 pts
+          c('7H', 'H', '7'),  // must-follow, 0 pts
+        ],
+        u5: [],
+      },
+      currentTrick: [
+        { userId: 'u1', card: c('9H', 'H', '9') },
+        { userId: 'u3', card: c('KH', 'H', 'K') },
+      ],
+      tricks: [],
+      picker: 'u2',
+      partner: null,
+      partnerRevealed: false,
+      callMode: 'ace',
+      calledSuit: 'S',      // called suit is spades — hearts lead is NOT a called-suit lead
+      calledAce: { aceId: 'AS' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: 'u1',
+      recrackerId: 'u5',    // u5 is partner (picker team)
+      isLeaster: false,
+      lastTrick: [],
+    }
+    // KH is not a guaranteed winner (picker can trump). u5 still to play.
+    // Bot must follow hearts → realCards = [AH, 7H]. No trump in realCards.
+    // Case 2 doesn't fire (no trump in realCards). Case 3: lowest non-trump = 7H.
+    expect(decidePlay(view, 'u4')).toBe('7H')
+  })
+
+  it('plays lowest non-trump from another suit when void in led fail but no winning trump', () => {
+    // u1 leads 9S. Teammate u3 trumps in with JC (near-top trump). Bot u4 void in S.
+    // Bot holds 7D (lowest trump, cannot beat JC) and KH (4-pt fail) and 7H (0-pt fail).
+    // Old: schmear KH (high fail). New: play 7H (lowest non-trump).
+    const view = {
+      phase: 'playing',
+      hands: {
+        u1: [], u2: [],
+        u3: [],
+        u4: [
+          c('7D', 'D', '7'),  // trump, 0 pts — but does NOT beat JC
+          c('KH', 'H', 'K'),  // fail, 4 pts
+          c('7H', 'H', '7'),  // fail, 0 pts
+        ],
+        u5: [],
+      },
+      currentTrick: [
+        { userId: 'u1', card: c('9S', 'S', '9') },
+        { userId: 'u3', card: c('JC', 'C', 'J') },
+      ],
+      tricks: [],
+      picker: 'u2',
+      partner: null,
+      partnerRevealed: false,
+      callMode: 'ace',
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: 'u1',
+      recrackerId: 'u5',
+      isLeaster: false,
+      lastTrick: [],
+    }
+    // JC is second-strongest trump. 7D (rank 13) cannot beat JC (rank 2). winningTrump = [].
+    // Case 2 doesn't fire. Case 3: nonTrump = [KH, 7H]. lowestCard = 7H (0 pts).
+    expect(decidePlay(view, 'u4')).toBe('7H')
   })
 })

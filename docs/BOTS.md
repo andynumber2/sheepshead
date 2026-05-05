@@ -24,14 +24,14 @@ Both bot decisions and the human pick-suggestion go through this single function
 ### Hand Score Formula
 
 ```
-handScore = (schwanzer points) × 4
-          + 3 × (count of non-trump aces)
-          + 2 × (count of non-trump tens)
-          + 5  if the Queen of Clubs is held
+handScore = (schwanzer points) × 4.4
+          + 1.1 × (count of non-trump aces)
+          + 1   × (count of non-trump tens)
+          + 2   if the Queen of Clubs is held
 ```
 
 - **Schwanzer points** (Queen=3, Jack=2, non-Q-non-J diamond=1, else=0) — strongest signal of trump quality
-- **Queen of Clubs bonus** (+5) — QC is the highest card in the deck and never loses a trump fight
+- **Queen of Clubs bonus** (+2) — QC is the highest card in the deck and never loses a trump fight
 - **Non-trump aces and tens** — capture point density in fail; Ace and Ten of Diamonds are trump, not fail (they contribute via schwanzer points)
 
 ### Position-Aware Threshold
@@ -210,9 +210,13 @@ Only trump can win — fail-led trick, bot is partner (void in led suit), picker
   - No fail A/10/K → dump trump A/10/K (never J or Q)
   - Neither → play lowest card
 - Not safe AND bot can win with a guaranteed card → play lowest-point guaranteed winning card
-- Not safe AND picker-team overtake is forced (called suit led AND called card not yet played AND no trump in trick yet) → fall through to trump-in branch
-  - Partner is forced to play called card on this trick, overtaking any fail winner; schmearing high points would donate them to the picker team
-- Not safe AND above conditions not met → schmear anyway
+- Not safe AND picker-team overtake is forced (called suit led AND called card not yet played AND no trump in trick yet) → exit Branch 1; [Branch 3](#opp-trump-in) fires via its predicted-win path
+  - Partner is forced to play called card on this trick, overtaking any fail winner; schmearing would donate those points to the picker team
+  - Branch 2 is also skipped (it requires the called suit was NOT led); Branch 3 is the landing point
+- Not safe AND bot void in led fail suit AND has trump that beats current winner → trump in with cheapest winning trump
+  - Forces picker to spend a higher trump to retake the trick, or steals the trick outright; preserves premium trump (J/Q) for later
+- Not safe AND all other cases → play lowest non-trump (lowest card if only trump remain); do not schmear
+  - Prevents donating A/10/K to a trick the picker team may still win
 
 **Branch 2: Force-take for called-suit lead-back**
 
@@ -234,15 +238,20 @@ Bot must follow non-called fail (only fail winners available):
   - An unidentified opponent could be void and trump over
 - Opponents remaining = 0 → take with schmear-self fail priority (A, 10, K, 9, 8, 7)
 
-**Branch 3: Trump-in (fail led, picker team winning or predicted to win, bot void in led suit)**
+<a name="opp-trump-in"></a>
 
-- Trump beats current winner → trump in using trump schmear priority (A, 10, K before pips; J/Q reserved) from the set of trump that beat the current winner
+**Branch 3: Trump-in (fail led, bot void in led suit)**
+
+Fires when the picker team is currently winning OR predicted to win the trick. Two entry paths:
+
+- **Direct**: a picker-team player holds the current trick
+- **Predicted** (via Branch 1 fallthrough): called suit led AND called card not yet played this trick AND no trump played in this trick
+  - Partner is forced to play the called card later this trick, overtaking any fail winner
+  - No-trump guard prevents firing when a fellow opponent has already trumped in (their trump beats the forced card, so the picker team will not actually win)
+
+*Action (same regardless of entry path):*
+- Bot has trump that beats current winner → trump in using trump schmear priority (A, 10, K before pips; J/Q reserved)
 - No trump beats current winner → fall through to lowest card
-
-*Predicted-win extension — treat picker team as winning when:*
-- Called suit led AND called card not yet played this trick AND no trump played in this trick
-  - Partner is forced to play called card, overtaking any called-suit fail winner
-  - No-trump guard skips the case where a fellow opponent has already trumped the lead
 
 **Branch 4: Default**
 
@@ -256,7 +265,7 @@ Bot must follow non-called fail (only fail winners available):
 Used in schmear branches and force-take (0-threats-remaining) cases.
 
 **Trump priority**: A, 10, K, 9, 8, 7, J, Q
-- Same letter (J or Q): prefer weakest by trump rank (e.g., Q♦ before Q♥ before Q♠ before Q♣)
+- Same letter (J or Q): prefer weakest by trump rank (e.g., QD before QH before QS before QC)
 
 **Fail priority**: A, 10, K, 9, 8, 7
 - Same rank across suits: prefer shortest non-trump suit in hand; tiebreak alphabetical
@@ -297,7 +306,7 @@ of bot team.
 | `resolveView` | Pre-computation wrapper called once per play decision in `decidePlay`. Returns the view enriched with: `knownLocations` (card locations from blitz declarations), `resolvedPartner` (inferred partner userId or null — distinct from engine-set `view.partner`), `resolvedTrumpVoids` (Set of userIds with no trump remaining), `resolvedNonTrumpVoids` (map of userId → Set of fail suits they cannot follow), and `resolvedTrumpRemaining` (integer count of trump still held by other players). All downstream inference calls receive the enriched view. |
 | `countTrumpPlayed` | Count visible trump in completed tricks and the current trick |
 | `trumpRemainingElsewhere` | Estimate trump still held by other players: `14 − own trump − seen trump − buried trump` |
-| `handScore` | Combined pick-quality score: `schwanzerPts × 4 + 3×(non-trump aces) + 2×(non-trump tens) + 5 if QC held` |
+| `handScore` | Combined pick-quality score: `schwanzerPts × 4.4 + 1.1×(non-trump aces) + 1×(non-trump tens) + 2 if QC held` |
 | `beats` | Returns true if a challenger card beats the current winner given led suit |
 | `currentWinner` | Returns the play object currently winning a trick |
 | `bestVoidBury` | Finds the best 2-card bury that voids a non-trump suit with ≥11 combined card points |
