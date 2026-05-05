@@ -212,7 +212,10 @@ Only trump can win — fail-led trick, bot is partner (void in led suit), picker
 - Not safe AND bot can win with a guaranteed card → play lowest-point guaranteed winning card
 - Not safe AND picker-team overtake is forced (called suit led AND called card not yet played AND no trump in trick yet) → fall through to trump-in branch
   - Partner is forced to play called card on this trick, overtaking any fail winner; schmearing high points would donate them to the picker team
-- Not safe AND above conditions not met → schmear anyway
+- Not safe AND bot void in led fail suit AND has trump that beats current winner → trump in with cheapest winning trump
+  - Forces picker to spend a higher trump to retake the trick, or steals the trick outright; preserves premium trump (J/Q) for later
+- Not safe AND all other cases → play lowest non-trump (lowest card if only trump remain); do not schmear
+  - Prevents donating A/10/K to a trick the picker team may still win
 
 **Branch 2: Force-take for called-suit lead-back**
 

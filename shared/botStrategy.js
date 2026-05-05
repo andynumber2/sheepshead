@@ -492,20 +492,26 @@ export function decidePlay(view, userId) {
       const takeover = cheapestGuaranteedWin(winningOpp, rv, userId)
       if (takeover) return takeover.id
 
-      // Predicted-win override (#163): when the called suit was led by a fellow
-      // opponent, the called card has not yet been played this trick
-      // (`partnerRevealed` engine flag), and no trump has been played in this
-      // trick, the picker-team partner is forced to play the called card later
-      // this trick and will overtake any current fail-suit winner. Schmearing
-      // high points to the current leader just donates them to the picker team.
-      // Fall through to the predicted-win trump-in branch below (which trumps
-      // in via the trump schmear priority, or returns the lowest card if no
-      // trump is held).
+      // #163: called suit led + partner forced to play called card + no trump yet →
+      // fall through to trump-in branch (guaranteed win; pickBySchmearPriority applies).
       const calledSuitLedUnrevealed = !view.partnerRevealed && !!view.calledSuit && ledSuit === view.calledSuit
-      if (!(calledSuitLedUnrevealed && noTrumpPlayedYet)) {
-        return schmearOpp()
+      if (calledSuitLedUnrevealed && noTrumpPlayedYet) {
+        // fall through to predicted-win / lead-back branches below
+      } else {
+        // #165 case 2: void in led fail + winning trump available → trump in with cheapest winner.
+        // Forces picker to spend more trump or steals the trick outright.
+        const voidInFail = !isTrump(currentTrick[0].card) && realCards.some(c => isTrump(c))
+        if (voidInFail) {
+          const winningTrump = realCards.filter(c =>
+            isTrump(c) && currentTrick.every(play => beats(c, play.card, ledSuit))
+          )
+          if (winningTrump.length > 0) return lowestCard(winningTrump).id
+        }
+        // #165 case 3: universal safe fallback — play lowest non-trump regardless of suit.
+        // Do not schmear high-point fail onto a trick the picker team may win.
+        const nonTrump = realCards.filter(c => !isTrump(c))
+        return nonTrump.length > 0 ? lowestCard(nonTrump).id : lowestCard(realCards).id
       }
-      // else fall through to predicted-win / lead-back branches below
     }
     // Force-take to enable called-suit lead-back: when the called suit has not been led
     // on this trick AND the partner identity is not yet deduced, and the bot has a
