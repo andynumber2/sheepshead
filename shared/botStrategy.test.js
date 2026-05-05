@@ -397,12 +397,12 @@ describe('decidePlay — opponent schmear-anyway fallback overridden when picker
     expect(decidePlay(view, 'u4')).toBe('AD')
   })
 
-  it('regression guard: takeover path still fires when bot holds a guaranteed winner', () => {
-    // Same recrack setup, but bot u4 holds Q♣ (top trump, always guaranteed).
-    // The schmear-branch takeover path (cheapestGuaranteedWin) must still fire
-    // and the bot should win the trick with QC. The predicted-win override
-    // applies only to the schmear-anyway *fallback*, not the takeover.
-    // QC is the cheapest guaranteed winner by points (Q♣=3, A♦=11, K♦=4).
+  it('calledSuitLedUnrevealed takes priority over guaranteed-takeover: plays AD not QC (#205)', () => {
+    // Same recrack setup (u3 is partner), but bot u4 holds QC (rank-0 trump, always guaranteed)
+    // plus AD (11-pt trump). Hearts (called suit) is led; no trump played yet.
+    // calledSuitLedUnrevealed = true → fall through to Branch 3 before cheapestGuaranteedWin.
+    // Branch 3 schmear priority on winning trump [QC, AD, KD]: 'A' rank first → AD (11 pts).
+    // Playing AD is strictly better than QC: more points captured, QC preserved for later.
     const view = {
       phase: 'playing',
       hands: {
@@ -431,7 +431,7 @@ describe('decidePlay — opponent schmear-anyway fallback overridden when picker
       isLeaster: false,
       lastTrick: [],
     }
-    expect(decidePlay(view, 'u4')).toBe('QC')
+    expect(decidePlay(view, 'u4')).toBe('AD')
   })
 })
 
@@ -1924,5 +1924,56 @@ describe('decidePlay — opponent bot: unsafe fallback plays lowest non-trump, n
     // JC is second-strongest trump. 7D (rank 13) cannot beat JC (rank 2). winningTrump = [].
     // Case 2 doesn't fire. Case 3: nonTrump = [KH, 7H]. lowestCard = 7H (0 pts).
     expect(decidePlay(view, 'u4')).toBe('7H')
+  })
+})
+
+describe('decidePlay — opponent bot: calledSuitLedUnrevealed takes priority over guaranteed-takeover (#205)', () => {
+  it('plays schmear-priority trump (10D) not QC when called suit led, partner unplayed, bot holds QC', () => {
+    // Reproduces game 2 hand 1 trick 1: called suit H led. Teammate u7 winning with 10H.
+    // Bot u9 void in H, holds QC (guaranteed winner, rank 0) plus 10D, 9D (cheaper trump).
+    // Partner deduced as u1 (u6/u7/u8 all played non-AH on H-led trick → u1 is last candidate).
+    // calledSuitLedUnrevealed = true, noTrumpPlayedYet = true.
+    // Old (bug): cheapestGuaranteedWin fires first → QC returned (rank-0 shortcut).
+    // New (#205): calledSuitLedUnrevealed checked first → fall through to Branch 3 →
+    //   schmear priority on [QC, 10D, 9D] picks 10D ('10' rank before 'Q').
+    const view = {
+      phase: 'playing',
+      hands: {
+        u1: [],
+        u6: [], u7: [], u8: [],
+        u9: [
+          c('QC', 'C', 'Q'),   // trump rank 0 — strongest; should be preserved
+          c('10D', 'D', '10'), // trump rank 9 — 10 pts, schmear priority '10'
+          c('9D', 'D', '9'),   // trump rank 11 — 0 pts
+          c('AC', 'C', 'A'),   // fail
+          c('9S', 'S', '9'),   // fail
+          c('10C', 'C', '10'), // fail
+        ],
+      },
+      currentTrick: [
+        { userId: 'u6', card: c('9H', 'H', '9') },
+        { userId: 'u7', card: c('10H', 'H', '10') },
+        { userId: 'u8', card: c('7H', 'H', '7') },
+      ],
+      tricks: [],
+      picker: 'u8',
+      partner: null,
+      partnerRevealed: false,
+      callMode: 'ace',
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      calledTen: null,
+      calledKing: null,
+      crackerId: null,
+      recrackerId: null,
+      isLeaster: false,
+      lastTrick: [],
+    }
+    // u6, u7, u8 all played non-AH on H-led trick → knownNonPartners = {u8, u9, u6, u7}.
+    // Only u1 remains → resolvedPartner = u1. u7 (teammate) winning with 10H.
+    // calledSuitLedUnrevealed = true (H led, AH not played, calledSuit = H).
+    // noTrumpPlayedYet = true (9H, 10H, 7H are all fail).
+    // Branch 3 fires: winningTrump = [QC, 10D, 9D]. schmear priority → 10D.
+    expect(decidePlay(view, 'u9')).toBe('10D')
   })
 })
