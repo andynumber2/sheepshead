@@ -81,6 +81,8 @@ Direct pushes to `main` are blocked by a pre-push hook (`.githooks/pre-push`). A
 ## BOTS Sync
 `docs/BOTS.md` contains a plain-English description of the bot's strategy. **Whenever you change bot strategy in `shared/botStrategy.js` or `shared/botInference.js`, also update `docs/BOTS.md` to match.** When you are asked to work on bot strategy, read `docs/BOTS.md` first for context. Always compare `docs/BOTS.md` to the code before working on strategy and make sure they are consistent with each other. If they are not, STOP, and let the user know there is an inconsistency so they can decide whether to fix it or not.
 
+`docs/BOTS.md` uses a conditions-first bullet format: each branch is a bullet starting with the trigger condition (`condition → action`), with rationale in indented sub-bullets only. Maintain that format when adding or updating sections.
+
 ## General Rules
 
 When implementing any new game feature in `gameEngine.js`, write corresponding tests in `gameEngine.test.js` — unit tests for pure functions, state-construction tests for stateful functions.
