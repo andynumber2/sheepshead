@@ -111,6 +111,13 @@ When reading instructions or discussing this project, check for terminology inco
   - **Leaster** — no one picks; 6 tricks are played, but the player with the fewest card points wins
   - **Schwanzer** — no one picks (Schwanzer variant active); no tricks are played — scores are based on cards in each player's dealt hand
 - **Trick** — 5 cards played, one by each player.
+- **First out / Last out** — Describes a player's position in the picking order relative to the dealer. "First out" is the player immediately left of the dealer (first chance to pick or pass); "last out" is the dealer (last chance to pick or pass).
+
+### Cards & Suits
+- **Trump** — Cards that outrank all fail-suit cards: all Queens, all Jacks, and all Diamonds (by suit). Trump rank is fixed regardless of the suit on the card.
+- **Fail suit** — A non-trump suit: Hearts, Clubs, or Spades. A card belongs to a fail suit only if it is not trump by rank (i.e., not a Queen, Jack, or Diamond).
+- **Trump tight** — A player whose hand consists entirely of trump cards.
+- **Shortest suit / Longest suit** — The fail suit a player holds the fewest / most cards of.
 
 ### Roles
 - **Picker** — The player who picked up the blind.
@@ -121,4 +128,7 @@ When reading instructions or discussing this project, check for terminology inco
 ### Points & Scores
 - **Score** — A signed integer delta awarded to each player at the end of a hand (e.g. +2, -1). Accumulates into game, day, and lifetime totals.
 - **Card Points** — 120 total per hand. Used to determine the hand outcome in all variants except Schwanzer.
+- **Schneider** — A lopsided hand outcome where one team dominates in card points, triggering an extra scoring multiplier.
+- **Crack** — A pre-play action by opponents that escalates the hand's stakes.
+- **Re-crack** — A picker-team response to a crack that escalates stakes further.
 - **Schwanzer Points** — Used in the Schwanzer no-pick variant to determine the loser.
