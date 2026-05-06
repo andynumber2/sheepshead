@@ -154,7 +154,8 @@ export function decideCall(view, userId) {
 
     if (underSuits.length > 0) {
       const suit = underSuits[0]
-      const underCard = lowestCard(hand)
+      const fails = hand.filter(c => !isTrump(c))
+      const underCard = fails.length > 0 ? lowestCard(fails) : weakestTrump(hand)
       return { type: 'ace_under', suit, underCardId: underCard.id }
     }
 
