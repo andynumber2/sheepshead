@@ -154,10 +154,7 @@ export function decideCall(view, userId) {
 
     if (underSuits.length > 0) {
       const suit = underSuits[0]
-      // Pick lowest-value non-trump card as under card; fall back to lowest trump
-      const underCard =
-        hand.filter(c => !isTrump(c)).sort((a, b) => cardPoints(a) - cardPoints(b))[0]
-        ?? [...hand].sort((a, b) => cardPoints(a) - cardPoints(b))[0]
+      const underCard = lowestCard(hand)
       return { type: 'ace_under', suit, underCardId: underCard.id }
     }
 
