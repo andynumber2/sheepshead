@@ -1366,6 +1366,48 @@ describe('decidePlay — Case 4: partner trump lead-back timing', () => {
   })
 })
 
+describe('decidePlay — partner leading with no trump avoids called suit', () => {
+  // u1=picker, u2=partner (leading), u3..u5=opponents, calledSuit='H'
+  function partnerNoTrumpLeadView({ hand, lastTrick = [] }) {
+    return {
+      phase: 'playing',
+      hands: { u1: [], u2: hand, u3: [], u4: [], u5: [] },
+      currentTrick: [],
+      tricks: [],
+      picker: 'u1',
+      partner: 'u2',
+      partnerRevealed: true,
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      isLeaster: false,
+      lastTrick,
+    }
+  }
+
+  it('leads lowest non-called-suit fail when alternatives exist (never leads called suit)', () => {
+    // Partner holds called-suit fails (7H, 9H) and non-called fails (KS=4pts, 8C=0pts).
+    // Under the old code: lastTrumpCount=0 ≤ 3 → incorrectly returns '7H' (lowest called).
+    // Expected: 8C — lowestCard of non-called fails (0 pts < 4 pts).
+    const hand = [
+      c('7H', 'H', '7'),
+      c('9H', 'H', '9'),
+      c('KS', 'S', 'K'),
+      c('8C', 'C', '8'),
+    ]
+    expect(decidePlay(partnerNoTrumpLeadView({ hand }), 'u2')).toBe('8C')
+  })
+
+  it('leads lowest called-suit fail when all fails are called suit (no choice)', () => {
+    // Partner holds only Hearts (called suit). No non-called alternative. Must lead Hearts.
+    const hand = [
+      c('KH', 'H', 'K'),
+      c('7H', 'H', '7'),
+      c('9H', 'H', '9'),
+    ]
+    expect(decidePlay(partnerNoTrumpLeadView({ hand }), 'u2')).toBe('7H')
+  })
+})
+
 describe('decidePlay — opponent plays cheapest trump when picker-team winner is unbeatable (#169)', () => {
   it('plays lowest trump instead of highest when no trump can beat current winner', () => {
     // Fail led (9H). Picker u2 already played QC (rank 0, highest trump possible).

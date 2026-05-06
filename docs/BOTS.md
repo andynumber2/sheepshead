@@ -122,8 +122,7 @@ Priority order:
 - Partner holds ≥ 2 trump AND strongest trump is not a guaranteed winner AND partner holds ≥ 1 fail card → lead lowest-point fail card instead of trump
   - Preserves trump for later; exception to default lead-trump rule
 - Trump available (and fail-lead exception above did not fire) → lead highest trump
-- No trump, bot is partner, last trick had ≤ 3 trump played → lead lowest called-suit card
-- No trump, bot is partner, last trick had > 3 trump played → lead lowest-point fail card
+- No trump, bot is partner → lead lowest non-called-suit fail card (never leads called suit unless it's the only option)
 - No trump, bot is not partner, safe fail suits available → lead highest-value card among safe suits
   - "Safe" = no opponent known void in that suit from completed trick history
 - No trump, not partner, all suits risky → lead highest-value fail card overall

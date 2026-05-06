@@ -235,17 +235,13 @@ export function decidePlay(view, userId) {
         return best.id
       }
 
-      // Partner with no trump: lead called suit if previous trick was low on trump,
-      // otherwise lead the lowest-point fail card
+      // Partner with no trump: lead lowest non-called-suit fail to avoid tipping
+      // the called suit. Only fall back to called suit if it's the only option.
       if (userId === partner) {
-        const { calledSuit, lastTrick = [] } = view
-        const lastTrumpCount = lastTrick.filter(p => !p.card?.hidden && isTrump(p.card)).length
-        if (lastTrumpCount <= 3) {
-          const calledSuitCards = realCards.filter(c => effectiveSuit(c) === calledSuit)
-          if (calledSuitCards.length > 0) return lowestCard(calledSuitCards).id
-        }
-        const fails = realCards.filter(c => !isTrump(c))
-        return fails.length > 0 ? lowestCard(fails).id : lowestCard(realCards).id
+        const { calledSuit } = view
+        const nonCalledFails = realCards.filter(c => effectiveSuit(c) !== calledSuit)
+        if (nonCalledFails.length > 0) return lowestCard(nonCalledFails).id
+        return lowestCard(realCards).id
       }
 
       // No trump; lead highest-value fail card — but avoid suits where an opponent
