@@ -87,7 +87,7 @@ Priority order:
 
 1. **Normal ace call**: suits exist where bot does NOT hold or bury the ace AND holds ≥ 1 fail card of that suit → call the ace of the qualifying suit with the fewest fail cards in hand
    - Fewest fail cards in hand = most likely an opponent holds the ace
-2. **Ace-under call**: no normal ace call possible AND suits exist where bot holds neither the ace nor any fail cards → pick an under card (cheapest non-trump; fall back to cheapest trump) and declare ace-under
+2. **Ace-under call**: no normal ace call possible AND suits exist where bot holds neither the ace nor any fail cards → pick an under card using `lowestCard` (non-trump first by points ascending; fall back to weakest trump by points then trump rank) and declare ace-under
 3. **Fallback** → go alone
 
 ### Ten Call (`callMode === 'ten'`)
