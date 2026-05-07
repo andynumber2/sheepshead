@@ -117,11 +117,8 @@ Priority order:
 
 #### Picker-team Bot Leading
 
-- Guaranteed non-trump winner available → play highest-value qualifying card
-  - "Guaranteed" = every higher same-suit card is seen AND no opponent can trump it
-- Partner holds ≥ 2 trump AND strongest trump is not a guaranteed winner AND partner holds ≥ 1 fail card → lead lowest-point fail card instead of trump
-  - Preserves trump for later; exception to default lead-trump rule
-- Trump available (and fail-lead exception above did not fire) → lead highest trump
+- Guaranteed winner available → play highest-value qualifying card (by points; trump and non-trump both eligible)
+- Trump available → lead highest trump (partner always leads trump back if able)
 - No trump, bot is partner → lead lowest non-called-suit fail card (never leads called suit unless it's the only option)
 - No trump, bot is not partner, safe fail suits available → lead highest-value card among safe suits
   - "Safe" = no opponent known void in that suit from completed trick history

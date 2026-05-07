@@ -215,25 +215,15 @@ export function decidePlay(view, userId) {
 
   if (isLeading) {
     if (isPickerTeam) {
-      // Cash any guaranteed non-trump winner: play highest-value first
-      const guaranteedFails = realCards
-        .filter(c => !isTrump(c) && isGuaranteedWinner(c, rv, userId))
+      // Cash guaranteed winners first, highest value (by points) first.
+      // Partner may cash guaranteed trump winners; picker only cashes guaranteed fails.
+      const guaranteedWinners = realCards
+        .filter(c => isGuaranteedWinner(c, rv, userId))
         .sort((a, b) => cardPoints(b) - cardPoints(a))
-      if (guaranteedFails.length > 0) return guaranteedFails[0].id
-      // Lead strongest trump to win tricks and accumulate points.
-      // Partner with 2+ trump: defer to a fail card if the strongest trump is not
-      // a guaranteed winner (preserve trump for later when they can be decisive).
+      if (guaranteedWinners.length > 0) return guaranteedWinners[0].id
+      // Lead strongest trump. Partner always leads trump back if able.
       const best = highestTrump(realCards)
-      if (best) {
-        if (userId === partner) {
-          const myTrumpCount = realCards.filter(c => isTrump(c)).length
-          const fails = realCards.filter(c => !isTrump(c))
-          if (myTrumpCount >= 2 && fails.length > 0 && !isGuaranteedWinner(best, rv, userId)) {
-            return lowestCard(fails).id
-          }
-        }
-        return best.id
-      }
+      if (best) return best.id
 
       // Partner with no trump: lead lowest non-called-suit fail to avoid tipping
       // the called suit. Only fall back to called suit if it's the only option.
