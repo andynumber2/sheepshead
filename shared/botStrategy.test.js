@@ -1264,11 +1264,9 @@ describe('decidePlay — Case 4: partner trump lead-back timing', () => {
     }
   }
 
-  it('defers to lowest-point fail when partner holds 2 weak trump and strongest is not guaranteed', () => {
+  it('leads strongest trump when no guaranteed winner exists', () => {
     // Partner holds 9D + 8D (weak trump) and fail cards (KS=4pts, 7S=0pts).
-    // No tricks have been played, so all higher-rank trump (ranks 0-10) are unseen.
-    // isGuaranteedWinner(9D) = false (QC through 8D rank 0-10 unaccounted for).
-    // Partner has 2+ trump, fails exist → should defer to lowestCard(fails) = 7S.
+    // No tricks played, so no guaranteed winners. Partner always leads trump back.
     const hand = [
       c('9D', 'D', '9'),  // trump rank 11
       c('8D', 'D', '8'),  // trump rank 12
@@ -1276,7 +1274,7 @@ describe('decidePlay — Case 4: partner trump lead-back timing', () => {
       c('7S', 'S', '7'),  // fail, 0 pts
     ]
     const view = partnerLeadView({ hand })
-    expect(decidePlay(view, 'u2')).toBe('7S')
+    expect(decidePlay(view, 'u2')).toBe('9D')
   })
 
   it('leads highest trump when strongest is a guaranteed winner', () => {
@@ -1289,6 +1287,34 @@ describe('decidePlay — Case 4: partner trump lead-back timing', () => {
     ]
     const view = partnerLeadView({ hand })
     expect(decidePlay(view, 'u2')).toBe('QC')
+  })
+
+  it('leads guaranteed trump by points, not by trump strength', () => {
+    // Partner holds QC (rank 0, guaranteed, 3pts) + AD (rank 8, also guaranteed, 11pts).
+    // Ranks 1-7 all seen in tricks → AD is guaranteed.
+    // By trump strength: QC wins. By points: AD wins (11 > 3).
+    // Expected: AD — partner cashes highest-point guaranteed trump first.
+    const hand = [
+      c('QC', 'C', 'Q'),  // trump rank 0, always guaranteed, 3 pts
+      c('AD', 'D', 'A'),  // trump rank 8, guaranteed once ranks 1-7 seen, 11 pts
+      c('KS', 'S', 'K'),  // fail
+    ]
+    const tricks = [{
+      plays: [
+        { userId: 'u3', card: c('QS', 'S', 'Q') },  // rank 1
+        { userId: 'u3', card: c('QH', 'H', 'Q') },  // rank 2
+        { userId: 'u3', card: c('QD', 'D', 'Q') },  // rank 3
+        { userId: 'u3', card: c('JC', 'C', 'J') },  // rank 4
+        { userId: 'u3', card: c('JS', 'S', 'J') },  // rank 5
+      ],
+    }, {
+      plays: [
+        { userId: 'u3', card: c('JH', 'H', 'J') },  // rank 6
+        { userId: 'u3', card: c('JD', 'D', 'J') },  // rank 7
+      ],
+    }]
+    const view = partnerLeadView({ hand, tricks })
+    expect(decidePlay(view, 'u2')).toBe('AD')
   })
 
   it('leads QS when QC was played in a prior trick (QS becomes guaranteed)', () => {
@@ -1339,9 +1365,8 @@ describe('decidePlay — Case 4: partner trump lead-back timing', () => {
     expect(decidePlay(view, 'u2')).toBe('QS')
   })
 
-  it('does not defer for the picker — picker with 2 weak trump still leads highest trump', () => {
+  it('picker leads strongest trump when none are guaranteed', () => {
     // Picker (u1) holds 9D + 8D (weak trump, not guaranteed) and fail cards.
-    // The new deferral logic is partner-only → picker should still lead highest trump (9D).
     const hand = [
       c('9D', 'D', '9'),  // trump rank 11
       c('8D', 'D', '8'),  // trump rank 12
@@ -1363,6 +1388,131 @@ describe('decidePlay — Case 4: partner trump lead-back timing', () => {
       lastTrick: [],
     }
     expect(decidePlay(view, 'u1')).toBe('9D')
+  })
+
+  it('picker leads guaranteed trump by points, not by trump strength', () => {
+    // Picker holds QC (rank 0, guaranteed, 3pts) + AD (rank 8, guaranteed, 11pts) + fail.
+    // Ranks 1-7 all seen in tricks → AD is guaranteed.
+    // Expected: AD (11pts) over QC (3pts).
+    const hand = [
+      c('QC', 'C', 'Q'),  // trump rank 0, always guaranteed, 3 pts
+      c('AD', 'D', 'A'),  // trump rank 8, guaranteed once ranks 1-7 seen, 11 pts
+      c('KS', 'S', 'K'),  // fail
+    ]
+    const tricks = [{
+      plays: [
+        { userId: 'u3', card: c('QS', 'S', 'Q') },
+        { userId: 'u3', card: c('QH', 'H', 'Q') },
+        { userId: 'u3', card: c('QD', 'D', 'Q') },
+        { userId: 'u3', card: c('JC', 'C', 'J') },
+        { userId: 'u3', card: c('JS', 'S', 'J') },
+      ],
+    }, {
+      plays: [
+        { userId: 'u3', card: c('JH', 'H', 'J') },
+        { userId: 'u3', card: c('JD', 'D', 'J') },
+      ],
+    }]
+    const view = {
+      phase: 'playing',
+      hands: { u1: hand, u2: [], u3: [], u4: [], u5: [] },
+      currentTrick: [],
+      tricks,
+      buried: [],
+      picker: 'u1',
+      partner: 'u2',
+      partnerRevealed: true,
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      isLeaster: false,
+      lastTrick: [],
+    }
+    expect(decidePlay(view, 'u1')).toBe('AD')
+  })
+})
+
+describe('decidePlay — partner with trump always leads trump, not fails', () => {
+  // u1=picker, u2=partner (leading), u3..u5=opponents, calledSuit='C'
+  // Mirrors game 2 hand 1: partner has trump available and should lead it.
+  function partnerTwoTrumpLeadView({ hand }) {
+    return {
+      phase: 'playing',
+      hands: { u1: [], u2: hand, u3: [], u4: [], u5: [] },
+      currentTrick: [],
+      tricks: [],
+      picker: 'u1',
+      partner: 'u2',
+      partnerRevealed: true,
+      calledSuit: 'C',
+      calledAce: { aceId: 'AC' },
+      isLeaster: false,
+      lastTrick: [],
+    }
+  }
+
+  it('leads strongest trump even with called-suit and non-called fails available', () => {
+    // Partner holds JS+9D (2 unguaranteed trump) and fails [8C(called), 8S, 7S].
+    // Partner always leads trump back — JS is the strongest trump.
+    const hand = [
+      c('JS', 'S', 'J'),  // trump rank 5, not guaranteed
+      c('8C', 'C', '8'),  // fail — called suit
+      c('8S', 'S', '8'),  // fail — non-called
+      c('9D', 'D', '9'),  // trump rank 11
+      c('7S', 'S', '7'),  // fail — non-called
+    ]
+    expect(decidePlay(partnerTwoTrumpLeadView({ hand }), 'u2')).toBe('JS')
+  })
+
+  it('leads strongest trump even when all fails are called suit', () => {
+    const hand = [
+      c('JS', 'S', 'J'),  // trump rank 5
+      c('8C', 'C', '8'),  // fail — called suit
+      c('9C', 'C', '9'),  // fail — called suit
+      c('9D', 'D', '9'),  // trump rank 11
+    ]
+    expect(decidePlay(partnerTwoTrumpLeadView({ hand }), 'u2')).toBe('JS')
+  })
+})
+
+describe('decidePlay — partner leading with no trump avoids called suit', () => {
+  // u1=picker, u2=partner (leading), u3..u5=opponents, calledSuit='H'
+  function partnerNoTrumpLeadView({ hand, lastTrick = [] }) {
+    return {
+      phase: 'playing',
+      hands: { u1: [], u2: hand, u3: [], u4: [], u5: [] },
+      currentTrick: [],
+      tricks: [],
+      picker: 'u1',
+      partner: 'u2',
+      partnerRevealed: true,
+      calledSuit: 'H',
+      calledAce: { aceId: 'AH' },
+      isLeaster: false,
+      lastTrick,
+    }
+  }
+
+  it('leads lowest non-called-suit fail when alternatives exist (never leads called suit)', () => {
+    // Partner holds called-suit fails (7H, 9H) and non-called fails (KS=4pts, 8C=0pts).
+    // Under the old code: lastTrumpCount=0 ≤ 3 → incorrectly returns '7H' (lowest called).
+    // Expected: 8C — lowestCard of non-called fails (0 pts < 4 pts).
+    const hand = [
+      c('7H', 'H', '7'),
+      c('9H', 'H', '9'),
+      c('KS', 'S', 'K'),
+      c('8C', 'C', '8'),
+    ]
+    expect(decidePlay(partnerNoTrumpLeadView({ hand }), 'u2')).toBe('8C')
+  })
+
+  it('leads lowest called-suit fail when all fails are called suit (no choice)', () => {
+    // Partner holds only Hearts (called suit). No non-called alternative. Must lead Hearts.
+    const hand = [
+      c('KH', 'H', 'K'),
+      c('7H', 'H', '7'),
+      c('9H', 'H', '9'),
+    ]
+    expect(decidePlay(partnerNoTrumpLeadView({ hand }), 'u2')).toBe('7H')
   })
 })
 

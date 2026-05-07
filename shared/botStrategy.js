@@ -215,37 +215,23 @@ export function decidePlay(view, userId) {
 
   if (isLeading) {
     if (isPickerTeam) {
-      // Cash any guaranteed non-trump winner: play highest-value first
-      const guaranteedFails = realCards
-        .filter(c => !isTrump(c) && isGuaranteedWinner(c, rv, userId))
+      // Cash guaranteed winners first, highest value (by points) first.
+      // Partner may cash guaranteed trump winners; picker only cashes guaranteed fails.
+      const guaranteedWinners = realCards
+        .filter(c => isGuaranteedWinner(c, rv, userId))
         .sort((a, b) => cardPoints(b) - cardPoints(a))
-      if (guaranteedFails.length > 0) return guaranteedFails[0].id
-      // Lead strongest trump to win tricks and accumulate points.
-      // Partner with 2+ trump: defer to a fail card if the strongest trump is not
-      // a guaranteed winner (preserve trump for later when they can be decisive).
+      if (guaranteedWinners.length > 0) return guaranteedWinners[0].id
+      // Lead strongest trump. Partner always leads trump back if able.
       const best = highestTrump(realCards)
-      if (best) {
-        if (userId === partner) {
-          const myTrumpCount = realCards.filter(c => isTrump(c)).length
-          const fails = realCards.filter(c => !isTrump(c))
-          if (myTrumpCount >= 2 && fails.length > 0 && !isGuaranteedWinner(best, rv, userId)) {
-            return lowestCard(fails).id
-          }
-        }
-        return best.id
-      }
+      if (best) return best.id
 
-      // Partner with no trump: lead called suit if previous trick was low on trump,
-      // otherwise lead the lowest-point fail card
+      // Partner with no trump: lead lowest non-called-suit fail to avoid tipping
+      // the called suit. Only fall back to called suit if it's the only option.
       if (userId === partner) {
-        const { calledSuit, lastTrick = [] } = view
-        const lastTrumpCount = lastTrick.filter(p => !p.card?.hidden && isTrump(p.card)).length
-        if (lastTrumpCount <= 3) {
-          const calledSuitCards = realCards.filter(c => effectiveSuit(c) === calledSuit)
-          if (calledSuitCards.length > 0) return lowestCard(calledSuitCards).id
-        }
-        const fails = realCards.filter(c => !isTrump(c))
-        return fails.length > 0 ? lowestCard(fails).id : lowestCard(realCards).id
+        const { calledSuit } = view
+        const nonCalledFails = realCards.filter(c => effectiveSuit(c) !== calledSuit)
+        if (nonCalledFails.length > 0) return lowestCard(nonCalledFails).id
+        return lowestCard(realCards).id
       }
 
       // No trump; lead highest-value fail card — but avoid suits where an opponent
