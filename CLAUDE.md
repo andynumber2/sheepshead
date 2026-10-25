@@ -74,6 +74,10 @@ Eventually, there will be a mobile app created which will be able to connect alo
 
 **Never commit directly to main — not even for trivial changes.** Always create a feature branch first. Direct pushes to `main` are blocked by a pre-push hook (`.githooks/pre-push`). After merging, local branches tracking deleted remotes are auto-deleted by the post-merge hook.
 
+## No Project Memory
+
+**Do not use Claude Code project memory (`~/.claude/projects/.../memory/`) for this project.** It is local to one machine and one user, so it does not carry over to other machines or other contributors. Record roadmap, priorities, decisions, and deferred work in durable, shared places: GitHub issues and milestones, or files committed to this repo (e.g. `docs/`, this `CLAUDE.md`).
+
 
 ## RULES Sync
 
